@@ -37,3 +37,8 @@
  .source-card .run-meta,.source-card .rolling-note,.source-card>.muted{display:none}
  .source-card .text-button{font-size:14px;margin-left:auto}.source-card strong{font-size:13px}
 }
+
+/* Ensemble controls sit with the map so the model and level rail stays compact. */
+.ensemble-panel{padding:15px 17px;margin-bottom:23px;border:1px solid #37545c;border-radius:9px;background:linear-gradient(115deg,#183238,#142630)}
+.ensemble-topline,.ensemble-actions{display:flex;align-items:center;justify-content:space-between;gap:12px}.ensemble-topline>span:last-child{font-size:12px;color:#a7c3c9}.ensemble-actions{justify-content:flex-start;margin-top:12px}.ensemble-panel p{font-size:12px;line-height:1.6;color:#acc7ce;margin:10px 0 0}.ensemble-tabs{height:37px}.member-trigger{width:150px;background:#142832;border-color:#42616b;height:37px}.spread-note{font-size:12px;line-height:1.5;color:#a9bec6;margin-top:10px}.day-ticks{gap:2px}.day-ticks button{min-width:0;font-size:11px}
+@media(max-width:580px){.ensemble-panel{margin-top:12px;margin-bottom:20px;padding:13px}.ensemble-topline{align-items:flex-start;flex-direction:column;gap:5px}.ensemble-actions{flex-wrap:wrap}.ensemble-tabs [role=tab]{padding:6px 13px}.day-ticks button{font-size:10px}.day-ticks button:nth-child(even){visibility:hidden}.day-ticks button:last-child{visibility:visible}}
