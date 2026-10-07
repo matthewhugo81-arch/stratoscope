@@ -50,6 +50,8 @@ The WebGL2 globe uses an orthographic spherical projection, with reversible came
 
 Temperature is Celsius; geopotential height is metres, with contours every 400 m labelled in dam; wind speed is m/s. Open-Meteo meteorological wind direction is converted to earth-relative components as u = -speed sin(direction), v = -speed cos(direction), then interpolated before computing speed. Lighting near the globe edge is decorative depth shading; hover values provide the unshaded numerical values. The Southern Hemisphere is explicitly outside data coverage and never filled with extrapolated Northern Hemisphere weather. Coastlines are Natural Earth 1:110m, public domain.
 
+The absolute-temperature colour scale spans −90°C to +20°C, retaining the cold-end colours and reaching orange at −20°C, red-orange at −15°C, and deeper reds above 0°C. The WebGL globe, software fallback and legend share the same Celsius anchors. Values outside the range use endpoint colours; pointer readouts still show the actual temperature. Wind and ensemble-spread scales are separate.
+
 ## Polar-vortex wind indicator
 
 The readout shows zonal-mean eastward wind **u at 60°N and 10 hPa**, in m/s. It averages signed u across every unique longitude on that latitude circle before reducing the native source grid for display: 360 samples for direct GFS, 720 for GEFS, and 1,440 for ECMWF IFS/AIFS. A repeated longitude seam is counted only once. It uses neither scalar wind speed nor the absolute value of u. The sign is retained: positive is westerly, negative is easterly, and zero is the direction-change threshold. No latitude or vertical interpolation is used.

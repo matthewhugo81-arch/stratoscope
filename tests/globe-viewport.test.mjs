@@ -2,7 +2,10 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import ts from 'typescript';
-const source=await readFile(new URL('../lib/globe.ts',import.meta.url),'utf8');
+const scaleSource=await readFile(new URL('../lib/temperature-scale.ts',import.meta.url),'utf8');
+const scaleCode=ts.transpileModule(scaleSource,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+const scaleUrl='data:text/javascript;base64,'+Buffer.from(scaleCode).toString('base64');
+const source=(await readFile(new URL('../lib/globe.ts',import.meta.url),'utf8')).replace("from './temperature-scale'",`from '${scaleUrl}'`);
 const {outputText}=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}});
 const {viewBasis,rotateBasis,projectGlobe,inverseGlobe}=await import('data:text/javascript;base64,'+Buffer.from(outputText).toString('base64'));
 for(const viewport of [{width:1120,height:630,dpr:1},{width:693,height:350,dpr:2},{width:362,height:362,dpr:3}])test(`globe fits and pointer coordinates round-trip in ${viewport.width}×${viewport.height}`,()=>{
