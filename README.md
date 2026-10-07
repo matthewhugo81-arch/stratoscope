@@ -1,28 +1,41 @@
 # Stratoscope
 
-Northern Hemisphere polar stereographic weather viewer. A Vinext/React client and Cloudflare-compatible route read NOAA GFS 1-degree data on demand.
+Interactive Northern Hemisphere stratosphere globe, built with Vinext/React and a Cloudflare-compatible data route. No API key is required.
 
-## Data
+## Sources and coverage
 
-- 100, 70, 50, 30, 20 and 10 hPa; 6-hour steps from analysis to +240 hours.
-- Temperature in Celsius, geopotential height in metres (contour labels in dam), earth-relative U/V wind components in m/s.
-- The latest completed cycle is selected by checking the +240h inventory, with an initial five-hour publication delay and fallback across prior cycles.
-- NOAA NOMADS filters a complete Northern Hemisphere grid; GRIB2 template 3.0 and packing template 5.0 are validated and decoded locally in the Worker. Other packing, missing fields, mixed runs and unsupported grids fail explicitly.
-- Raster interpolation is bilinear. Wind speed is calculated after interpolating U and V. Height contours are sampled in projection space at 400 m intervals. The colour scales are fixed across times and levels; end colours clamp out-of-scale values.
-- Pressure labels include approximate standard-atmosphere altitude only. GFS forecasts are model output, not observations. All dates are UTC.
-- Coastline data is Natural Earth 1:110m, public domain.
+| Model | Pressure levels, hPa | Timeline | Display grid |
+| --- | --- | --- | --- |
+| NOAA GFS, direct | 100, 70, 50, 30, 20, 10 | Analysis to +240 h | 1 degree |
+| ECMWF IFS 0.25 via Open-Meteo | 100, 50 | Today 00 UTC to +240 h | 10-degree sampled overview |
+| DWD ICON Global via Open-Meteo | 100, 70, 50, 30 | Today 00 UTC to +168 h | 10-degree sampled overview |
+| GFS Global via Open-Meteo | 100, 70, 50, 30 | Today 00 UTC to +240 h | 10-degree sampled overview |
 
-Sources: https://www.nco.ncep.noaa.gov/pmb/products/gfs/ and https://nomads.ncep.noaa.gov/
-Coastlines: https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_110m_coastline.geojson
+ECMWF requests for 70 and 30 hPa return null in the Open-Meteo feed checked on 7 October 2026. Unsupported levels are disabled and rejected by the API; the viewer never silently changes the source model. Open-Meteo HRES 9 km does not supply pressure-level fields, so the ECMWF source is specifically IFS 0.25.
 
-## Run
+The Open-Meteo layers are **coarse sampled maps**, not native-resolution model grids. 360 point forecasts form a 10-degree regular grid. Bilinear interpolation smooths the display but does not restore smaller-scale information. Each location is requested with nearest-cell selection and elevation downscaling disabled.
 
-`npm ci`, then `npm run dev`. `npm run build` emits the Cloudflare Worker. No API keys are required. Site identity is retained in `.openai/hosting.json`.
+NOAA fields are from one named GFS cycle. Open-Meteo supplies a rolling timeseries assembled from model updates; its timeline anchor is midnight UTC, not a claimed model initialisation. All dates are UTC.
 
-The browser checks for the latest run when opened or refreshed; no scheduled automation is required. NOAA outages are shown explicitly, retaining any previous plot with its original timestamp clearly labelled. Recent frames are cached in bounded memory on client and server.
+## Globe and units
 
-## Verification
+The WebGL2 globe uses an orthographic spherical projection, with reversible camera-basis rotation. Drag in either direction to tilt or rotate, scroll/pinch or use the buttons to zoom, and reset to the North Pole or the default tilted view. Arrow keys rotate, +/− zoom, and Home resets north. The software fallback preserves these controls if WebGL2 is unavailable.
 
-Live frames were checked at all six levels, spanning analysis to +240h. All 32,760 points in each of four fields of a +24h 10 hPa sample were independently compared with ECMWF ecCodes: maximum error below 0.0051 in display units. Invalid API inputs return HTTP 400. TypeScript and responsive browser checks are part of the initial delivery.
+Temperature is Celsius; geopotential height is metres, with contours every 400 m labelled in dam; wind speed is m/s. Open-Meteo meteorological wind direction is converted to earth-relative components as u = -speed sin(direction), v = -speed cos(direction), then interpolated before computing speed. Lighting near the globe edge is decorative depth shading; hover values provide the unshaded numerical values. The Southern Hemisphere is explicitly outside data coverage and never filled with extrapolated Northern Hemisphere weather. Coastlines are Natural Earth 1:110m, public domain.
 
-The optional `select_forecast` WebMCP tool shares the same visible state as the UI. It selects a view; it does not claim that loading has completed.
+## Requests and caching
+
+An Open-Meteo level is downloaded in six batches of 60 coordinates. Each download retrieves the full supported timeline and keeps only six-hour steps. Completed timelines and partial downloads are cached in bounded process memory and the Worker Cache API for up to 30 minutes. A temporary 429 response preserves completed batches and asks the browser to resume automatically after 65 seconds; hourly/daily quota errors remain explicit. Source outages never produce synthetic fallback weather. Previous plots retain an explicit source, pressure and timestamp label during loading.
+
+## Run and verify
+
+`npm ci`, `npm run dev`, `npm run build`. The build emits the Cloudflare Worker. Site identity is preserved in `.openai/hosting.json`.
+
+Initial direct-GFS decoder validation compared all 32,760 points of temperature, height and U/V against ECMWF ecCodes with errors below 0.0051 in display units. The interactive update verifies forward/inverse projection consistency after repeated rotations, cached timeline retrieval, resumed partial downloads, wind conversion, unsupported pressure/horizon rejection, live provider frames and browser controls.
+
+Sources:
+- https://www.nco.ncep.noaa.gov/pmb/products/gfs/
+- https://open-meteo.com/en/docs/ecmwf-api
+- https://open-meteo.com/en/docs/gfs-api
+- https://open-meteo.com/en/docs/dwd-api
+- https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_110m_coastline.geojson

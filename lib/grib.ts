@@ -1,6 +1,6 @@
 // NOAA NOMADS filtered GFS: GRIB2 grid 3.0 and simple packing 5.0.
 export type Grid = {nx:number;ny:number;lat0:number;lon0:number;dx:number;dy:number};
-export type Frame = {run:string;hour:number;level:number;valid:string;grid:Grid;temperature:number[];height:number[];u:number[];v:number[];source:string};
+export type Frame = {run:string;hour:number;level:number;valid:string;grid:Grid;temperature:number[];height:number[];u:number[];v:number[];source:string;model?:string;runKind?:'cycle'|'rolling';fetchedAt?:string};
 const signed=(v:number,bits:number)=>v&2**(bits-1)?-(v&(2**(bits-1)-1)):v;
 export function decodeGrib(buffer:ArrayBuffer){
  const d=new DataView(buffer);let pos=0;const fields:Record<string,number[]>={};let grid:Grid|undefined,run='',hour=-1,level=-1;
