@@ -1,4 +1,5 @@
 import {decodeGrib,type Frame,type Grid} from './grib';
+import {readCachedJson,writeCachedJson} from './optional-cache';
 
 type Entry={date:string;time:string;step:string;levtype:string;levelist:string;param:string;_offset:number;_length:number};
 const origin='https://data.ecmwf.int/forecasts';
@@ -41,9 +42,8 @@ export function northernGrid(values:number[],g:Grid){
  return result;
 }
 async function loadFrame(run:string,hour:number,level:number):Promise<Frame>{
- const cache=(globalThis as unknown as {caches?:{default?:Cache}}).caches?.default;
  const cacheKey=new Request(`https://stratoscope-cache.invalid/ecmwf-direct-v1/${run}/${level}/${hour}`);
- if(cache){const hit=await cache.match(cacheKey);if(hit)return await hit.json() as Frame;}
+ const cached=await readCachedJson<Frame>(cacheKey);if(cached)return cached;
  const selected=select(await inventory(run,hour),run,hour,level),fields:Partial<Record<'temperature'|'height'|'u'|'v',number[]>>={};
  // Decode one global field at a time to keep Worker memory bounded.
  for(const {entry:e,key} of selected){
@@ -55,7 +55,7 @@ async function loadFrame(run:string,hour:number,level:number):Promise<Frame>{
   fields[key]=northernGrid(decoded.fields[key],decoded.grid);
  }
  const data:Frame={run,hour,level,valid:new Date(Date.parse(run)+hour*3600000).toISOString(),grid:{nx:360,ny:91,lat0:90,lon0:0,dx:1,dy:-1},temperature:fields.temperature!,height:fields.height!,u:fields.u!,v:fields.v!,model:'ecmwf_direct',runKind:'cycle',fetchedAt:new Date().toISOString(),source:baseUrl(run,hour)+'.grib2'};
- if(cache)await cache.put(cacheKey,Response.json(data,{headers:{'Cache-Control':'public, max-age=10800'}})).catch(()=>{});
+ await writeCachedJson(cacheKey,data,10800);
  return data;
 }
 export async function ecmwfFrame(run:string,hour:number,level:number){

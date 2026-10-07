@@ -1,5 +1,6 @@
 import {MODELS,type ModelId} from './models';
 import type {Frame} from './grib';
+import {readCachedJson,writeCachedJson} from './optional-cache';
 type Bundle={at:number;frames:Frame[];nextOffset?:number};
 type Location={latitude:number;longitude:number;hourly_units:Record<string,string>;hourly:Record<string,Array<number|null>|string[]>};
 const bundles=new Map<string,Bundle>(),pending=new Map<string,Promise<Bundle>>();
@@ -19,10 +20,9 @@ export async function openMeteoFrame(model:ModelId,run:string,level:number,hour:
 }
 async function loadBundle(model:ModelId,run:string,level:number):Promise<Bundle>{
  const config=MODELS[model];if(!config.apiModel)throw Error('Select an Open-Meteo model.');
- const cache=(globalThis as unknown as {caches?:{default?:Cache}}).caches?.default;
  const key=`${model}/${run}/${level}`,cacheKey=new Request(`https://stratoscope-cache.invalid/open-meteo-v2/${key}`);
  let progress=partial.get(key);
- if(cache){const cached=await cache.match(cacheKey);if(cached){const saved=await cached.json() as Bundle;if(saved.nextOffset===360)return saved;progress=saved;}}
+ const saved=await readCachedJson<Bundle>(cacheKey);if(saved){if(saved.nextOffset===360)return saved;progress=saved;}
  if(progress&&Date.now()-progress.at>ttl){partial.delete(key);progress=undefined;}
  const now=Date.now(),grid={nx:36,ny:10,lat0:0,lon0:0,dx:10,dy:10};
  const frames:Frame[]=progress?.frames??Array.from({length:config.maxHour/6+1},(_,i)=>({run,hour:i*6,level,valid:new Date(Date.parse(run)+i*6*3600000).toISOString(),grid,temperature:[],height:[],u:[],v:[],model,runKind:'rolling',fetchedAt:new Date(now).toISOString(),source:'https://open-meteo.com/en/docs'}));
@@ -46,7 +46,7 @@ async function loadBundle(model:ModelId,run:string,level:number):Promise<Bundle>
    }
   }
   bundle.nextOffset=offset+60;partial.set(key,bundle);if(partial.size>6)partial.delete(partial.keys().next().value!);
-  if(cache)await cache.put(cacheKey,Response.json(bundle,{headers:{'Cache-Control':'public, max-age=1800'}})).catch(()=>{});
+  await writeCachedJson(cacheKey,bundle,1800);
  }
  partial.delete(key);
  return bundle;
