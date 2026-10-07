@@ -1,6 +1,7 @@
 import {decodeGrib,type Frame,type Grid} from './grib';
 import {MODELS,memberCount,type EnsembleModel} from './models';
 import {readCachedJson,writeCachedJson} from './optional-cache';
+import {zonalMeanAt60,type ZonalWind} from './zonal-wind';
 
 const ec='https://data.ecmwf.int/forecasts',noaa='https://nomads.ncep.noaa.gov';
 const fieldKeys=['temperature','height','u','v'] as const;
@@ -48,14 +49,14 @@ export function sampleNorth(values:number[],g:Grid){
  return result;
 }
 async function loadMember(model:EnsembleModel,run:string,hour:number,level:number,member:number):Promise<Frame>{
- const cacheKey=new Request(`https://stratoscope-cache.invalid/ensemble-v1/${model}/${run}/${hour}/${level}/${member}`);
+ const cacheKey=new Request(`https://stratoscope-cache.invalid/ensemble-v2/${model}/${run}/${hour}/${level}/${member}`);
  const cached=await readCachedJson<Frame>(cacheKey);if(cached)return cached;
- const fields:Partial<Record<Key,number[]>>={};let source='';
+ const fields:Partial<Record<Key,number[]>>={};let source='',zonalWind60N:ZonalWind|undefined;
  if(model==='gefs'){
   const f=gefsFile(run,hour,level,member),q=new URLSearchParams({file:f.name,[`lev_${level}_mb`]:'on',var_TMP:'on',var_HGT:'on',var_UGRD:'on',var_VGRD:'on',subregion:'',leftlon:'0',rightlon:'359.5',toplat:'90',bottomlat:'0',dir:f.dir});source=f.url;
   const r=await fetch(`${noaa}/cgi-bin/filter_gefs_atmos_0p50${f.part}.pl?${q}`,{signal:AbortSignal.timeout(60000)});if(!r.ok)throw Error(`NOAA could not supply GEFS member ${member}. Please retry later.`);
   const decoded=decodeGrib(await r.arrayBuffer());if(decoded.run!==run||decoded.hour!==hour||decoded.level!==level||decoded.member!==member)throw Error('NOAA returned a different ensemble member or forecast.');
-  for(const key of fieldKeys){if(!decoded.fields[key])throw Error('A GEFS weather field is missing');fields[key]=sampleNorth(decoded.fields[key],decoded.grid);}
+  for(const key of fieldKeys){if(!decoded.fields[key])throw Error('A GEFS weather field is missing');if(level===10&&key==='u')zonalWind60N=zonalMeanAt60(decoded.fields.u,decoded.grid);fields[key]=sampleNorth(decoded.fields[key],decoded.grid);}
  }else{
   const base=ecBase(model,run,hour,member),selected=select(await inventory(base),model,run,hour,level,member);source=base+'.grib2';
   // One global field at a time bounds memory. Each request handles just one member.
@@ -65,10 +66,12 @@ async function loadMember(model:EnsembleModel,run:string,hour:number,level:numbe
    const bytes=await r.arrayBuffer();if(bytes.byteLength!==e._length)throw Error('Incomplete ECMWF ensemble download');const decoded=decodeGrib(bytes);
    const correctMember=model==='ifs_ens'&&member===0?decoded.product===0:decoded.member===member;
    if(decoded.run!==run||decoded.hour!==hour||decoded.level!==level||!correctMember||!decoded.fields[key]||Object.keys(decoded.fields).length!==1)throw Error('ECMWF returned a different ensemble field or member.');
+   if(level===10&&key==='u')zonalWind60N=zonalMeanAt60(decoded.fields.u,decoded.grid);
    fields[key]=sampleNorth(decoded.fields[key],decoded.grid);
   }
  }
  const data:Frame={run,hour,level,valid:new Date(Date.parse(run)+hour*3600000).toISOString(),grid:{nx:360,ny:91,lat0:90,lon0:0,dx:1,dy:-1},temperature:fields.temperature!,height:fields.height!,u:fields.u!,v:fields.v!,source,model,runKind:'cycle',fetchedAt:new Date().toISOString(),ensemble:{view:'member',member,count:memberCount(model)}};
+ if(zonalWind60N)data.zonalWind60N=zonalWind60N;
  await writeCachedJson(cacheKey,data,10800);return data;
 }
 export async function ensembleMember(model:EnsembleModel,run:string,hour:number,level:number,member:number){

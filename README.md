@@ -20,7 +20,7 @@ Open http://localhost:5173. Local development uses the starter's mock sign-in id
 ```sh
 # Check types and run regression tests
 npm exec -- tsc --noEmit
-node --test tests/optional-cache.test.mjs tests/forecast-client.test.mjs
+node --test tests/optional-cache.test.mjs tests/forecast-client.test.mjs tests/zonal-wind.test.mjs
 
 # Build the Worker and run it locally
 npm run build
@@ -55,6 +55,16 @@ Direct NOAA and ECMWF fields are from one named model cycle. Direct ECMWF select
 The WebGL2 globe uses an orthographic spherical projection, with reversible camera-basis rotation. Drag to tilt or rotate. Ctrl + scroll, pinch or the buttons zoom the globe; ordinary scrolling moves the page. Left/right arrows step backward/forward by six forecast hours. With the globe focused, Shift + arrows rotate, +/− zoom, and Home resets north. Focused sliders, tabs, model menus and pressure controls retain their normal keyboard behavior. The timeline stays visible as the page scrolls, and the globe adapts to the screen size. The software fallback preserves the controls if WebGL2 is unavailable.
 
 Temperature is Celsius; geopotential height is metres, with contours every 400 m labelled in dam; wind speed is m/s. Open-Meteo meteorological wind direction is converted to earth-relative components as u = -speed sin(direction), v = -speed cos(direction), then interpolated before computing speed. Lighting near the globe edge is decorative depth shading; hover values provide the unshaded numerical values. The Southern Hemisphere is explicitly outside data coverage and never filled with extrapolated Northern Hemisphere weather. Coastlines are Natural Earth 1:110m, public domain.
+
+## Polar-vortex wind indicator
+
+The readout shows zonal-mean eastward wind **u at 60°N and 10 hPa**, in m/s. It averages signed u across every unique longitude on that latitude circle before reducing the native source grid for display: 360 samples for direct GFS, 720 for GEFS, and 1,440 for ECMWF IFS/AIFS. A repeated longitude seam is counted only once. It uses neither scalar wind speed nor the absolute value of u. The sign is retained: positive is westerly, negative is easterly, and zero is the direction-change threshold. No latitude or vertical interpolation is used.
+
+The indicator follows the selected model, run, forecast lead and member. It stays at 10 hPa when the map is switched to another pressure level, reuses the forecast cache, and waits for the selected map to finish before requesting a separate 10 hPa field. Mean and Spread views both show the mean signed zonal wind across the complete ensemble, including the control; Member shows that individual member. Missing models, incomplete latitude circles and failed downloads show an unavailable state, never a synthetic zero. Previous model/time/member values are not presented as the selected diagnostic. Older cached frames without the native diagnostic use a clearly labelled display-grid estimate.
+
+This is an **instantaneous model field**, not a daily mean, direct observation, probability of warming or formal SSW event declaration. A negative value is a reversal signal to monitor. Winter timing and event criteria matter when identifying a major SSW; see [NOAA's SSW Compendium](https://www.ncei.noaa.gov/access/metadata/landing-page/bin/iso?id=gov.noaa.ncdc:C00960).
+
+Regression tests cover signed averaging, exact latitude selection, seam handling, incomplete data, stale forecast rejection, ensemble aggregation and near-zero formatting. Independent ecCodes comparisons of all 1,440 ECMWF longitudes at initial and +240 h lead times agreed within 0.0012 m/s (the app decodes winds to 0.01 m/s). Live native diagnostics were checked for GFS, direct IFS, GEFS, IFS ENS and AIFS ENS.
 
 ## Requests and caching
 

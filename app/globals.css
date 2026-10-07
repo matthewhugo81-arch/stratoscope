@@ -89,3 +89,24 @@ footer{font-size:11px;line-height:1.5}
 @media(max-width:1100px){.plot-area{padding-right:0}.readout{padding-top:14px}.readout details{margin-top:0}.timeline{flex-wrap:nowrap}.timeline-track{flex-basis:auto}}
 @media(max-width:700px){.timeline{flex-wrap:wrap;gap:10px;padding:12px;bottom:8px}.timeline-track{flex-basis:100%;padding-top:3px}.timeline-title strong{display:inline-block;margin-right:12px}.keyboard-hint{display:inline-block}.timeline-title{flex:1}.day-ticks{margin-top:9px}.day-ticks button{font-size:10px}.day-ticks button:nth-child(even){visibility:hidden}.day-ticks button:last-child{visibility:visible}}
 @media(max-width:580px){.atlas{padding:0 14px}.workspace{padding-top:18px;gap:16px}.topbar{height:62px}.controls h1{font-size:23px;margin-bottom:14px}.plot-area{padding:0}.globe,.plot-area:has(.ensemble-panel) .globe{max-width:440px}.globe-caption{margin:0 9px 16px}.globe-tools{margin:8px 9px 0}.level{padding:7px 1px}.ensemble-panel{margin-top:0}.plot-heading h2{font-size:20px}.map-status{bottom:76px}.timeline-title .eyebrow{font-size:11px}.keyboard-hint{font-size:11px}footer{font-size:11px}}
+
+/* Signed zonal wind stays tied to 10 hPa, independently of the map layer. */
+.zonal-card{margin-top:19px;padding:13px 12px;border:1px solid #34545e;border-radius:7px;background:linear-gradient(145deg,#142d35,#10212c);min-width:0}
+.zonal-card .eyebrow{font-size:10px;letter-spacing:1px;color:#9dc8cf}
+.zonal-card h4{font-size:17px;font-weight:500;margin:5px 0 12px;letter-spacing:-.3px}
+.zonal-card h4 span{color:#688994;margin:0 3px}
+.zonal-reading{display:flex;flex-direction:column;gap:5px;min-height:57px}
+.zonal-value{font:32px/1.1 monospace;letter-spacing:-1.4px;white-space:nowrap}
+.zonal-value small{font:12px Arial,sans-serif;letter-spacing:0;color:#abc7cf}
+.zonal-direction{font-size:12px}
+.zonal-card .westerly{color:#b8edda}.zonal-card .easterly{color:#ffd093}.zonal-card .neutral{color:#d3e2eb}
+.zonal-card p{font-size:11px;line-height:1.5;margin:9px 0 0;color:#9db7c4}
+.zonal-card .zonal-context{color:#c1d6dd}
+.zonal-card .zonal-sampling{margin-top:5px;font-size:10px}
+.zonal-card .zonal-note{border-top:1px solid #2f4650;padding-top:9px;font-size:11px}
+.zonal-note span{color:#587781;margin:0 3px}
+.zonal-loading{display:flex;gap:6px;align-items:center;color:#aac3cd;font-size:12px;line-height:1.5}
+.zonal-empty{font-size:28px;line-height:1}.zonal-unavailable{font-size:12px;color:#adc1cc;line-height:1.5}
+.zonal-card .text-button{font-size:12px;text-decoration:underline}
+@media(max-width:1100px){.zonal-card{width:100%;display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px 18px;margin-top:0;padding:14px 16px}.zonal-card>.eyebrow{grid-column:1}.zonal-card h4{grid-column:1;margin:3px 0}.zonal-reading{grid-column:2;grid-row:1/4;justify-content:center}.zonal-card .zonal-context{grid-column:3;grid-row:1/3;margin:0;align-self:center}.zonal-card .zonal-sampling{grid-column:1;font-size:11px}.zonal-card .zonal-note{grid-column:3;grid-row:3/5;margin:0;padding-top:5px}.zonal-card>.zonal-unavailable{grid-column:2/4;grid-row:1/3;margin:0}}
+@media(max-width:580px){.zonal-card{grid-template-columns:1fr 1fr;gap:5px 12px;padding:13px}.zonal-card .zonal-context{grid-column:1/-1;grid-row:auto;margin-top:4px}.zonal-card .zonal-note{grid-column:1/-1;grid-row:auto;margin-top:3px}.zonal-card>.zonal-unavailable{grid-column:1/-1;grid-row:auto}.zonal-reading{grid-column:2;align-items:flex-end}.zonal-card .zonal-sampling{grid-column:1/-1}.zonal-value{font-size:30px}}
