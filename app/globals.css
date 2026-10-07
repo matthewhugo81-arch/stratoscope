@@ -162,3 +162,22 @@ footer{font-size:11px;line-height:1.5}
 .glosea-inspector label{display:flex;align-items:center;gap:6px}.glosea-inspector input,.glosea-slider{accent-color:#a8e6d6}
 .glosea-slider{width:100%;margin:14px 0}.glosea-outlook details{border-top:1px solid #2b454f;padding-top:10px}.glosea-outlook a{color:#b5efdd;text-decoration:underline}
 @media(max-width:580px){.glosea-outlook{padding:12px}.glosea-heading h2{font-size:18px}.glosea-inspector{gap:10px}.glosea-toggle{flex-wrap:wrap}.glosea-chart{overflow-x:auto}.glosea-chart svg{min-width:600px}}
+
+/* Put the map title over the viewport instead of reserving a blank band. */
+.topbar{height:48px}
+@media(min-width:1101px){.workspace{height:max(490px,calc(100dvh - 206px));padding-top:10px}}
+.plot-area{position:relative}
+.plot-heading{position:absolute;top:0;left:20px;right:20px;z-index:3;pointer-events:none;min-height:34px}
+.plot-heading>div{pointer-events:auto;background:#0b141de8;border-radius:5px}
+.plot-heading>div:first-child{padding:5px 8px}
+.plot-heading .eyebrow{display:none}
+.plot-heading h2{font-size:18px;margin:0;line-height:24px}
+.map-shell{margin-top:0}
+.globe-tools{top:40px}
+.ensemble-panel{position:relative;z-index:4}
+
+.globe-tools .fit-label{display:inline}
+@media(max-width:1150px){.plot-heading{left:16px;right:0}}
+@media(max-width:580px){.topbar{height:48px}.plot-heading{left:0;right:0}.plot-heading h2{font-size:16px}.globe-tools{top:42px}.globe-tools .fit-label{display:none}}
+
+.map-shell>.plot-heading{left:0;right:0;top:0}
