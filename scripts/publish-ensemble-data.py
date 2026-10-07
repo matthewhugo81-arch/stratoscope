@@ -13,7 +13,7 @@ import subprocess
 import tarfile
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model', choices=['gefs', 'ifs_ens', 'aifs_ens'], required=True)
+parser.add_argument('--model', choices=['gefs', 'ifs_ens', 'aifs_ens', 'icon'], required=True)
 parser.add_argument('--output', type=Path, required=True)
 args = parser.parse_args()
 repository = os.environ['GITHUB_REPOSITORY']
@@ -48,9 +48,9 @@ if old_sha:
                 target = (root/member.name).resolve()
                 assert target.is_relative_to(root) and not member.issym() and not member.islnk()
             tar.extractall(root, filter='data')
-(root/'README.md').write_text('Generated Stratoscope ensemble data. Current and preceding model runs only.\n\nThis branch is replaced automatically; source code lives on main.\nOfficial NOAA / ECMWF sources and calculation details: see the main README.\n', encoding='utf-8')
+(root/'README.md').write_text('Generated Stratoscope forecast data. Current and preceding model runs only.\n\nThis branch is replaced automatically; source code lives on main.\nOfficial NOAA / ECMWF / DWD sources and calculation details: see the main README.\n', encoding='utf-8')
 git('add', '.')
-git('commit', '-m', f"Prepared {args.model} ensemble {manifest['run']}")
+git('commit', '-m', f"Prepared {args.model} forecast {manifest['run']}")
 # Compare-and-swap is restricted to this generated branch; never main.
 git('push', f'--force-with-lease=refs/heads/{branch}:{old_sha}', 'origin', f'HEAD:refs/heads/{branch}')
 print('PUBLISHED', args.model, manifest['run'], branch)
