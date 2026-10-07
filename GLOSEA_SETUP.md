@@ -1,8 +1,6 @@
-# GloSea seasonal wind outlook — awaiting CDS activation
+# GloSea seasonal wind outlook
 
-The importer, chart and monthly workflow are implemented, but **no real CDS
-download has been tested yet**. The public chart stays hidden until a complete
-validated dataset is published. The existing six forecast models are unchanged.
+Activated on 7 October 2026 after successful authenticated CDS validation and publication of the September 2026 issue: 50 complete members, 180 valid dates. Monthly publication is enabled for the 11th at 13:17 UTC. The browser downloads only the compact prepared JSON. Failed validations preserve the previous public issue.
 
 ## One-time account setup
 

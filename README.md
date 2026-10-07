@@ -140,10 +140,10 @@ Sources:
 - https://www.weather.gov/disclaimer
 - https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_110m_coastline.geojson
 
-## GloSea seasonal wind outlook (pending activation)
+## GloSea seasonal wind outlook
 
-The optional 60N / 10hPa seasonal wind chart and CDS preparation workflow are
-implemented but await a first authenticated real-data validation. No GloSea
-forecast is displayed until a complete 50-member dataset is published. See
-[GLOSEA_SETUP.md](GLOSEA_SETUP.md) for free account setup, secret storage,
-validation gates, dates, calculations, licensing and activation instructions.
+The optional 60N / 10hPa seasonal wind chart is live below the forecast timeline.
+Its first real CDS issue was validated and published on 7 October 2026, with 50
+complete members and 180 valid dates. The monthly workflow runs on the 11th at
+13:17 UTC and publishes one compact JSON file; viewers do not query CDS.
+See [GLOSEA_SETUP.md](GLOSEA_SETUP.md) for setup, validation, dates and attribution.
