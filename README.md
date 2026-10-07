@@ -177,3 +177,18 @@ previously validated daily GloSea issue remains a fallback until its new
 Forecasts update monthly. Historical 1993–2016 data are prepared once per model
 version and start month, with yearly checkpoints for interrupted downloads.
 See [SEASONAL_DATA.md](SEASONAL_DATA.md) for methodology, schedules and checks.
+
+## Ensemble member panels
+
+All members opens a shared 10 hPa north-pole map grid, including the control,
+with a six-hour timeline and temperature/wind-speed selector. A red border and
+E marker identify native-grid zonal-mean u wind strictly below 0 m/s at 60N,
+10 hPa at the selected time. This is an easterly-wind flag, not an SSW diagnosis.
+Click a tile to inspect that member on the detailed globe.
+
+The existing ensemble preparation writes one compact gzip bundle per forecast
+time, containing 2-degree overview fields and unrounded native wind diagnostics.
+The browser downloads one bundle, never 31/51 separate member files, and saves
+it in the per-model run cache. Missing bundles are labelled pending. Prepared
+files use STRATP01 headers and are validated against model, run, lead, grid,
+member count, source and field bounds before display.
