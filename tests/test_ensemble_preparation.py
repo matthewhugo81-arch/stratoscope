@@ -18,6 +18,16 @@ RUN = datetime(2026, 10, 7, tzinfo=timezone.utc)
 
 
 class PreparationTests(unittest.TestCase):
+    def test_panel_encoding_preserves_each_native_diagnostic(self):
+        values=np.zeros((51,3,46,180));values[:,0]=-60;values[:,1]=31000;values[:,2]=25
+        diagnostics=[dict(value=-.00001 if i==0 else float(i),samples=1440,longitudeStep=.25,basis='native') for i in range(51)]
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'members.bin.gz';p.save_panels(path,'ifs_ens',RUN,360,values,diagnostics)
+            raw=gzip.decompress(path.read_bytes());self.assertEqual(raw[:8],b'STRATP01')
+            length=struct.unpack('<I',raw[8:12])[0];h=json.loads(raw[12:12+length])
+            self.assertEqual(h['zonal'][0],-.00001);self.assertEqual(h['count'],51)
+            packed=np.frombuffer(raw[12+length:],dtype='<i4').reshape(51,3,46,180)
+            np.testing.assert_array_equal(np.cumsum(packed,axis=-1)/100,values)
     def test_full_ensemble_scalar_speed_population_sd_and_native_signed_wind(self):
         entries = [('https://test.invalid/data', (m*4+k)*20, 20, m, 10, key)
                    for m in range(51) for k, key in enumerate(p.KEYS)]

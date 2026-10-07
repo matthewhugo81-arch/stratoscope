@@ -156,7 +156,7 @@ def decode_field(message, model, run, hour, member, level, key):
         ec.codes_release(handle)
 
 
-def calculate(model, run, hour, levels, workers):
+def calculate(model, run, hour, levels, workers, panel_writer=None):
     entries = noaa_entries(run, hour, levels, workers) if model == 'gefs' else ec_entries(model, run, hour, levels)
     expected = {(m, level, key) for m in range(CONFIG[model]['count']) for level in levels for key in KEYS}
     identities = [tuple(item[3:]) for item in entries]
@@ -184,8 +184,22 @@ def calculate(model, run, hour, levels, workers):
             diagnostics = [downloaded[m, 10, 'u'][1] for m in range(CONFIG[model]['count'])]
             assert all(d and d['samples'] == diagnostics[0]['samples'] for d in diagnostics)
             zonal = {**diagnostics[0], 'value': sum(d['value'] for d in diagnostics)/len(diagnostics)}
+            if panel_writer:
+                panel_writer(np.stack([values['temperature'],values['height'],wind],axis=1)[:,:,::2,::2],diagnostics)
         results[level] = (planes, zonal)
     return results
+
+
+def save_panels(path,model,run,hour,values,diagnostics):
+    count=CONFIG[model]['count']
+    assert values.shape==(count,3,46,180) and np.isfinite(values).all()
+    assert len(diagnostics)==count and all(d and np.isfinite(d['value']) for d in diagnostics)
+    header=json.dumps(dict(version=1,model=model,run=run.isoformat(timespec='milliseconds').replace('+00:00','Z'),hour=hour,level=10,count=count,grid=dict(nx=180,ny=46,lat0=90,lon0=0,dx=2,dy=-2),scale=100,planes=3,zonal=[d['value'] for d in diagnostics],samples=diagnostics[0]['samples'],source=NOAA_ORIGIN if model=='gefs' else EC_ORIGIN),separators=(',',':')).encode()
+    arrays=np.rint(values*100).astype('<i4')
+    arrays[:,:,:,1:]-=arrays[:,:,:,:-1].copy()
+    payload=gzip.compress(b'STRATP01'+struct.pack('<I',len(header))+header+arrays.tobytes(),compresslevel=6,mtime=0)
+    path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(payload)
+    return dict(bytes=len(payload),sha256=hashlib.sha256(payload).hexdigest())
 
 
 def save_frame(path, model, run, hour, level, planes, zonal):
@@ -222,7 +236,10 @@ def main():
     manifest = {'version': 1, 'model': args.model, 'run': run.isoformat(timespec='milliseconds').replace('+00:00', 'Z'), 'maxHour': max(hours), 'levels': levels, 'step': 6, 'count': config['count'], 'files': {}, 'complete': hours == list(range(0, config['maxHour']+1, 6)) and levels == config['levels']}
     for hour in hours:
         started = time.monotonic()
-        result = calculate(args.model, run, hour, levels, args.workers)
+        def panel_writer(values,diagnostics):
+            filename=f'{run_key}/10/{hour}.members.bin.gz'
+            manifest.setdefault('panels',{})[str(hour)]={'path':filename,**save_panels(args.output/filename,args.model,run,hour,values,diagnostics)}
+        result = calculate(args.model, run, hour, levels, args.workers,panel_writer)
         for level, (planes, zonal) in result.items():
             filename = f'{run_key}/{level}/{hour}.bin.gz'
             manifest['files'][f'{level}/{hour}'] = {'path': filename, **save_frame(args.output/filename, args.model, run, hour, level, planes, zonal)}
