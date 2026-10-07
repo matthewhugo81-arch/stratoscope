@@ -139,3 +139,11 @@ Sources:
 - https://www.nco.ncep.noaa.gov/pmb/products/gens/
 - https://www.weather.gov/disclaimer
 - https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_110m_coastline.geojson
+
+## GloSea seasonal wind outlook (pending activation)
+
+The optional 60N / 10hPa seasonal wind chart and CDS preparation workflow are
+implemented but await a first authenticated real-data validation. No GloSea
+forecast is displayed until a complete 50-member dataset is published. See
+[GLOSEA_SETUP.md](GLOSEA_SETUP.md) for free account setup, secret storage,
+validation gates, dates, calculations, licensing and activation instructions.

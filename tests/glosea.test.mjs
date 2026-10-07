@@ -1,0 +1,11 @@
+import {test,afterEach} from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import ts from 'typescript';
+const source=await readFile(new URL('../lib/glosea.ts',import.meta.url),'utf8');
+const {validateGloSea,fetchGloSea,GLOSEA_SOURCE,GLOSEA_URL}=await import('data:text/javascript;base64,'+Buffer.from(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText).toString('base64'));
+const originalFetch=globalThis.fetch;afterEach(()=>globalThis.fetch=originalFetch);
+function fixture(){const start=Date.parse('2026-09-01T00:00:00.000Z'),stamp=d=>new Date(start+d*86400000).toISOString();return {version:1,model:'glosea',system:'610',complete:true,nominal:stamp(0),preparedAt:stamp(10),source:GLOSEA_SOURCE,latitude:60,level:10,units:'m/s',sampling:'00 UTC daily samples',memberCount:50,dates:Array.from({length:180},(_,i)=>stamp(i+1)),members:Array.from({length:50},(_,i)=>({id:stamp(-Math.floor(i/2)).slice(0,10).replaceAll('-','')+'-'+i%2,start:stamp(-Math.floor(i/2)),values:Array(180).fill(i%2?10:-20)})),mean:Array(180).fill(-5),easterlyFraction:Array(180).fill(.5),attribution:'TEST FIXTURE ONLY',method:'TEST FIXTURE ONLY'};}
+test('signed wind, equal weights and valid-date alignment survive validation',()=>{const d=validateGloSea(fixture());assert.equal(d.mean[0],-5);assert.equal(d.easterlyFraction[0],.5);});
+test('reject partial ensembles, wrong diagnostics and shifted valid dates',()=>{for(const mutate of [d=>d.members.pop(),d=>d.members[0].values.pop(),d=>d.mean[0]=0,d=>d.easterlyFraction[0]=.7,d=>d.dates.reverse(),d=>d.level=50,d=>d.source='https://example.org',d=>d.members[1].id=d.members[0].id]){const d=fixture();mutate(d);assert.throws(()=>validateGloSea(d));}});
+test('no published data keeps outlook hidden; one compact file supplies all members',async()=>{globalThis.fetch=async()=>new Response('',{status:404});assert.equal(await fetchGloSea(new AbortController().signal),null);let count=0;globalThis.fetch=async url=>{count++;assert.equal(url,GLOSEA_URL);return Response.json(fixture())};assert.equal((await fetchGloSea(new AbortController().signal)).members.length,50);assert.equal(count,1);});

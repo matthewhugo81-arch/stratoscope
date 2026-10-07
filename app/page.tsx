@@ -9,6 +9,7 @@ import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue} from '@/compo
 import {PolarMap} from '@/components/polar-map';
 import {ZonalWindCard} from '@/components/zonal-wind-card';
 import {ForecastStamps} from '@/components/forecast-stamps';
+import {GloSeaOutlook} from '@/components/glosea-outlook';
 import {MODELS,isModel,isCycle,isEnsemble,memberCount,supports,type ModelId,type ForecastMeta,type EnsembleView} from '@/lib/models';
 import {loadForecast,peekForecast,clearForecastCache,activateForecastSequence} from '@/lib/forecast-client';
 import {forecastMeta} from '@/lib/forecast-transport';
@@ -129,6 +130,7 @@ export default function Home(){
    </div>
   </section>
   {showStamps&&<ForecastStamps times={times} hour={hour} run={run} field={field} onSelect={chooseHour}/>}
+  <GloSeaOutlook/>
 
   <footer><span>STRATOSCOPE <b> / </b> NORTHERN HEMISPHERE</span><span>{noaaSource?'NOAA / NCEP':ecSource?<a href="https://www.ecmwf.int/en/forecasts/datasets/open-data" target="_blank" rel="noreferrer">ECMWF · CC BY 4.0</a>:<a href="https://www.dwd.de/EN/service/legal_notice/legal_notice_node.html" target="_blank" rel="noreferrer">DWD · CC BY 4.0</a>} <i>·</i> All times UTC</span></footer>
  </main>
