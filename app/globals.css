@@ -42,3 +42,50 @@
 .ensemble-panel{padding:15px 17px;margin-bottom:23px;border:1px solid #37545c;border-radius:9px;background:linear-gradient(115deg,#183238,#142630)}
 .ensemble-topline,.ensemble-actions{display:flex;align-items:center;justify-content:space-between;gap:12px}.ensemble-topline>span:last-child{font-size:12px;color:#a7c3c9}.ensemble-actions{justify-content:flex-start;margin-top:12px}.ensemble-panel p{font-size:12px;line-height:1.6;color:#acc7ce;margin:10px 0 0}.ensemble-tabs{height:37px}.member-trigger{width:150px;background:#142832;border-color:#42616b;height:37px}.spread-note{font-size:12px;line-height:1.5;color:#a9bec6;margin-top:10px}.day-ticks{gap:2px}.day-ticks button{min-width:0;font-size:11px}
 @media(max-width:580px){.ensemble-panel{margin-top:12px;margin-bottom:20px;padding:13px}.ensemble-topline{align-items:flex-start;flex-direction:column;gap:5px}.ensemble-actions{flex-wrap:wrap}.ensemble-tabs [role=tab]{padding:6px 13px}.day-ticks button{font-size:10px}.day-ticks button:nth-child(even){visibility:hidden}.day-ticks button:last-child{visibility:visible}}
+
+/* Keep the forecast controls in reach without scaling down readable type. */
+html{overflow-y:scroll;scrollbar-gutter:stable;scrollbar-width:auto;scrollbar-color:#587787 #0b141d;scroll-padding-bottom:130px}
+::-webkit-scrollbar{width:12px;height:12px}
+::-webkit-scrollbar-track{background:#0b141d}
+::-webkit-scrollbar-thumb{background:#587787;border:3px solid #0b141d;border-radius:8px}
+body{min-width:320px}
+.atlas{max-width:1640px;padding:0 28px}
+.topbar{height:68px}
+.workspace{min-height:0;gap:24px;padding:20px 0}
+.controls h1{font-size:25px;margin:9px 0 18px}
+.model-control{margin-bottom:18px}
+.section-label{margin-bottom:9px}
+.control-section{margin-bottom:16px}
+.level-list{gap:2px}
+.level{padding:4px 10px;min-height:35px}
+.level>span:nth-child(2){font-size:18px}
+.footnote{line-height:1.6;margin-top:10px}
+.toggle-row{margin:12px 0}
+.source-card{padding-top:13px;gap:6px}
+.plot-area{padding:0 20px}
+.plot-heading h2{font-size:21px;margin-top:6px}
+.map-shell{margin-top:4px}
+.globe-tools{margin-top:10px}
+.globe{max-width:clamp(280px,calc(100dvh - 410px),580px)}
+.globe-caption{margin:0 0 14px;gap:10px}
+.globe .probe{width:max-content;max-width:calc(100% - 16px);flex-wrap:wrap;justify-content:center;gap:4px 10px}
+.globe .probe>*{white-space:nowrap}
+.legend{margin-bottom:4px}
+.ensemble-panel{padding:12px 14px;margin-bottom:14px}
+.ensemble-actions{margin-top:8px}
+.ensemble-panel p{margin-top:7px}
+.plot-area:has(.ensemble-panel) .globe{max-width:clamp(300px,calc(100dvh - 520px),510px)}
+.readout-rule{margin:22px 0}
+.readout p{line-height:1.6}
+.timeline{position:sticky;bottom:12px;z-index:10;padding:14px 18px 12px;margin-bottom:16px;gap:20px;box-shadow:0 8px 30px #050b12a8}
+.timeline-title{min-width:150px}
+.timeline-title strong{margin-top:5px}
+.keyboard-hint{display:block;color:#9bb4c2;font-size:12px;margin-top:5px}
+.timeline-track{min-width:0}
+.day-ticks{margin-top:12px}
+.step-buttons button{width:36px;height:36px}
+footer{font-size:11px;line-height:1.5}
+@media(max-width:1150px){.atlas{padding:0 20px}.workspace{gap:18px}.plot-area{padding-left:16px}.globe-caption{gap:2px}.plot-heading{flex-direction:row;align-items:center}}
+@media(max-width:1100px){.plot-area{padding-right:0}.readout{padding-top:14px}.readout details{margin-top:0}.timeline{flex-wrap:nowrap}.timeline-track{flex-basis:auto}}
+@media(max-width:700px){.timeline{flex-wrap:wrap;gap:10px;padding:12px;bottom:8px}.timeline-track{flex-basis:100%;padding-top:3px}.timeline-title strong{display:inline-block;margin-right:12px}.keyboard-hint{display:inline-block}.timeline-title{flex:1}.day-ticks{margin-top:9px}.day-ticks button{font-size:10px}.day-ticks button:nth-child(even){visibility:hidden}.day-ticks button:last-child{visibility:visible}}
+@media(max-width:580px){.atlas{padding:0 14px}.workspace{padding-top:18px;gap:16px}.topbar{height:62px}.controls h1{font-size:23px;margin-bottom:14px}.plot-area{padding:0}.globe,.plot-area:has(.ensemble-panel) .globe{max-width:440px}.globe-caption{margin:0 9px 16px}.globe-tools{margin:8px 9px 0}.level{padding:7px 1px}.ensemble-panel{margin-top:0}.plot-heading h2{font-size:20px}.map-status{bottom:76px}.timeline-title .eyebrow{font-size:11px}.keyboard-hint{font-size:11px}footer{font-size:11px}}
