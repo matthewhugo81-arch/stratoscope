@@ -150,6 +150,16 @@ See [GLOSEA_SETUP.md](GLOSEA_SETUP.md) for setup, validation, dates and attribut
 
 ## Native seasonal chart selector
 
+Downloaded globe frames now use IndexedDB to retain one model run per model
+across model switches and page reloads. Levels and ensemble mean/spread/member
+selections are keyed independently. A newer run removes that model's older stored
+frames; late old requests cannot replace it. Refresh data explicitly clears the
+selected model. Browser storage is optional: denied storage or a full quota falls
+back to normal downloads. Clearing site data also removes saved frames.
+The initial download of each new frame remains necessary. Model discovery is
+reused for five minutes when switching models and bypassed by Refresh data.
+
+
 The seasonal section offers Stratoscope SVG charts for Met Office, ECMWF,
 Météo-France, DWD, CMCC, JMA and BOM. Forecast members, the ensemble mean,
 historical ranges and ERA5 references can be inspected with a date slider.

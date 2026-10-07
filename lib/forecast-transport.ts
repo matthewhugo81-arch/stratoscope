@@ -10,4 +10,11 @@ export async function forecastRequest(query:string,signal:AbortSignal):Promise<F
  const r=await fetch(`/api/forecast?${query}`,{signal}),j=await r.json() as (Frame|ForecastMeta)&{error?:string;retryAfter?:number};
  if(!r.ok)throw Object.assign(Error(j.error??'Forecast unavailable'),{retryAfter:j.retryAfter});return j;
 }
-export function forecastMeta(model:ModelId,signal:AbortSignal,summary=true){return isEnsemble(model)&&summary?preparedMeta(model,signal):forecastRequest(`meta=1&model=${model}`,signal) as Promise<ForecastMeta>;}
+const metadata=new Map<string,{at:number;value:ForecastMeta}>();
+export function clearForecastMeta(model:ModelId){for(const key of metadata.keys())if(key.startsWith(model+'/'))metadata.delete(key)}
+export async function forecastMeta(model:ModelId,signal:AbortSignal,summary=true){
+ signal.throwIfAborted();const key=model+'/'+summary,hit=metadata.get(key);
+ if(hit&&Date.now()-hit.at<300000)return hit.value;
+ const value=await (isEnsemble(model)&&summary?preparedMeta(model,signal):forecastRequest(`meta=1&model=${model}`,signal) as Promise<ForecastMeta>);
+ signal.throwIfAborted();metadata.set(key,{at:Date.now(),value});return value;
+}

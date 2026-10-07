@@ -7,11 +7,20 @@ export function GloSeaOutlook(){
  const [data,setData]=useState<GloSea|null>(null),[open,setOpen]=useState(false),[model,setModel]=useState<SeasonalId>('egrr');
  const [forecast,setForecast]=useState<SeasonalForecast|null>(null),[climate,setClimate]=useState<SeasonalClimate|null>(null),[era,setEra]=useState<EraClimate|null>(null),[loading,setLoading]=useState(false),[error,setError]=useState(''),[referenceError,setReferenceError]=useState(false),[refresh,setRefresh]=useState(0);
  useEffect(()=>{const c=new AbortController();void fetchGloSea(AbortSignal.any([c.signal,AbortSignal.timeout(15000)])).then(d=>{if(!c.signal.aborted)setData(d)}).catch(()=>{});return()=>c.abort()},[]);
+ // ERA5 is shared by every model and can arrive before the model hindcasts.
+ useEffect(()=>{
+  if(!open)return;const c=new AbortController();let timer:ReturnType<typeof setTimeout>|undefined;
+  const check=async()=>{
+   try{const d=await fetchEra(AbortSignal.any([c.signal,AbortSignal.timeout(25000)]));if(c.signal.aborted)return;if(d){setEra(d);return}}
+   catch{if(c.signal.aborted)return}
+   timer=setTimeout(check,60000);
+  };
+  void check();return()=>{c.abort();clearTimeout(timer)};
+ },[open,refresh]);
  useEffect(()=>{
   if(!open)return;
   const c=new AbortController(),signal=AbortSignal.any([c.signal,AbortSignal.timeout(25000)]);
-  setForecast(null);setClimate(null);setEra(null);setError('');setReferenceError(false);setLoading(true);
-  void fetchEra(signal).then(d=>{if(!c.signal.aborted)setEra(d)}).catch(()=>{if(!c.signal.aborted)setReferenceError(true)});
+  setForecast(null);setClimate(null);setError('');setReferenceError(false);setLoading(true);
   void (async()=>{
    let f:SeasonalForecast|null=null;
    try{f=await fetchSeasonal(model,signal);if(!c.signal.aborted)setForecast(f)}catch{if(!c.signal.aborted)setError('The selected forecast could not be loaded. Please retry.')}
