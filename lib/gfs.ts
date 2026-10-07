@@ -1,4 +1,5 @@
 import {decodeGrib,type Frame} from './grib';
+import {zonalMeanAt60} from './zonal-wind';
 export const LEVELS=[100,70,50,30,20,10];
 const origin='https://nomads.ncep.noaa.gov',frames=new Map<string,{at:number;data:Frame}>();
 let latest:{at:number;run:string}|undefined;
@@ -19,5 +20,6 @@ export async function getFrame(run:string,hour:number,level:number):Promise<Fram
  const decoded=decodeGrib(await r.arrayBuffer());if(decoded.run!==run||decoded.hour!==hour||decoded.level!==level)throw Error('NOAA returned a different forecast than requested.');
  for(const key of ['temperature','height','u','v'])if(!decoded.fields[key])throw Error('A required weather field is missing.');
  const data:Frame={run,hour,level,valid:new Date(Date.parse(run)+hour*3600000).toISOString(),grid:decoded.grid,temperature:decoded.fields.temperature,height:decoded.fields.height,u:decoded.fields.u,v:decoded.fields.v,source:url};
+ if(level===10)data.zonalWind60N=zonalMeanAt60(decoded.fields.u,decoded.grid);
  frames.set(id,{at:Date.now(),data});if(frames.size>18)frames.delete(frames.keys().next().value!);return data;
 }

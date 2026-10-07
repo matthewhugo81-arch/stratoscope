@@ -18,7 +18,7 @@ export async function loadForecast(model:ModelId,run:string,hour:number,level:nu
  async function one(m:number){
   signal.throwIfAborted();const k=`${id}/${m}`,hit=cached(frames,k,model);if(hit)return hit.frame;
   return downloads.get(k,signal,async downloadSignal=>{
-  const r=await fetch(`/api/forecast?model=${model}&run=${encodeURIComponent(run)}&hour=${hour}&level=${level}&member=${Math.max(0,m)}`,{signal:AbortSignal.any([downloadSignal,AbortSignal.timeout(180000)])}),j=await r.json() as Frame & {error?:string;retryAfter?:number};downloadSignal.throwIfAborted();
+  const r=await fetch(`/api/forecast?model=${model}&run=${encodeURIComponent(run)}&hour=${hour}&level=${level}&member=${Math.max(0,m)}&diagnostics=u60-v1`,{signal:AbortSignal.any([downloadSignal,AbortSignal.timeout(180000)])}),j=await r.json() as Frame & {error?:string;retryAfter?:number};downloadSignal.throwIfAborted();
   if(!r.ok)throw new ForecastError(j.error??'Forecast unavailable',j.retryAfter);if(j.model!==model||j.run!==run||j.hour!==hour||j.level!==level)throw Error('Received a different forecast than requested');
   frames.set(k,{at:Date.now(),frame:j});if(frames.size>24)frames.delete(frames.keys().next().value!);return j;
   });

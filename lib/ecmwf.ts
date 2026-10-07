@@ -1,5 +1,6 @@
 import {decodeGrib,type Frame,type Grid} from './grib';
 import {readCachedJson,writeCachedJson} from './optional-cache';
+import {zonalMeanAt60,type ZonalWind} from './zonal-wind';
 
 type Entry={date:string;time:string;step:string;levtype:string;levelist:string;param:string;_offset:number;_length:number};
 const origin='https://data.ecmwf.int/forecasts';
@@ -42,9 +43,10 @@ export function northernGrid(values:number[],g:Grid){
  return result;
 }
 async function loadFrame(run:string,hour:number,level:number):Promise<Frame>{
- const cacheKey=new Request(`https://stratoscope-cache.invalid/ecmwf-direct-v1/${run}/${level}/${hour}`);
+ const cacheKey=new Request(`https://stratoscope-cache.invalid/ecmwf-direct-v2/${run}/${level}/${hour}`);
  const cached=await readCachedJson<Frame>(cacheKey);if(cached)return cached;
  const selected=select(await inventory(run,hour),run,hour,level),fields:Partial<Record<'temperature'|'height'|'u'|'v',number[]>>={};
+ let zonalWind60N:ZonalWind|undefined;
  // Decode one global field at a time to keep Worker memory bounded.
  for(const {entry:e,key} of selected){
   const end=e._offset+e._length-1,response=await fetch(baseUrl(run,hour)+'.grib2',{headers:{Range:`bytes=${e._offset}-${end}`},signal:AbortSignal.timeout(30000)});
@@ -52,9 +54,11 @@ async function loadFrame(run:string,hour:number,level:number):Promise<Frame>{
   const bytes=await response.arrayBuffer();if(bytes.byteLength!==e._length)throw Error('Incomplete ECMWF download');
   const decoded=decodeGrib(bytes);
   if(decoded.run!==run||decoded.hour!==hour||decoded.level!==level||!decoded.fields[key]||Object.keys(decoded.fields).length!==1)throw Error('ECMWF returned a different field than requested.');
+  if(level===10&&key==='u')zonalWind60N=zonalMeanAt60(decoded.fields.u,decoded.grid);
   fields[key]=northernGrid(decoded.fields[key],decoded.grid);
  }
  const data:Frame={run,hour,level,valid:new Date(Date.parse(run)+hour*3600000).toISOString(),grid:{nx:360,ny:91,lat0:90,lon0:0,dx:1,dy:-1},temperature:fields.temperature!,height:fields.height!,u:fields.u!,v:fields.v!,model:'ecmwf_direct',runKind:'cycle',fetchedAt:new Date().toISOString(),source:baseUrl(run,hour)+'.grib2'};
+ if(zonalWind60N)data.zonalWind60N=zonalWind60N;
  await writeCachedJson(cacheKey,data,10800);
  return data;
 }

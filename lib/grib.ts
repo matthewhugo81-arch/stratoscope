@@ -1,7 +1,8 @@
 // Regular latitude/longitude GRIB2, simple packing 5.0 and CCSDS 5.42.
 import {decodeAec} from './aec';
+import type {ZonalWind} from './zonal-wind';
 export type Grid = {nx:number;ny:number;lat0:number;lon0:number;dx:number;dy:number};
-export type Frame = {run:string;hour:number;level:number;valid:string;grid:Grid;temperature:number[];height:number[];u:number[];v:number[];wind?:number[];source:string;model?:string;runKind?:'cycle'|'rolling';fetchedAt?:string;ensemble?:{view:'mean'|'spread'|'member';member?:number;count:number}};
+export type Frame = {run:string;hour:number;level:number;valid:string;grid:Grid;temperature:number[];height:number[];u:number[];v:number[];wind?:number[];zonalWind60N?:ZonalWind;source:string;model?:string;runKind?:'cycle'|'rolling';fetchedAt?:string;ensemble?:{view:'mean'|'spread'|'member';member?:number;count:number}};
 const signed=(v:number,bits:number)=>v&2**(bits-1)?-(v&(2**(bits-1)-1)):v;
 export function decodeGrib(buffer:ArrayBuffer){
  const d=new DataView(buffer);let pos=0;const fields:Record<string,number[]>={};let grid:Grid|undefined,run='',hour=-1,level=-1,member:number|undefined,product:number|undefined;
