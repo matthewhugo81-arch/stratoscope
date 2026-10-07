@@ -2,11 +2,30 @@ import importlib.util,sys,unittest
 from pathlib import Path
 from datetime import datetime,timedelta,timezone
 import numpy as np
+from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
 from seasonal_config import *
 spec=importlib.util.spec_from_file_location('seasonal',Path(__file__).resolve().parents[1]/'scripts/prepare-seasonal.py');s=importlib.util.module_from_spec(spec);spec.loader.exec_module(s)
 N=datetime(2026,9,1,tzinfo=timezone.utc)
 class SeasonalTests(unittest.TestCase):
+ def test_era_reference_only_publishes_after_all_years_and_handles_leap_days(self):
+  def checkpoint(name):
+   if not name.startswith('checkpoints/'):return None
+   year=int(name.split('/')[-1].split('.')[0]);start=datetime(year,1,1)
+   days=(datetime(year+1,1,1)-start).days
+   return dict(version=2,year=year,daily={(start+timedelta(days=i)).strftime('%m-%d'):year-1992 for i in range(days)})
+  with patch.object(s,'load',side_effect=checkpoint),patch.object(s,'publish') as publish:
+   s.era5(None,aggregate_only=True)
+   payload=publish.call_args.args[1]
+   self.assertEqual(len(payload['daily']),366)
+   self.assertEqual(payload['daily']['01-01'],12.5)
+   self.assertEqual(payload['daily']['02-29'],14)
+   self.assertEqual(payload['counts']['02-29'],6)
+  with patch.object(s,'load',return_value=None),patch.object(s,'publish') as publish:
+   with self.assertRaisesRegex(ValueError,'still requires year'):s.era5(None,aggregate_only=True)
+   publish.assert_not_called()
+  with patch.object(s,'load',side_effect=checkpoint),patch.object(s,'publish') as publish:
+   s.era5(None,selected_year=1993);publish.assert_not_called()
  def test_qualified_lagged_members_and_year_boundary(self):
   for model,cfg in MODELS.items():
    for hc in [False,True]:

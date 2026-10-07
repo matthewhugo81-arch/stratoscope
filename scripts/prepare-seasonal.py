@@ -110,13 +110,14 @@ def climate(client,model,nominal):
  payload=dict(version=2,complete=True,model=model,system=cfg['system'],month=nominal.month,period=[1993,2016],years=YEARS,sampleCount=len(pooled),steps=STEPS,sampling='12-hourly instantaneous',mean=np.round(array.mean(axis=0),4).tolist(),source=SOURCE,method='Equal-weight qualified hindcast members across 1993–2016, aligned by 12-hour lead from each nominal first-of-month. Linear sample quantiles; no bias correction. Leap years retain their native lead-time calendar.')
  for name,values in zip(['min','p10','p25','p75','p90','max'],quantiles):payload[name]=np.round(values,4).tolist()
  publish(final,payload)
-def era5(client):
+def era5(client,selected_year=None,aggregate_only=False):
  final='climate/era5-1993-2016.json'
  if load(final):print('ERA5 reference already prepared');return
  sums={};counts={}
- for year in YEARS:
+ for year in ([selected_year] if selected_year else YEARS):
   name=f'checkpoints/era5/{year}.json';part=load(name)
   if part is None:
+   if aggregate_only:raise ValueError('ERA5 reference still requires year '+str(year))
    request=dict(product_type=['reanalysis'],variable=['u_component_of_wind'],pressure_level=['10'],year=[str(year)],month=[f'{m:02}' for m in range(1,13)],day=[f'{d:02}' for d in range(1,32)],time=[f'{h:02}:00' for h in range(24)],area=[60,-180,60,180],data_format='grib',download_format='unarchived')
    file=retrieve(client,'reanalysis-era5-pressure-levels',request,f'era5-{year}');hours={}
    for _,_,valid,value in read_grib(file):
@@ -133,16 +134,17 @@ def era5(client):
   for day,value in part['daily'].items():
    if not isinstance(value,(float,int)) or not np.isfinite(value) or abs(value)>=200:raise ValueError('Invalid ERA5 value')
    sums[day]=sums.get(day,0)+value;counts[day]=counts.get(day,0)+1
+ if selected_year:return
  if len(sums)!=366 or any(n!=(6 if day=='02-29' else 24) for day,n in counts.items()):raise ValueError('Incomplete ERA5 climate')
  publish(final,dict(version=2,complete=True,period=[1993,2016],latitude=60,level=10,units='m/s',source=ERA_SOURCE,method='Daily mean of all 24 hourly 60N zonal means; calendar-day average over 1993–2016. February 29 uses the six leap years.',daily={d:round(sums[d]/counts[d],4) for d in sums},counts=counts))
 def main():
- p=argparse.ArgumentParser();p.add_argument('--model',choices=MODELS,default='egrr');p.add_argument('--phase',choices=['forecast','climate','era5','update'],required=True);p.add_argument('--month');args=p.parse_args()
+ p=argparse.ArgumentParser();p.add_argument('--model',choices=MODELS,default='egrr');p.add_argument('--phase',choices=['forecast','climate','era5','update'],required=True);p.add_argument('--month');p.add_argument('--era5-year',type=int,choices=YEARS);p.add_argument('--aggregate-only',action='store_true');args=p.parse_args()
  nominal=datetime.strptime(args.month,'%Y-%m').replace(tzinfo=timezone.utc) if args.month else latest(args.model,datetime.now(timezone.utc))
  if not datetime(2026,4,1,tzinfo=timezone.utc)<=nominal<datetime(2027,1,1,tzinfo=timezone.utc):raise ValueError('Model versions must be reviewed for this issue date')
  setup()
  import cdsapi
  client=cdsapi.Client(url='https://cds.climate.copernicus.eu/api',key=os.environ['CDSAPI_KEY'],quiet=False,debug=False,timeout=60)
- if args.phase=='era5':era5(client)
+ if args.phase=='era5':era5(client,args.era5_year,args.aggregate_only)
  elif args.phase in ['forecast','update']:
   forecast(client,args.model,nominal)
   if args.phase=='update':climate(client,args.model,nominal)
