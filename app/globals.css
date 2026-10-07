@@ -215,3 +215,5 @@ footer{font-size:11px;line-height:1.5}
 
 .ec46-chart img{display:block;width:100%;height:auto;background:#fff;border-radius:5px}.ec46-chart>p{font-size:12px;line-height:1.6;color:#abc3ce}
 .ec46-chart img{max-height:75vh;object-fit:contain}
+
+.member-map-image{position:relative;flex:1;min-height:0;width:100%}.member-map-image canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}

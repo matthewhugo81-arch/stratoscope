@@ -5,24 +5,34 @@ import {MODELS,type EnsembleModel} from '@/lib/models';
 import {isEasterly,loadMemberPanels} from '@/lib/member-panels';
 import {color,inverseGlobe,projectGlobe,sample,sampleWind,viewBasis} from '@/lib/globe';
 import {temperatureGradient} from '@/lib/temperature-scale';
-const size=144,basis=viewBasis(90,0),viewport={width:size,height:size,dpr:1};
+const basis=viewBasis(90,0);
 const Panel=memo(function Panel({frame,field,coast,onSelect}:{frame:Frame;field:string;coast:number[][][];onSelect:()=>void}){
  const canvas=useRef<HTMLCanvasElement>(null),u=frame.zonalWind60N!.value,easterly=isEasterly(u);
+ const [size,setSize]=useState(256);
+ useEffect(()=>{const el=canvas.current!;const measure=()=>{const r=el.getBoundingClientRect();setSize(Math.min(640,Math.max(192,Math.ceil(Math.min(r.width,r.height)*Math.max(2,window.devicePixelRatio||1)))))};const observer=new ResizeObserver(measure);observer.observe(el);window.addEventListener('resize',measure);measure();return()=>{observer.disconnect();window.removeEventListener('resize',measure)}},[]);
  const windLabel=Math.abs(u)<.05?(u<0?'−<0.1':u>0?'+<0.1':'0.0'):(u>0?'+':'')+u.toFixed(1);
  useEffect(()=>{
   const ctx=canvas.current?.getContext('2d');if(!ctx)return;
-  const image=ctx.createImageData(size,size);
+  const viewport={width:size,height:size,dpr:1},image=ctx.createImageData(size,size),heights=new Float32Array(size*size).fill(NaN);
   for(let y=0;y<size;y++)for(let x=0;x<size;x++){
-   const p=inverseGlobe(x,y,basis,1,viewport);if(!p||p.lat<0)continue;
+   const p=inverseGlobe(x+.5,y+.5,basis,1,viewport);if(!p||p.lat<0)continue;
    const rgb=color(field==='wind'?sampleWind(frame,p.lat,p.lon):sample(frame,frame.temperature,p.lat,p.lon),field==='wind',false);
-   const h=sample(frame,frame.height,p.lat,p.lon)/400,contour=Math.abs(h-Math.round(h))<.03,k=(y*size+x)*4;
-   rgb.forEach((v,c)=>image.data[k+c]=contour?v*.5+240*.5:v);image.data[k+3]=255;
+   const k=(y*size+x)*4;heights[y*size+x]=sample(frame,frame.height,p.lat,p.lon)/400;
+   rgb.forEach((v,c)=>image.data[k+c]=v);image.data[k+3]=255;
   }
-  ctx.putImageData(image,0,0);ctx.strokeStyle='#e4f5ff99';ctx.lineWidth=.55;
+  // Use the local height gradient for consistent, antialiased contour strokes.
+  for(let y=1;y<size-1;y++)for(let x=1;x<size-1;x++){
+   const i=y*size+x,h=heights[i];if(!Number.isFinite(h))continue;
+   const gradient=Math.hypot((heights[i+1]-heights[i-1])/2,(heights[i+size]-heights[i-size])/2);
+   if(!Number.isFinite(gradient)||gradient<1e-7)continue;
+   const distance=Math.abs(h-Math.round(h))/gradient,ink=Math.max(0,Math.min(1,size/360+.5-distance))*.68;
+   for(let c=0;c<3;c++)image.data[i*4+c]=image.data[i*4+c]*(1-ink)+[245,240,212][c]*ink;
+  }
+  ctx.putImageData(image,0,0);ctx.strokeStyle='#e4f5ffb3';ctx.lineWidth=size/360;
   for(const points of coast){ctx.beginPath();let started=false;for(const [lon,lat] of points){const p=projectGlobe(lon,lat,basis,1,viewport);if(p.depth<=0){started=false;continue}if(started)ctx.lineTo(p.x,p.y);else{ctx.moveTo(p.x,p.y);started=true}}ctx.stroke()}
- },[frame,field,coast]);
+ },[frame,field,coast,size]);
  return <button className={'member-map-tile'+(easterly?' easterly':'')} onClick={onSelect} aria-label={`${frame.ensemble!.member===0?'Control':'Member '+frame.ensemble!.member}, 60N 10hPa zonal wind ${u.toFixed(3)} metres per second${easterly?', easterly':''}. Open on globe.`}>
-  <strong>{frame.ensemble!.member===0?'Control':`Member ${String(frame.ensemble!.member).padStart(2,'0')}`}</strong><canvas ref={canvas} width={size} height={size} aria-hidden="true"/><span>{windLabel} m/s{easterly?' · E':''}</span>
+  <strong>{frame.ensemble!.member===0?'Control':`Member ${String(frame.ensemble!.member).padStart(2,'0')}`}</strong><div className="member-map-image"><canvas ref={canvas} width={size} height={size} aria-hidden="true"/></div><span>{windLabel} m/s{easterly?' · E':''}</span>
  </button>;
 });
 export function MemberPanels({model,run,hour,field,onClose,onInspect}:{model:EnsembleModel;run:string;hour:number;field:string;onClose:()=>void;onInspect:(member:number,hour:number,field:string)=>void}){
