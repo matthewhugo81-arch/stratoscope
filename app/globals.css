@@ -181,3 +181,11 @@ footer{font-size:11px;line-height:1.5}
 @media(max-width:580px){.topbar{height:48px}.plot-heading{left:0;right:0}.plot-heading h2{font-size:16px}.globe-tools{top:42px}.globe-tools .fit-label{display:none}}
 
 .map-shell>.plot-heading{left:0;right:0;top:0}
+
+/* The official seasonal charts retain their model climatology and attribution. */
+.seasonal-model-label{display:flex;align-items:center;gap:10px;color:#a4bfcc;font-size:12px}
+.seasonal-model-label select{background:#162e38;border:1px solid #42616b;border-radius:5px;color:#d9edf0;padding:10px;min-width:200px;font-size:14px}
+.seasonal-embed{display:block;width:100%;height:clamp(400px,55vw,760px);border:0;border-radius:6px;background:#fff}
+.seasonal-source{display:flex;gap:8px 20px;justify-content:space-between;flex-wrap:wrap}
+.glosea-local-details>.glosea-outlook{border:0;padding:12px 0 0}
+@media(max-width:580px){.seasonal-model-label{width:100%;justify-content:space-between}.seasonal-model-label select{min-width:0;max-width:65%}.seasonal-embed{height:420px}}

@@ -147,3 +147,18 @@ Its first real CDS issue was validated and published on 7 October 2026, with 50
 complete members and 180 valid dates. The monthly workflow runs on the 11th at
 13:17 UTC and publishes one compact JSON file; viewers do not query CDS.
 See [GLOSEA_SETUP.md](GLOSEA_SETUP.md) for setup, validation, dates and attribution.
+
+## Copernicus seasonal chart selector
+
+The seasonal section below the globe also offers the official C3S 60N/10hPa
+wind charts for Met Office, ECMWF, Météo-France, DWD, CMCC, JMA and BOM.
+The charts use Copernicus's public Share → Embed widget, preserving forecast
+members, ERA5 daily climatology and the model hindcast distribution. No fixed
+issue date is supplied, so each widget selects its latest available monthly
+issue. The visible chart includes its own date, climate period and legend.
+Only the chosen model is embedded, and closing the section unloads it.
+An official product link remains available if the external embed cannot load.
+These seven are the U10hPa products listed by C3S; the broader catalogue's
+ECCC, NCEP and multi-system filters do not currently return U10hPa products.
+The independent downloaded GloSea chart remains under the Met Office option.
+This change adds no CDS downloads, credentials or paid services.

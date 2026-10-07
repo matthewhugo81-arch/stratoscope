@@ -25,10 +25,29 @@ export function GloSeaChart({data}:{data:GloSea}){
   <details><summary>GloSea data & method</summary><p>{data.method}</p><p>{data.attribution}</p><p>Prepared {date(data.preparedAt)}. Members are aligned by calendar date, despite their different initialisation dates. This outlook is independent of the map’s selected model and forecast time.</p><a href={GLOSEA_SOURCE} target="_blank" rel="noreferrer">Copernicus dataset & licence</a></details>
  </section>;
 }
+const seasonalModels=[
+ {id:'egrr',name:'Met Office · GloSea'},
+ {id:'ecmf',name:'ECMWF'},
+ {id:'lfpw',name:'Météo-France'},
+ {id:'edzw',name:'DWD'},
+ {id:'cmcc',name:'CMCC'},
+ {id:'rjtd',name:'JMA'},
+ {id:'ammc',name:'BOM'},
+];
 export function GloSeaOutlook(){
- const [data,setData]=useState<GloSea|null>(null),[open,setOpen]=useState(false);
+ const [data,setData]=useState<GloSea|null>(null),[open,setOpen]=useState(false),[model,setModel]=useState('egrr');
  useEffect(()=>{const c=new AbortController();void fetchGloSea(AbortSignal.any([c.signal,AbortSignal.timeout(15000)])).then(d=>{if(!c.signal.aborted)setData(d)}).catch(()=>{});return()=>c.abort()},[]);
- // Do not offer a forecast until an entire real ensemble has been published.
- if(!data)return null;
- return <div className="glosea-section"><button className="glosea-toggle" onClick={()=>setOpen(v=>!v)} aria-expanded={open} aria-controls="glosea-chart">{open?'Hide':'Show'} GloSea seasonal wind outlook <span>60°N · 10 hPa</span></button>{open&&<div id="glosea-chart"><GloSeaChart data={data}/></div>}</div>;
+ const selected=seasonalModels.find(m=>m.id===model)!;
+ const product='c3s_seasonal_stratots_'+model;
+ const source='https://climate.copernicus.eu/charts/packages/c3s_seasonal/products/'+product+'?area=60N&type=plumemembers';
+ // Official Share → Embed URL, with “Show most recent” enabled (no fixed base_time).
+ const embed='https://climate.copernicus.eu/charts/embed/c3s_seasonal/'+product+'?area=60N&controls_overlay=1&player_dimension=base_time&type=plumemembers';
+ return <div className="glosea-section"><button className="glosea-toggle" onClick={()=>setOpen(v=>!v)} aria-expanded={open} aria-controls="seasonal-wind-charts">{open?'Hide':'Show'} seasonal wind outlooks <span>7 models · 60°N · 10 hPa</span></button>{open&&<section id="seasonal-wind-charts" className="glosea-outlook" aria-label="Seasonal wind model comparison">
+  <div className="glosea-heading"><div><span className="eyebrow">COPERNICUS · SEASONAL OUTLOOKS</span><h2>Polar vortex wind <span>/ 60°N · 10 hPa</span></h2></div><label className="seasonal-model-label">Seasonal model<select value={model} onChange={e=>setModel(e.target.value)} aria-label="Seasonal wind model">{seasonalModels.map(m=><option value={m.id} key={m.id}>{m.name}</option>)}</select></label></div>
+  <p>Blue: forecast members and mean. Black: ERA5 climate mean. Orange shading: the model’s hindcast distribution. Each chart shows its own issue date and latest available forecast.</p>
+  <iframe key={model} className="seasonal-embed" title={selected.name+' seasonal zonal wind with climatology'} src={embed} allowFullScreen referrerPolicy="strict-origin-when-cross-origin"/>
+  <p className="seasonal-source">Official Copernicus Climate Change Service chart, hosted by ECMWF. <a href={source} target="_blank" rel="noreferrer">Open {selected.name} chart on Copernicus ↗</a></p>
+  <p>Use the chart’s month selector for earlier issues. These are seasonal forecasts, independent of the globe’s model and timeline. The historical model distribution and ERA5 climate mean are different reference datasets; neither is a forecast of this winter. If the embedded chart is unavailable, use the Copernicus link above.</p>
+  {model==='egrr'&&data&&<details className="glosea-local-details"><summary>Explore our downloaded GloSea wind values</summary><GloSeaChart data={data}/></details>}
+ </section>}</div>;
 }
