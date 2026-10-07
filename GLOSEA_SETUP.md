@@ -1,5 +1,9 @@
 # GloSea seasonal wind outlook
 
+This document describes the original daily GloSea importer, retained as a
+validated fallback. The new native seven-model charts, including historical
+reference preparation, are documented in [SEASONAL_DATA.md](SEASONAL_DATA.md).
+
 Activated on 7 October 2026 after successful authenticated CDS validation and publication of the September 2026 issue: 50 complete members, 180 valid dates. Monthly publication is enabled for the 11th at 13:17 UTC. The browser downloads only the compact prepared JSON. Failed validations preserve the previous public issue.
 
 ## One-time account setup

@@ -189,3 +189,13 @@ footer{font-size:11px;line-height:1.5}
 .seasonal-source{display:flex;gap:8px 20px;justify-content:space-between;flex-wrap:wrap}
 .glosea-local-details>.glosea-outlook{border:0;padding:12px 0 0}
 @media(max-width:580px){.seasonal-model-label{width:100%;justify-content:space-between}.seasonal-model-label select{min-width:0;max-width:65%}.seasonal-embed{height:420px}}
+/* Native seasonal charts use the atlas palette and interactive readouts. */
+.seasonal-issue{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin:18px 0 12px;color:#c6e4e4;font-size:13px}.seasonal-issue>span{font:11px monospace;color:#98b5c2}
+.native-seasonal-chart svg{display:block;width:100%;height:auto;touch-action:pan-y}
+.seasonal-legend{display:flex;gap:9px 18px;flex-wrap:wrap;color:#a9bfca;font-size:11px;margin:10px 0}
+.seasonal-legend>span:before{content:'';display:inline-block;width:20px;height:2px;background:#b5efdd;margin:0 6px 3px 0}.seasonal-legend>.member-key:before{background:#599aae}.seasonal-legend>.climate-key:before{background:#efb56e}.seasonal-legend>.band-key:before{height:8px;background:#e6a65355}.seasonal-legend>.era-key:before{background:#edf2f4}
+.seasonal-chart-options{display:flex;gap:18px;font-size:12px;color:#bfd6df;margin-top:12px}.seasonal-chart-options label{display:flex;gap:6px;align-items:center}.seasonal-chart-options input{accent-color:#a8e6d6}
+.seasonal-values{display:flex;gap:10px 24px;flex-wrap:wrap;padding:14px;background:#142d35;border:1px solid #34545e;border-radius:6px;font-size:12px;color:#a7c6d0}.seasonal-values strong{color:#c6e8e2}.seasonal-values b{color:#b5efdd;font-family:monospace}
+.seasonal-pending{border-left:2px solid #d6a66b;padding-left:10px}.seasonal-refresh{background:#17313a;border:1px solid #42616b;border-radius:4px;padding:7px 12px;color:#b5efdd;font-size:12px}.seasonal-source{align-items:center;margin-top:16px;font-size:12px}.seasonal-source a{text-decoration:underline}
+.seasonal-empty{min-height:260px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;color:#b4ced8;border:1px dashed #36505b;border-radius:6px;margin:18px 0;padding:24px}
+@media(max-width:580px){.seasonal-values{gap:8px}.seasonal-values>strong{width:100%}.seasonal-legend{font-size:10px;gap:6px 12px}.seasonal-chart-options{gap:10px;flex-wrap:wrap}}

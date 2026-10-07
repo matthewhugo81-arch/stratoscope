@@ -148,17 +148,22 @@ complete members and 180 valid dates. The monthly workflow runs on the 11th at
 13:17 UTC and publishes one compact JSON file; viewers do not query CDS.
 See [GLOSEA_SETUP.md](GLOSEA_SETUP.md) for setup, validation, dates and attribution.
 
-## Copernicus seasonal chart selector
+## Native seasonal chart selector
 
-The seasonal section below the globe also offers the official C3S 60N/10hPa
-wind charts for Met Office, ECMWF, Météo-France, DWD, CMCC, JMA and BOM.
-The charts use Copernicus's public Share → Embed widget, preserving forecast
-members, ERA5 daily climatology and the model hindcast distribution. No fixed
-issue date is supplied, so each widget selects its latest available monthly
-issue. The visible chart includes its own date, climate period and legend.
-Only the chosen model is embedded, and closing the section unloads it.
-An official product link remains available if the external embed cannot load.
-These seven are the U10hPa products listed by C3S; the broader catalogue's
-ECCC, NCEP and multi-system filters do not currently return U10hPa products.
-The independent downloaded GloSea chart remains under the Met Office option.
-This change adds no CDS downloads, credentials or paid services.
+The seasonal section offers Stratoscope SVG charts for Met Office, ECMWF,
+Météo-France, DWD, CMCC, JMA and BOM. Forecast members, the ensemble mean,
+historical ranges and ERA5 references can be inspected with a date slider.
+An official C3S product link remains available for comparison.
+
+`prepare-seasonal.yml` downloads official CDS data using the existing private
+Actions secret, validates complete ensembles and publishes compact JSON to
+`forecast-data-seasonal`. The browser never contacts the authenticated CDS API.
+The first historical preparation can take hours. Unavailable models and
+references are labelled pending; partial ensembles are never plotted. The official
+chart remains as a temporary fallback for models awaiting their first native file. The
+previously validated daily GloSea issue remains a fallback until its new
+12-hourly series is ready. Each plot shows its actual issue and sampling.
+
+Forecasts update monthly. Historical 1993–2016 data are prepared once per model
+version and start month, with yearly checkpoints for interrupted downloads.
+See [SEASONAL_DATA.md](SEASONAL_DATA.md) for methodology, schedules and checks.
