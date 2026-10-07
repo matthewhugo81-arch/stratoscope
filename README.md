@@ -192,3 +192,7 @@ The browser downloads one bundle, never 31/51 separate member files, and saves
 it in the per-model run cache. Missing bundles are labelled pending. Prepared
 files use STRATP01 headers and are validated against model, run, lead, grid,
 member count, source and field bounds before display.
+
+## EC46 daily wind chart
+The wind-outlook selector includes ECMWF EC46, loaded directly from the official anonymous OpenCharts graphical-product API. Omitting base_time selects the latest available run on opening or Refresh outlook. The issued chart retains its 101 members, mean, model-climate lines, date and attribution. This is an official image, not raw member data. No paid delivery service, API secret or scheduled ingest is used.
+

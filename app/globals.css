@@ -212,3 +212,6 @@ footer{font-size:11px;line-height:1.5}
 
 /* Retain chart space during model changes so the document cannot collapse. */
 .seasonal-chart-content{display:flow-root}
+
+.ec46-chart img{display:block;width:100%;height:auto;background:#fff;border-radius:5px}.ec46-chart>p{font-size:12px;line-height:1.6;color:#abc3ce}
+.ec46-chart img{max-height:75vh;object-fit:contain}
