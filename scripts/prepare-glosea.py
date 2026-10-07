@@ -158,18 +158,23 @@ def main():
         import cdsapi
         cache = args.output.parent / 'glosea-downloads' / nominal.strftime('%Y%m')
         cache.mkdir(parents=True, exist_ok=True)
-        client = cdsapi.Client(url='https://cds.climate.copernicus.eu/api', key=key, quiet=True, debug=False, timeout=60)
+        # Normal client logging reports queue status; debug (request headers) stays off.
+        client = cdsapi.Client(url='https://cds.climate.copernicus.eu/api', key=key, quiet=False, debug=False, timeout=60)
         inputs = []
         for index, request in enumerate(requests):
             dest = cache / f'part-{index}.grib'
+            print(f"Retrieving part {index + 1}/{len(requests)}: {request['year'][0]}-{request['month'][0]}, {len(request['day'])} start dates", flush=True)
             client.retrieve(DATASET, request, str(dest))
+            print(f'Downloaded part {index + 1}: {dest.stat().st_size} bytes', flush=True)
             inputs.append(dest)
+    print('Checking GRIB metadata, complete longitude circles and valid-date alignment', flush=True)
     payload = assemble((record for path in inputs for record in read_grib(path, nominal)), nominal, now)
     args.output.mkdir(parents=True, exist_ok=True)
     temporary = args.output / 'latest.json.tmp'
     temporary.write_text(json.dumps(payload, separators=(',', ':'), allow_nan=False), encoding='utf-8')
     temporary.replace(args.output / 'latest.json')
     print(f"Prepared {payload['memberCount']} complete GloSea members, {DAYS} valid dates, nominal {nominal:%Y-%m}")
+    print(f"Valid range: {payload['dates'][0]} to {payload['dates'][-1]}; ensemble mean range: {min(payload['mean']):.3f} to {max(payload['mean']):.3f} m/s")
 
 
 if __name__ == '__main__':
