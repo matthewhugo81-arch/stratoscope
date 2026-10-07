@@ -1,9 +1,10 @@
+import {noaaFile,noaaIndex,noaaFields} from './noaa-open-data';
 import {decodeGrib,type Frame,type Grid} from './grib';
 import {MODELS,memberCount,type EnsembleModel} from './models';
 import {readCachedJson,writeCachedJson} from './optional-cache';
 import {zonalMeanAt60,type ZonalWind} from './zonal-wind';
 
-const ec='https://data.ecmwf.int/forecasts',noaa='https://nomads.ncep.noaa.gov';
+const ec='https://data.ecmwf.int/forecasts';
 const fieldKeys=['temperature','height','u','v'] as const;
 type Key=typeof fieldKeys[number];
 type Entry={date:string;time:string;step:string;levtype:string;levelist:string;param:string;type:string;number?:string;_offset:number;_length:number};
@@ -12,10 +13,6 @@ function parts(run:string){return {day:run.slice(0,10).replaceAll('-',''),cycle:
 function ecBase(model:EnsembleModel,run:string,hour:number,member:number){
  const {day,cycle}=parts(run),system=model==='aifs_ens'?'aifs-ens':'ifs',stream=model==='ifs_ens'&&member===0?'oper':'enfo',type=stream==='oper'?'fc':member===0?'cf':model==='ifs_ens'?'ef':'pf';
  return `${ec}/${day}/${cycle}z/${system}/0p25/${stream}/${day}${cycle}0000-${hour}h-${stream}-${type}`;
-}
-function gefsFile(run:string,hour:number,level:number,member:number){
- const {day,cycle}=parts(run),part=[20,30,70].includes(level)?'b':'a',name=`${member===0?'gec00':'gep'+String(member).padStart(2,'0')}.t${cycle}z.pgrb2${part}.0p50.f${String(hour).padStart(3,'0')}`,dir=`/gefs.${day}/${cycle}/atmos/pgrb2${part}p5`;
- return {name,dir,part,url:`${noaa}/pub/data/nccf/com/gens/prod${dir}/${name}`};
 }
 async function inventory(base:string){
  let task=indexes.get(base);if(!task){task=(async()=>{const r=await fetch(base+'.index',{signal:AbortSignal.timeout(15000)});if(!r.ok)throw Error('This ECMWF ensemble run is unavailable. Refresh for the latest completed run.');const text=await r.text();if(text.length>15000000)throw Error('Unexpected ensemble index size');return text.trim().split('\n').map(s=>JSON.parse(s) as Entry).filter(e=>e.levtype==='pl'&&[10,50,100].includes(Number(e.levelist))&&['t','gh','z','u','v'].includes(e.param));})();indexes.set(base,task);task.catch(()=>indexes.delete(base));if(indexes.size>8)indexes.delete(indexes.keys().next().value!);}return task;
@@ -31,7 +28,7 @@ export async function latestEnsembleRun(model:EnsembleModel){
   const run=new Date(start-back*interval*3600000).toISOString();
   try{
    if(model==='gefs'){
-    for(const level of [10,30]){const file=gefsFile(run,384,level,30),r=await fetch(file.url+'.idx',{signal:AbortSignal.timeout(9000)});if(!r.ok)throw Error('Incomplete GEFS cycle');const text=await r.text();for(const field of ['TMP','HGT','UGRD','VGRD'])if(!text.includes(`:${field}:${level} mb:`))throw Error('Incomplete GEFS cycle');}
+    for(const level of [10,30]){const entries=await noaaIndex(noaaFile('gefs',run,384,level,30));for(const field of ['TMP','HGT','UGRD','VGRD'])if(!entries.some(p=>p[3]===field&&p[4]===`${level} mb`))throw Error('Incomplete GEFS cycle');}
    }else{
     const members=await inventory(ecBase(model,run,360,1)),control=await inventory(ecBase(model,run,360,0));
     for(const level of MODELS[model].levels)for(let member=0;member<51;member++)select(member?members:control,model,run,360,level,member);
@@ -53,16 +50,16 @@ async function loadMember(model:EnsembleModel,run:string,hour:number,level:numbe
  const cached=await readCachedJson<Frame>(cacheKey);if(cached)return cached;
  const fields:Partial<Record<Key,number[]>>={};let source='',zonalWind60N:ZonalWind|undefined;
  if(model==='gefs'){
-  const f=gefsFile(run,hour,level,member),q=new URLSearchParams({file:f.name,[`lev_${level}_mb`]:'on',var_TMP:'on',var_HGT:'on',var_UGRD:'on',var_VGRD:'on',subregion:'',leftlon:'0',rightlon:'359.5',toplat:'90',bottomlat:'0',dir:f.dir});source=f.url;
-  const r=await fetch(`${noaa}/cgi-bin/filter_gefs_atmos_0p50${f.part}.pl?${q}`,{signal:AbortSignal.timeout(60000)});if(!r.ok)throw Error(`NOAA could not supply GEFS member ${member}. Please retry later.`);
-  const decoded=decodeGrib(await r.arrayBuffer());if(decoded.run!==run||decoded.hour!==hour||decoded.level!==level||decoded.member!==member)throw Error('NOAA returned a different ensemble member or forecast.');
+  const decoded=await noaaFields('gefs',run,hour,level,member);source=decoded.source;
   for(const key of fieldKeys){if(!decoded.fields[key])throw Error('A GEFS weather field is missing');if(level===10&&key==='u')zonalWind60N=zonalMeanAt60(decoded.fields.u,decoded.grid);fields[key]=sampleNorth(decoded.fields[key],decoded.grid);}
  }else{
   const base=ecBase(model,run,hour,member),selected=select(await inventory(base),model,run,hour,level,member);source=base+'.grib2';
   // One global field at a time bounds memory. Each request handles just one member.
   for(const {key,entry:e} of selected){
-   const end=e._offset+e._length-1,r=await fetch(source,{headers:{Range:`bytes=${e._offset}-${end}`},signal:AbortSignal.timeout(30000)});
-   if(r.status!==206||!r.headers.get('Content-Range')?.startsWith(`bytes ${e._offset}-${end}/`)){await r.body?.cancel();throw Error('ECMWF did not return the requested ensemble field range.');}
+   const end=e._offset+e._length-1,r=await fetch(source,{cache:'no-store',headers:{Range:`bytes=${e._offset}-${end}`},signal:AbortSignal.timeout(30000)});
+   // Content-Range may be hidden by provider CORS; byte count and GRIB identity remain mandatory.
+  const range=r.headers.get('Content-Range');
+   if(r.status!==206||(range&&!range.startsWith(`bytes ${e._offset}-${end}/`))){await r.body?.cancel();throw Error('ECMWF did not return the requested ensemble field range.');}
    const bytes=await r.arrayBuffer();if(bytes.byteLength!==e._length)throw Error('Incomplete ECMWF ensemble download');const decoded=decodeGrib(bytes);
    const correctMember=model==='ifs_ens'&&member===0?decoded.product===0:decoded.member===member;
    if(decoded.run!==run||decoded.hour!==hour||decoded.level!==level||!correctMember||!decoded.fields[key]||Object.keys(decoded.fields).length!==1)throw Error('ECMWF returned a different ensemble field or member.');

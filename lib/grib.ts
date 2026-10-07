@@ -1,4 +1,5 @@
 // Regular latitude/longitude GRIB2, simple packing 5.0 and CCSDS 5.42.
+import {decodeComplex} from './complex-packing';
 import {decodeAec} from './aec';
 import type {ZonalWind} from './zonal-wind';
 export type Grid = {nx:number;ny:number;lat0:number;lon0:number;dx:number;dy:number};
@@ -9,7 +10,7 @@ export function decodeGrib(buffer:ArrayBuffer){
  while(pos<buffer.byteLength){
   if(d.getUint32(pos)!==0x47524942||d.getUint8(pos+7)!==2)throw Error('Invalid GRIB2 response');
   const size=Number(d.getBigUint64(pos+8));if(size<20||pos+size>buffer.byteLength)throw Error('Truncated GRIB2 response');
-  let p=pos+16,key='',geopotential=false,reference=0,binary=0,decimal=0,bits=0,count=0,bitmap=255,packing=0,flags=0,block=0,rsi=0;let localGrid:Grid|undefined;
+  let p=pos+16,key='',geopotential=false,reference=0,binary=0,decimal=0,bits=0,count=0,bitmap=255,packing=0,flags=0,block=0,rsi=0;let localGrid:Grid|undefined,complex:DataView|undefined;
   while(p<pos+size-4){
    const len=d.getUint32(p),section=d.getUint8(p+4);if(len<5||p+len>pos+size-4)throw Error('Invalid GRIB section');
    if(section===1){const r=new Date(Date.UTC(d.getUint16(p+12),d.getUint8(p+14)-1,d.getUint8(p+15),d.getUint8(p+16))).toISOString();if(run&&run!==r)throw Error('Mixed forecast cycles');run=r;}
@@ -28,12 +29,13 @@ export function decodeGrib(buffer:ArrayBuffer){
     if(hour!==-1&&(hour!==h||level!==l))throw Error('Mixed forecast fields');hour=h;level=l;
     const names:Record<string,string>={'0:0':'temperature','3:5':'height','3:4':'height','2:2':'u','2:3':'v'},parameter=d.getUint8(p+9)+':'+d.getUint8(p+10);key=names[parameter];geopotential=parameter==='3:4';
    }
-   if(section===5){packing=d.getUint16(p+9);if(packing!==0&&packing!==42)throw Error('Unsupported GRIB packing');count=d.getUint32(p+5);reference=d.getFloat32(p+11);binary=signed(d.getUint16(p+15),16);decimal=signed(d.getUint16(p+17),16);bits=d.getUint8(p+19);if(bits>32||count>2100000)throw Error('Unsupported field size');if(packing===42){if(len<25)throw Error('Truncated CCSDS metadata');flags=d.getUint8(p+21);block=d.getUint8(p+22);rsi=d.getUint16(p+23);}}
+   if(section===5){packing=d.getUint16(p+9);if(![0,2,3,42].includes(packing))throw Error('Unsupported GRIB packing');count=d.getUint32(p+5);reference=d.getFloat32(p+11);binary=signed(d.getUint16(p+15),16);decimal=signed(d.getUint16(p+17),16);bits=d.getUint8(p+19);if(bits>32||count>2100000)throw Error('Unsupported field size');if(packing===42){if(len<25)throw Error('Truncated CCSDS metadata');flags=d.getUint8(p+21);block=d.getUint8(p+22);rsi=d.getUint16(p+23);}}
+   if(section===5&&(packing===2||packing===3)){if(len<(packing===3?49:47))throw Error('Truncated complex metadata');complex=new DataView(buffer,p,len);}
    if(section===6)bitmap=d.getUint8(p+5);
    if(section===7&&key){
     if(bitmap!==255||!localGrid||count!==localGrid.nx*localGrid.ny||(packing===0&&Math.ceil(count*bits/8)>len-5))throw Error('Missing or incomplete field');
     const values=new Array<number>(count),factor=2**binary,scale=10**(-decimal);let bit=0;
-    const packed=packing===42&&bits?decodeAec(new Uint8Array(buffer,p+5,len-5),count,bits,flags,block,rsi):null;
+    const packed=complex?decodeComplex(new Uint8Array(buffer,p+5,len-5),complex,count):packing===42&&bits?decodeAec(new Uint8Array(buffer,p+5,len-5),count,bits,flags,block,rsi):null;
     for(let i=0;i<count;i++){let n=packed?packed[i]:0,left=packed?0:bits;while(left>0){const byte=d.getUint8(p+5+(bit>>3)),offset=bit&7,take=Math.min(8-offset,left);n=n*2**take+((byte>>(8-offset-take))&((1<<take)-1));bit+=take;left-=take;}values[i]=Math.round((((reference+n*factor)*scale-(key==='temperature'?273.15:0))/(geopotential?9.80665:1))*100)/100;}
     if(fields[key])throw Error('Duplicate forecast field');
     fields[key]=values;

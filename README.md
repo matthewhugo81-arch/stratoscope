@@ -1,35 +1,29 @@
 # Stratoscope
 
-Interactive Northern Hemisphere stratosphere globe, built with Vinext/React and a Cloudflare-compatible data route. No API key is required.
+Interactive Northern Hemisphere stratosphere globe, hosted on **GitHub Pages**. The browser downloads official public weather fields directly and decodes them in background Web Workers. No ChatGPT hosting, server account, API key or paid proxy is needed to use this build.
 
-[Live viewer](https://stratoscope-northern-atlas.matthugo81.chatgpt.site/) (access follows the existing Site's sharing settings).
+[Live viewer](https://matthewhugo81-arch.github.io/stratoscope/)
 
-This repository contains the working source and development history. The viewer remains hosted on Sites; a GitHub push does not automatically deploy it. This export does not configure GitHub Actions, paid data services, hosting subscriptions or API keys.
+## Run and publish
 
-## Quick start
-
-Use Node.js 22.13 or newer and npm.
+Use Node.js 22.13 or newer and npm:
 
 ```sh
 npm ci
-npm run dev
+npm run dev:pages
 ```
 
-Open http://localhost:5173. Local development uses the starter's mock sign-in identity. No weather API key or database is required.
+Open http://localhost:5174/stratoscope/.
 
 ```sh
-# Check types and run regression tests
 npm exec -- tsc --noEmit
-node --test tests/optional-cache.test.mjs tests/forecast-client.test.mjs tests/zonal-wind.test.mjs
-
-# Build the Worker and run it locally
-npm run build
-npm start
+node --test tests/*.test.mjs
+npm run build:pages
 ```
 
-The build emits a Cloudflare-compatible Worker and browser assets under `dist`. GitHub Pages alone cannot run the `/api/forecast` backend. This export does not provision a new hosting service.
+The Pages build writes static browser assets into `docs/`. Commit the source **and rebuilt docs/** to `main`; GitHub Pages publishes from `main /docs`. `.nojekyll` disables Jekyll processing. The `/stratoscope/` base path is configured in `vite.pages.config.ts`. No scheduled workflow, paid runner, cloud backend or artifact store is configured. GitHub's free Pages service has published usage limits; this does not mean unlimited traffic or guaranteed availability.
 
-The `.openai/hosting.json` file contains the existing Site identity and empty storage bindings, not credentials. Keep it when continuing work on that Site. Environment files, dependencies, generated output and local tool state are excluded from Git.
+The original Sites/Vinext build commands remain available for portability, but the GitHub website does not call that deployment. `.openai/hosting.json` identifies the historical Site and contains no credentials. Do not add secrets or environment files to this public repository. `docs/` is intentionally tracked; local dependencies and generated Worker output are ignored.
 
 ## Sources and coverage
 
@@ -52,7 +46,7 @@ Direct NOAA and ECMWF fields are from one named model cycle. Direct ECMWF select
 
 ## Globe and units
 
-The WebGL2 globe uses an orthographic spherical projection, with reversible camera-basis rotation. Drag to tilt or rotate. Ctrl + scroll, pinch or the buttons zoom the globe; ordinary scrolling moves the page. Left/right arrows step backward/forward by six forecast hours. With the globe focused, Shift + arrows rotate, +/− zoom, and Home resets north. Focused sliders, tabs, model menus and pressure controls retain their normal keyboard behavior. The timeline stays visible as the page scrolls, and the globe adapts to the screen size. The software fallback preserves the controls if WebGL2 is unavailable.
+The WebGL2 globe uses an orthographic spherical projection, with reversible camera-basis rotation. Drag to tilt or rotate. Scroll directly over the map, pinch or use the buttons to zoom the globe; scrolling outside the map moves the page or side panel. Left/right arrows step backward/forward by six forecast hours. With the globe focused, Shift + arrows rotate, +/− zoom, and Home resets north. Focused sliders, tabs, model menus and pressure controls retain their normal keyboard behavior. The timeline stays visible as the page scrolls, and the globe adapts to the screen size. The software fallback preserves the controls if WebGL2 is unavailable.
 
 Temperature is Celsius; geopotential height is metres, with contours every 400 m labelled in dam; wind speed is m/s. Open-Meteo meteorological wind direction is converted to earth-relative components as u = -speed sin(direction), v = -speed cos(direction), then interpolated before computing speed. Lighting near the globe edge is decorative depth shading; hover values provide the unshaded numerical values. The Southern Hemisphere is explicitly outside data coverage and never filled with extrapolated Northern Hemisphere weather. Coastlines are Natural Earth 1:110m, public domain.
 
@@ -68,21 +62,24 @@ Regression tests cover signed averaging, exact latitude selection, seam handling
 
 ## Requests and caching
 
+NOAA GFS and GEFS use byte-range GETs against `noaa-gfs-bdp-pds.s3.amazonaws.com` and `noaa-gefs-pds.s3.amazonaws.com`. These are NOAA-managed public datasets, not user-owned AWS resources. GRIB complex packing with spatial differencing (5.3) is decoded locally; 24 raw NOAA fields across GFS/GEFS, 10/30/100 hPa, initial/future hours and multiple members were compared at every grid point with ecCodes, within 0.005 display units. Offline regression fixtures include independently generated ecCodes checksums.
+
+
 Worker Cache API access is optional. The Sites runtime can deny access to `caches.default` even when CacheStorage exists. All cache access, reads, JSON decoding and writes are guarded by `lib/optional-cache.ts`. A denied cache behaves as a cache miss; downloads and the existing bounded memory caches continue without adding storage or paid services. Run `node --test tests/optional-cache.test.mjs` for the production-permission-error regression checks.
 
 Ensemble views are mean, spread (population standard deviation, denominator N) and individual member. Member 0 is the control; all 31/51 members receive equal weight. Scalar wind speed is calculated for each member before its mean and spread. Height contours show mean height on both mean and spread maps, and the selected member's height on member maps. Temperature spread is a temperature difference in Celsius. AIFS geopotential is divided by standard gravity 9.80665 to obtain geopotential height in metres.
 
-GEFS uses NOMADS 0.5-degree atmosphere filters: part A at 10/50/100 hPa, part B at 20/30/70 hPa. ECMWF IFS perturbations use enfo/ef (index type pf), and its control uses oper/fc following Cycle 50r1. AIFS uses enfo/pf and enfo/cf. Native GRIB product template 4.1 member identifiers are validated, along with run, time, level and fields. Latitude scan direction and longitude origin are normalized onto a common 360 × 91 northern grid. No vertical interpolation or model substitution is performed.
+GEFS uses NOAA’s public NODD 0.5-degree GRIB files: part A at 10/50/100 hPa, part B at 20/30/70 hPa. ECMWF IFS perturbations use enfo/ef (index type pf), and its control uses oper/fc following Cycle 50r1. AIFS uses enfo/pf and enfo/cf. Native GRIB product template 4.1 member identifiers are validated, along with run, time, level and fields. Latitude scan direction and longitude origin are normalized onto a common 360 × 91 northern grid. No vertical interpolation or model substitution is performed.
 
-The browser requests at most two members concurrently, accumulates Welford statistics, and shows completed-member progress. Each server request decodes one member to keep CPU and memory bounded. It plots statistics only when all members are present. Mean/spread switching reuses the same calculation. Bounded browser caches retain 24 individual frames and six statistical pairs with least-recently-used eviction. Fixed-cycle frames remain reusable in the tab for six hours; rolling Open-Meteo frames expire after 15 minutes. Server caches retain ten ensemble frames in memory and use the optional Worker Cache API for three hours. The first mean/spread download can take a few minutes, especially on slow connections; individual members are much lighter. Latest-run discovery checks end-of-range inventories; IFS uses complete 00/12 UTC cycles, GEFS and AIFS use six-hour cycles with an eight-hour availability buffer.
+The browser requests at most two members concurrently, accumulates Welford statistics, and shows completed-member progress. Two reusable browser Web Workers fetch and decode individual members without blocking globe interactions. Abandoning a task terminates its worker and network activity. It plots statistics only when all members are present. Mean/spread switching reuses the same calculation. Bounded browser caches retain 24 individual frames and six statistical pairs with least-recently-used eviction. Fixed-cycle frames remain reusable in the tab for six hours; rolling Open-Meteo frames expire after 15 minutes. Each decoder retains a bounded in-memory cache. The optional server Cache API is absent in the Pages build. The first mean/spread download can take a few minutes, especially on slow connections; individual members are much lighter. Latest-run discovery checks end-of-range inventories; IFS uses complete 00/12 UTC cycles, GEFS and AIFS use six-hour cycles with an eight-hour availability buffer.
 
 Cached frames switch without an artificial delay. After a single direct forecast loads, the browser may preload one six-hour step ahead. It skips speculative whole-ensemble and Open-Meteo downloads, hidden tabs and supported data-saving/slow-connection signals. Foreground requests reuse in-flight preloads, abandoned requests are cancelled, and Refresh clears the selected model cache.
 
-The ensemble feeds are direct official data and need no API key. NOAA data is public domain unless otherwise identified. ECMWF Open Data is CC BY 4.0 with ECMWF terms and attribution; the site identifies modified data. The app uses free public endpoints and has no paid weather API credentials. This export does not create a paid hosting or delivery service. Any later choice of a separate host needs its own pricing review. Open-Meteo's free hosted API is for non-commercial use within its published quotas, which is distinct from the underlying data licence.
+The ensemble feeds are direct official data and need no API key. NOAA data is public domain unless otherwise identified. ECMWF Open Data is CC BY 4.0 with ECMWF terms and attribution; the site identifies modified data. The app uses free public endpoints and has no paid weather API credentials. GitHub Pages hosts the public static site. Data is requested anonymously from NOAA NODD public buckets, ECMWF and Open-Meteo. No AWS account is created and there are no requester-pays credentials. Open-Meteo's free hosted API is for non-commercial use within its published quotas, which is distinct from the underlying data licence.
 
-Direct ECMWF uses the public JSON index to request only the four required GRIB2 byte ranges. It requires HTTP 206 and validates the content range, byte count, run, lead time, pressure, variable and grid. CCSDS template 5.42 is decoded in TypeScript, then every fourth 0.25-degree point is retained and longitudes reordered to 0–359 degrees. Decoding proceeds one field at a time to bound memory. Completed frames are cached in bounded memory (12 frames) and the Worker Cache API (three hours).
+Direct ECMWF uses the public JSON index to request only the four required GRIB2 byte ranges. It requires HTTP 206 and validates byte count, run, lead time, pressure, variable and grid; the content-range header is checked when the provider exposes it through CORS. CCSDS template 5.42 is decoded in TypeScript, then every fourth 0.25-degree point is retained and longitudes reordered to 0–359 degrees. Decoding proceeds one field at a time to bound memory. Byte-range requests bypass the browser HTTP cache because merged partial responses can return the wrong range; completed forecast frames remain cached by the app. Completed frames are cached in bounded decoder memory (12 frames).
 
-An Open-Meteo level is downloaded in six batches of 60 coordinates. Each download retrieves the full supported timeline and keeps only six-hour steps. Completed timelines and partial downloads are cached in bounded process memory and the Worker Cache API for up to 30 minutes. A temporary 429 response preserves completed batches and asks the browser to resume automatically after 65 seconds; hourly/daily quota errors remain explicit. Source outages never produce synthetic fallback weather. Previous plots retain an explicit source, pressure and timestamp label during loading.
+An Open-Meteo level is downloaded in six batches of 60 coordinates. Each download retrieves the full supported timeline and keeps only six-hour steps. Completed timelines and partial downloads are cached in bounded decoder memory for up to 30 minutes. A temporary 429 response preserves completed batches and asks the browser to resume automatically after 65 seconds; hourly/daily quota errors remain explicit. Source outages never produce synthetic fallback weather. Previous plots retain an explicit source, pressure and timestamp label during loading.
 
 ## Run and verify
 
@@ -95,6 +92,9 @@ The direct ECMWF update compared all 1,038,240 native values of each of temperat
 Ensemble validation compared native IFS member temperature/height, AIFS member temperature/geopotential and all four GEFS fields with ecCodes 2.49.0; all values agreed within 0.0051 display units. The built Worker’s sampled outputs also agreed against independent ecCodes latitude/longitude coordinates at all 32,760 northern points per checked field. Checks cover population SD, scalar wind statistics, mean-height contours, duplicate/missing/mixed-member rejection, live control and last-member fields at initial and final leads, and unsupported model/level/member requests. Browser checks exercise complete mean/spread downloads for all three systems, member controls and the narrow-screen layout.
 
 Sources:
+- https://registry.opendata.aws/noaa-gfs-bdp-pds/
+- https://registry.opendata.aws/noaa-gefs/
+- https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits
 - https://www.ecmwf.int/en/forecasts/datasets/open-data
 - https://data.ecmwf.int/forecasts/
 - https://github.com/pspoerri/go-tiled-eccodes/tree/main/aec

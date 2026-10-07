@@ -6,7 +6,7 @@ import ts from 'typescript';
 // Load the browser modules without a browser, bundler, or upstream weather requests.
 async function moduleUrl(name){
  let source=await readFile(new URL(`../lib/${name}.ts`,import.meta.url),'utf8');
- for(const dependency of ['models','ensemble-statistics','shared-download','zonal-wind']){
+ for(const dependency of ['models','ensemble-statistics','shared-download','zonal-wind','forecast-transport']){
   if(source.includes(`from './${dependency}'`))source=source.replace(`from './${dependency}'`,`from '${await moduleUrl(dependency)}'`);
  }
  const {outputText}=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}});

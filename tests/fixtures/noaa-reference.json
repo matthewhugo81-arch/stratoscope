@@ -1,0 +1,20 @@
+[
+  {
+    "file": "grib-gfs-10-0-0-u.grib2",
+    "key": "u",
+    "count": 65160,
+    "hundredthsSHA256": "0a44bbfe0a71e17eafd221101a02a3374ae3840b6691f32be98eb740dd23c2ff",
+    "reference": "ECMWF ecCodes 2.49.0",
+    "run": 20261007,
+    "lead": 0
+  },
+  {
+    "file": "grib-gefs-30-384-30-temperature.grib2",
+    "key": "temperature",
+    "count": 259920,
+    "hundredthsSHA256": "01c2749829a32bc02d2a9de6b62aad88893823f812abe7f443aad4235c9384df",
+    "reference": "ECMWF ecCodes 2.49.0",
+    "run": 20261007,
+    "lead": 384
+  }
+]

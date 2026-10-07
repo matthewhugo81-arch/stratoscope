@@ -10,6 +10,7 @@ import {PolarMap} from '@/components/polar-map';
 import {ZonalWindCard} from '@/components/zonal-wind-card';
 import {MODELS,isModel,isCycle,isEnsemble,memberCount,supports,type ModelId,type ForecastMeta,type EnsembleView} from '@/lib/models';
 import {loadForecast,peekForecast,clearForecastCache} from '@/lib/forecast-client';
+import {forecastMeta} from '@/lib/forecast-transport';
 import type {Frame} from '@/lib/grib';
 const levels=[10,20,30,50,70,100];
 const alt:Record<number,string>={10:'~31 km',20:'~26 km',30:'~24 km',50:'~21 km',70:'~18 km',100:'~16 km'};
@@ -24,7 +25,7 @@ export default function Home(){
  function refreshData(){clearForecastCache(model);setRefresh(v=>v+1)}
  useEffect(()=>{
   const c=new AbortController();setMeta(null);setLoading(true);setError('');setRetryAt(0);
-  fetch(`/api/forecast?meta=1&model=${model}`,{signal:AbortSignal.any([c.signal,AbortSignal.timeout(55000)]),cache:'no-cache'}).then(async r=>{const j=await r.json() as ForecastMeta & {error?:string};if(!r.ok)throw Error(j.error);setMeta(j)}).catch(e=>{if(e.name!=='AbortError'){setError(e.name==='TimeoutError'?'Finding the latest forecast took too long. Please retry.':e.message);setLoading(false)}});
+  forecastMeta(model,AbortSignal.any([c.signal,AbortSignal.timeout(55000)])).then(setMeta).catch(e=>{if(e.name!=='AbortError'){setError(e.name==='TimeoutError'?'Finding the latest forecast took too long. Please retry.':e.message);setLoading(false)}});
   return()=>c.abort();
  },[model,refresh]);
  useEffect(()=>{

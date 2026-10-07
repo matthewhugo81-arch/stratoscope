@@ -49,8 +49,10 @@ async function loadFrame(run:string,hour:number,level:number):Promise<Frame>{
  let zonalWind60N:ZonalWind|undefined;
  // Decode one global field at a time to keep Worker memory bounded.
  for(const {entry:e,key} of selected){
-  const end=e._offset+e._length-1,response=await fetch(baseUrl(run,hour)+'.grib2',{headers:{Range:`bytes=${e._offset}-${end}`},signal:AbortSignal.timeout(30000)});
-  if(response.status!==206||!response.headers.get('Content-Range')?.startsWith(`bytes ${e._offset}-${end}/`)){await response.body?.cancel();throw Error('ECMWF did not return the requested field range. Please retry.');}
+  const end=e._offset+e._length-1,response=await fetch(baseUrl(run,hour)+'.grib2',{cache:'no-store',headers:{Range:`bytes=${e._offset}-${end}`},signal:AbortSignal.timeout(30000)});
+  // Content-Range may be hidden by provider CORS; byte count and GRIB identity remain mandatory.
+  const range=response.headers.get('Content-Range');
+  if(response.status!==206||(range&&!range.startsWith(`bytes ${e._offset}-${end}/`))){await response.body?.cancel();throw Error('ECMWF did not return the requested field range. Please retry.');}
   const bytes=await response.arrayBuffer();if(bytes.byteLength!==e._length)throw Error('Incomplete ECMWF download');
   const decoded=decodeGrib(bytes);
   if(decoded.run!==run||decoded.hour!==hour||decoded.level!==level||!decoded.fields[key]||Object.keys(decoded.fields).length!==1)throw Error('ECMWF returned a different field than requested.');
