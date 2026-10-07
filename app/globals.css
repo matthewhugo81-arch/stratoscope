@@ -39,10 +39,10 @@
  .source-card .text-button{font-size:14px;margin-left:auto}.source-card strong{font-size:13px}
 }
 
-/* Ensemble controls sit with the map so the model and level rail stays compact. */
-.ensemble-panel{padding:15px 17px;margin-bottom:23px;border:1px solid #37545c;border-radius:9px;background:linear-gradient(115deg,#183238,#142630)}
-.ensemble-topline,.ensemble-actions{display:flex;align-items:center;justify-content:space-between;gap:12px}.ensemble-topline>span:last-child{font-size:12px;color:#a7c3c9}.ensemble-actions{justify-content:flex-start;margin-top:12px}.ensemble-panel p{font-size:12px;line-height:1.6;color:#acc7ce;margin:10px 0 0}.ensemble-tabs{height:37px}.member-trigger{width:150px;background:#142832;border-color:#42616b;height:37px}.spread-note{font-size:12px;line-height:1.5;color:#a9bec6;margin-top:10px}.day-ticks{gap:2px}.day-ticks button{min-width:0;font-size:11px}
-@media(max-width:580px){.ensemble-panel{margin-top:12px;margin-bottom:20px;padding:13px}.ensemble-topline{align-items:flex-start;flex-direction:column;gap:5px}.ensemble-actions{flex-wrap:wrap}.ensemble-tabs [role=tab]{padding:6px 13px}.day-ticks button{font-size:10px}.day-ticks button:nth-child(even){visibility:hidden}.day-ticks button:last-child{visibility:visible}}
+/* Compact ensemble toolbar leaves the available height for the globe. */
+.ensemble-panel{display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;padding:8px 12px;margin-bottom:10px;border:1px solid #37545c;border-radius:7px;background:linear-gradient(115deg,#183238,#142630)}
+.ensemble-topline{display:contents}.ensemble-topline>span:last-child{order:2;margin-left:auto;font-size:11px;color:#a7c3c9}.ensemble-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;min-width:0}.ensemble-tabs{height:33px}.member-trigger{width:130px;background:#142832;border-color:#42616b;height:33px}.ensemble-description{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.spread-note{font-size:12px;line-height:1.5;color:#a9bec6;margin-top:10px}.day-ticks{gap:2px}.day-ticks button{min-width:0;font-size:11px}
+@media(max-width:580px){.ensemble-panel{gap:6px 10px;padding:8px}.ensemble-topline>span:last-child{order:0}.ensemble-actions{width:100%}.ensemble-tabs [role=tab]{padding:6px 13px}.day-ticks button{font-size:10px}.day-ticks button:nth-child(even){visibility:hidden}.day-ticks button:last-child{visibility:visible}}
 
 /* Keep the forecast controls in reach without scaling down readable type. */
 html{overflow-y:scroll;scrollbar-gutter:stable;scrollbar-width:auto;scrollbar-color:#587787 #0b141d;scroll-padding-bottom:130px}
@@ -72,9 +72,6 @@ body{min-width:320px}
 .globe .probe{width:max-content;max-width:calc(100% - 16px);flex-wrap:wrap;justify-content:center;gap:4px 10px}
 .globe .probe>*{white-space:nowrap}
 .legend{margin-bottom:4px}
-.ensemble-panel{padding:12px 14px;margin-bottom:14px}
-.ensemble-actions{margin-top:8px}
-.ensemble-panel p{margin-top:7px}
 .plot-area:has(.ensemble-panel) .globe{max-width:clamp(300px,calc(100dvh - 520px),510px)}
 .readout-rule{margin:22px 0}
 .readout p{line-height:1.6}
