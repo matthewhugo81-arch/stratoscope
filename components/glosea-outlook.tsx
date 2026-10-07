@@ -1,10 +1,15 @@
 'use client';
-import {useEffect,useState} from 'react';
+import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {fetchGloSea,type GloSea} from '@/lib/glosea';
 import {SEASONAL_MODELS,fetchSeasonal,fetchClimate,fetchEra,type SeasonalId,type SeasonalForecast,type SeasonalClimate,type EraClimate} from '@/lib/seasonal';
 import {SeasonalChart} from '@/components/seasonal-chart';
 export function GloSeaOutlook(){
+ const chartContent=useRef<HTMLDivElement>(null),[chartHeight,setChartHeight]=useState(0);
+ // Keep the chart slot tall while a different model loads; otherwise the browser
+ // clamps the document scroll position when the previous chart disappears.
+
  const [data,setData]=useState<GloSea|null>(null),[open,setOpen]=useState(false),[model,setModel]=useState<SeasonalId>('egrr');
+ useLayoutEffect(()=>{if(!chartContent.current)return;const content=chartContent.current;const measure=()=>setChartHeight(h=>Math.max(h,Math.ceil(content.getBoundingClientRect().height)));measure();const observer=new ResizeObserver(measure);observer.observe(content);return()=>observer.disconnect()},[open]);
  const [forecast,setForecast]=useState<SeasonalForecast|null>(null),[climate,setClimate]=useState<SeasonalClimate|null>(null),[era,setEra]=useState<EraClimate|null>(null),[loading,setLoading]=useState(false),[error,setError]=useState(''),[referenceError,setReferenceError]=useState(false),[refresh,setRefresh]=useState(0);
  useEffect(()=>{const c=new AbortController();void fetchGloSea(AbortSignal.any([c.signal,AbortSignal.timeout(15000)])).then(d=>{if(!c.signal.aborted)setData(d)}).catch(()=>{});return()=>c.abort()},[]);
  // ERA5 is shared by every model and can arrive before the model hindcasts.
@@ -36,10 +41,12 @@ export function GloSeaOutlook(){
  const matchingClimate=climate?.model===model&&climate.month===Number(plot?.nominal.slice(5,7))?climate:null;
  return <div className="glosea-section"><button className="glosea-toggle" onClick={()=>setOpen(v=>!v)} aria-expanded={open} aria-controls="seasonal-wind-charts">{open?'Hide':'Show'} seasonal wind outlooks <span>7 models · 60°N · 10 hPa</span></button>{open&&<section id="seasonal-wind-charts" className="glosea-outlook" aria-label="Seasonal wind model comparison">
   <div className="glosea-heading"><div><span className="eyebrow">STRATOSCOPE · SEASONAL OUTLOOKS</span><h2>Polar vortex wind <span>/ 60°N · 10 hPa</span></h2></div><label className="seasonal-model-label">Seasonal model<select value={model} onChange={e=>setModel(e.target.value as SeasonalId)} aria-label="Seasonal wind model">{SEASONAL_MODELS.map(m=><option value={m.id} key={m.id}>{m.name}</option>)}</select></label></div>
+  <div className="seasonal-chart-slot" style={{minHeight:chartHeight||undefined}}><div ref={chartContent} className="seasonal-chart-content">
   {plot?<SeasonalChart key={model+plot.nominal+plot.sampling} data={plot} climate={matchingClimate} era={era} referenceError={referenceError}/>:<>
    <p className="seasonal-pending" role="status">{loading?'Checking prepared '+selected.name+' data…':error||selected.name+' native data are still being prepared.'} The official Copernicus chart remains available below until the complete native ensemble is ready.</p>
    {!loading&&<iframe key={model} className="seasonal-embed" title={selected.name+' official seasonal wind chart while native data are pending'} src={'https://climate.copernicus.eu/charts/embed/c3s_seasonal/c3s_seasonal_stratots_'+model+'?area=60N&controls_overlay=1&player_dimension=base_time&type=plumemembers'} allowFullScreen referrerPolicy="strict-origin-when-cross-origin"/>}
   </>}
+  </div></div>
   {error&&plot&&<p role="status">{error} Showing the previously prepared GloSea issue.</p>}
   <div className="seasonal-source"><button className="seasonal-refresh" onClick={()=>setRefresh(n=>n+1)} disabled={loading}>Refresh seasonal data</button><a href={source} target="_blank" rel="noreferrer">Compare with the official {selected.name} chart ↗</a></div>
   <p>Seasonal outlooks are independent of the globe’s model and timeline. Forecasts update monthly; verified historical references are reused for the matching model version and start month.</p>

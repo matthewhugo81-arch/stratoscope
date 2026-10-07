@@ -209,3 +209,6 @@ footer{font-size:11px;line-height:1.5}
 @media(max-width:850px){.member-maps-grid,.member-maps-grid.gefs-grid{grid-template-columns:repeat(6,minmax(0,1fr))}.member-maps-key{flex-wrap:wrap}}
 @media(max-width:580px){.member-maps-grid,.member-maps-grid.gefs-grid{grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:140px;overflow-y:auto}.member-maps-dialog h2{font-size:14px}.member-maps-toolbar{flex-wrap:wrap}.member-maps-key i{width:100px}}
 @media(max-width:580px){.seasonal-plot svg{min-width:600px}.seasonal-values{gap:8px}.seasonal-values>strong{width:100%}.seasonal-legend{font-size:10px;gap:6px 12px}.seasonal-chart-options{gap:10px;flex-wrap:wrap}}
+
+/* Retain chart space during model changes so the document cannot collapse. */
+.seasonal-chart-content{display:flow-root}
