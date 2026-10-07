@@ -2,11 +2,12 @@ import {test,afterEach} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import ts from 'typescript';
+import {preparedResponse} from './prepared-fixture.mjs';
 
 // Load the browser modules without a browser, bundler, or upstream weather requests.
 async function moduleUrl(name){
  let source=await readFile(new URL(`../lib/${name}.ts`,import.meta.url),'utf8');
- for(const dependency of ['models','ensemble-statistics','shared-download','zonal-wind','forecast-transport']){
+ for(const dependency of ['models','prepared-ensembles','shared-download','zonal-wind','forecast-transport']){
   if(source.includes(`from './${dependency}'`))source=source.replace(`from './${dependency}'`,`from '${await moduleUrl(dependency)}'`);
  }
  const {outputText}=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}});
@@ -17,7 +18,7 @@ const originalFetch=globalThis.fetch,run='2026-10-07T00:00:00.000Z';
 const controller=()=>new AbortController(),pause=()=>new Promise(resolve=>setTimeout(resolve,10));
 const request=(hour=0,signal=controller().signal,model='ecmwf_direct',member=-1)=>loadForecast(model,run,hour,10,member,signal,()=>{});
 const frame=(url)=>{const q=new URL(url,'https://test.invalid').searchParams,model=q.get('model'),hour=Number(q.get('hour'));return {model,run:q.get('run'),hour,level:Number(q.get('level')),valid:new Date(Date.parse(run)+hour*3600000).toISOString(),grid:{nx:1,ny:1,lat0:90,lon0:0,dx:1,dy:-1},temperature:[-60],height:[31000],u:[10],v:[20],...(model==='ifs_ens'?{ensemble:{view:'member',member:Number(q.get('member')),count:51}}:{})};};
-afterEach(()=>{globalThis.fetch=originalFetch;for(const model of ['ecmwf_direct','ifs_ens','ecmwf'])clearForecastCache(model);});
+afterEach(()=>{globalThis.fetch=originalFetch;for(const model of ['ecmwf_direct','ifs_ens','gefs','aifs_ens','ecmwf'])clearForecastCache(model);});
 
 test('a selected forecast joins a preload without a second fetch',async()=>{
  let calls=0,release,upstream;
@@ -59,12 +60,32 @@ test('fixed-cycle cache lasts across navigation, rolling data still expires in 1
   clock+=6*3600000;assert.equal(peekForecast('ecmwf_direct',run,0,10,-1),undefined);
  }finally{Date.now=now;}
 });
-test('ensemble mean and spread reuse a complete 51-member result with bounded concurrency',async()=>{
- let calls=0,active=0,maxActive=0;globalThis.fetch=async url=>{calls++;active++;maxActive=Math.max(maxActive,active);await Promise.resolve();active--;return Response.json(frame(url));};
- const first=await request(24,controller().signal,'ifs_ens');
- assert.equal(calls,51);assert.ok(maxActive<=2);assert.equal(first.pair.mean.ensemble.count,51);
- const cached=peekForecast('ifs_ens',run,24,10,-1);assert.equal(cached.pair.spread.temperature[0],0);
- await request(24,controller().signal,'ifs_ens');assert.equal(calls,51);
+test('each complete ensemble mean and spread share one prepared download',async()=>{
+ for(const model of ['gefs','ifs_ens','aifs_ens']){
+  let calls=0;globalThis.fetch=async url=>{calls++;return preparedResponse(url);};
+  const first=await request(24,controller().signal,model);
+  assert.equal(calls,1);assert.equal(first.pair.mean.ensemble.count,model==='gefs'?31:51);
+  const cached=peekForecast(model,run,24,10,-1);assert.equal(cached.pair.spread.temperature[0],2);
+  await request(24,controller().signal,model);assert.equal(calls,1);
+ }
+});
+test('unavailable prepared data never falls back to downloading members',async()=>{
+ let calls=0;globalThis.fetch=async()=>{calls++;return new Response('missing',{status:404});};
+ await assert.rejects(request(54,controller().signal,'ifs_ens'),/prepared ensemble forecast is unavailable/);
+ assert.equal(calls,1);assert.equal(peekForecast('ifs_ens',run,54,10,-1),undefined);
+});
+test('a selected ensemble joins its preload, while Refresh cancels outstanding preparation downloads',async()=>{
+ let calls=0,release;globalThis.fetch=async url=>{calls++;await new Promise(resolve=>release=resolve);return preparedResponse(url);};
+ const c=controller(),preload=request(72,c.signal,'gefs');await pause();
+ c.abort();const foreground=request(72,controller().signal,'gefs');release();
+ await assert.rejects(preload,{name:'AbortError'});assert.equal((await foreground).frame.hour,72);assert.equal(calls,1);
+ globalThis.fetch=async(url,{signal})=>new Promise((resolve,reject)=>signal.addEventListener('abort',()=>reject(signal.reason),{once:true}));
+ const pending=request(78,controller().signal,'gefs');await pause();clearForecastCache('gefs');await assert.rejects(pending,{name:'AbortError'});
+ assert.equal(peekForecast('gefs',run,72,10,-1),undefined);
+});
+test('individual ensemble member selection still fetches only that member',async()=>{
+ let calls=0;globalThis.fetch=async url=>{calls++;assert.equal(new URL(url,'https://test.invalid').searchParams.get('member'),'17');return Response.json(frame(url));};
+ const result=await request(24,controller().signal,'ifs_ens',17);assert.equal(result.frame.ensemble.member,17);assert.equal(result.pair,undefined);assert.equal(calls,1);
 });
 
 test('a complete 41-frame loop replays without downloads beyond the 24-frame general cache',async()=>{
@@ -81,12 +102,12 @@ test('a complete 41-frame loop replays without downloads beyond the 24-frame gen
 });
 
 test('selected ensemble loops retain mean and spread beyond the six-pair general cache',async()=>{
- let calls=0;globalThis.fetch=async url=>{calls++;return Response.json(frame(url));};
+ let calls=0;globalThis.fetch=async url=>{calls++;return preparedResponse(url);};
  activateForecastSequence('ifs_ens',run,10,-1);
  for(let hour=0;hour<=42;hour+=6)await request(hour,controller().signal,'ifs_ens');
- assert.equal(calls,8*51);
+ assert.equal(calls,8);
  for(let hour=0;hour<=42;hour+=6){const result=await request(hour,controller().signal,'ifs_ens');assert.equal(result.pair.mean.hour,hour);assert.equal(result.pair.spread.hour,hour);}
- assert.equal(calls,8*51);
+ assert.equal(calls,8);
  assert.equal(peekForecast('ifs_ens',run,0,10,0),undefined);
 });
 

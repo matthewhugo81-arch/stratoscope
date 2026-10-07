@@ -2,10 +2,11 @@ import {forecastRequest} from './forecast-transport';
 import type {Frame} from './grib';
 import {MODELS,isCycle,isEnsemble,memberCount,type ModelId} from './models';
 import {frameZonalWind,type ZonalWind} from './zonal-wind';
-import {ensembleStatistics} from './ensemble-statistics';
+import {preparedPair,clearPreparedManifest} from './prepared-ensembles';
 import {sharedDownloads} from './shared-download';
 const frames=new Map<string,{at:number;frame:Frame}>(),statistics=new Map<string,{at:number;mean:Frame;spread:Frame}>();
 const downloads=sharedDownloads<Frame>();
+const summaryDownloads=sharedDownloads<ForecastResult>();
 export type ForecastResult={frame:Frame;pair?:{mean:Frame;spread:Frame}};
 type Sequence={model:ModelId;run:string;level:number;member:number;results:Map<string,{at:number;result:ForecastResult}>};
 let sequence:Sequence|undefined;
@@ -27,7 +28,7 @@ function retain(model:ModelId,run:string,hour:number,level:number,member:number,
 }
 const lifetime=(model:ModelId)=>isCycle(model)?6*3600000:900000;
 function cached<T extends {at:number}>(cache:Map<string,T>,key:string,model:ModelId){const hit=cache.get(key);if(!hit)return;if(Date.now()-hit.at>=lifetime(model)){cache.delete(key);return;}cache.delete(key);cache.set(key,hit);return hit;}
-export function clearForecastCache(model:ModelId){downloads.clear(model+'/');for(const cache of [frames,statistics,diagnostics])for(const key of cache.keys())if(key.startsWith(model+'/'))cache.delete(key);if(sequence?.model===model)sequence.results.clear();}
+export function clearForecastCache(model:ModelId){downloads.clear(model+'/');summaryDownloads.clear(model+'/');clearPreparedManifest(model);for(const cache of [frames,statistics,diagnostics])for(const key of cache.keys())if(key.startsWith(model+'/'))cache.delete(key);if(sequence?.model===model)sequence.results.clear();}
 export function peekForecastZonal(model:ModelId,run:string,hour:number,member:number){return cached(diagnostics,diagnosticKey(model,run,hour,member),model)?.value;}
 export function peekForecast(model:ModelId,run:string,hour:number,level:number,member:number):ForecastResult|undefined{
  if(inSequence(model,run,level,member)){const held=cached(sequence!.results,String(hour),model);if(held)return held.result;}
@@ -48,10 +49,11 @@ export async function loadForecast(model:ModelId,run:string,hour:number,level:nu
   });
  }
  if(!isEnsemble(model)||member>=0){const frame=await one(member);signal.throwIfAborted();return retain(model,run,hour,level,member,{frame},Date.now());}
- const hit=cached(statistics,id,model);if(hit)return {frame:hit.mean,pair:hit};
- const count=memberCount(model),accumulator=ensembleStatistics(count);let next=0,complete=0,failed=false;
- // At most two upstream member downloads at once. No partial statistics are plotted.
- async function worker(){while(next<count&&!failed){const m=next++;try{const f=await one(m);signal.throwIfAborted();if(failed)return;accumulator.add(f);progress(++complete);}catch(e){failed=true;throw e;}}}
- await Promise.all([worker(),worker()]);signal.throwIfAborted();const pair=accumulator.finish();statistics.set(id,{at:Date.now(),...pair});if(statistics.size>6)statistics.delete(statistics.keys().next().value!);
- return retain(model,run,hour,level,member,{frame:pair.mean,pair},Date.now());
+ // Exactly one compact prepared file, never a silent fan-out to 31/51 members.
+ const result=await summaryDownloads.get(id,signal,async downloadSignal=>{
+  const pair=await preparedPair(model,run,hour,level,AbortSignal.any([downloadSignal,AbortSignal.timeout(30000)]));downloadSignal.throwIfAborted();
+  statistics.set(id,{at:Date.now(),...pair});if(statistics.size>6)statistics.delete(statistics.keys().next().value!);
+  return retain(model,run,hour,level,member,{frame:pair.mean,pair},Date.now());
+ });
+ progress(memberCount(model));return result;
 }

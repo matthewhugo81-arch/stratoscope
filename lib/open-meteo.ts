@@ -1,11 +1,12 @@
 import {MODELS,type ModelId} from './models';
 import type {Frame} from './grib';
 import {readCachedJson,writeCachedJson} from './optional-cache';
+import {readOpenMeteo,writeOpenMeteo,reserveOpenMeteoLocations,pauseOpenMeteo} from './open-meteo-storage';
 type Bundle={at:number;frames:Frame[];nextOffset?:number};
 type Location={latitude:number;longitude:number;hourly_units:Record<string,string>;hourly:Record<string,Array<number|null>|string[]>};
 const bundles=new Map<string,Bundle>(),pending=new Map<string,Promise<Bundle>>();
 const partial=new Map<string,Bundle>();
-export class OpenMeteoRateLimit extends Error {retryAfter=65;constructor(message:string){super(message)}}
+export class OpenMeteoRateLimit extends Error {constructor(message:string,public retryAfter=65){super(message)}}
 const fields=['temperature','geopotential_height','wind_speed','wind_direction'];
 const ttl=30*60*1000;
 // Fetch a level's entire timeline once, retaining only six-hour steps. This keeps
@@ -22,17 +23,20 @@ async function loadBundle(model:ModelId,run:string,level:number):Promise<Bundle>
  const config=MODELS[model];if(!config.apiModel)throw Error('Select an Open-Meteo model.');
  const key=`${model}/${run}/${level}`,cacheKey=new Request(`https://stratoscope-cache.invalid/open-meteo-v2/${key}`);
  let progress=partial.get(key);
- const saved=await readCachedJson<Bundle>(cacheKey);if(saved){if(saved.nextOffset===360)return saved;progress=saved;}
+ const saved=await readOpenMeteo<Bundle>(key)??await readCachedJson<Bundle>(cacheKey);if(saved&&Date.now()-saved.at<ttl){if(saved.nextOffset===360)return saved;progress=saved;}
  if(progress&&Date.now()-progress.at>ttl){partial.delete(key);progress=undefined;}
  const now=Date.now(),grid={nx:36,ny:10,lat0:0,lon0:0,dx:10,dy:10};
  const frames:Frame[]=progress?.frames??Array.from({length:config.maxHour/6+1},(_,i)=>({run,hour:i*6,level,valid:new Date(Date.parse(run)+i*6*3600000).toISOString(),grid,temperature:[],height:[],u:[],v:[],model,runKind:'rolling',fetchedAt:new Date(now).toISOString(),source:'https://open-meteo.com/en/docs'}));
  const bundle:Bundle=progress??{at:now,frames,nextOffset:0};
  const variables=fields.map(v=>`${v}_${level}hPa`),start=run.slice(0,16),end=frames.at(-1)!.valid.slice(0,16);
  for(let offset=bundle.nextOffset??0;offset<360;offset+=60){
+  const budget=await reserveOpenMeteoLocations(60);
+  if(budget.exhausted)throw Error(`Open-Meteo’s ${budget.exhausted} request budget is reached. Reuse downloaded maps or choose a direct source below.`);
+  if(budget.wait)throw new OpenMeteoRateLimit('Pacing requests to stay within Open-Meteo’s free limit. Downloaded sections are saved; you can also choose a direct source below.',budget.wait);
   const locations=Array.from({length:60},(_,i)=>{const n=offset+i,lon=n%36*10;return {lat:Math.floor(n/36)*10,lon:lon>180?lon-360:lon}});
   const q=new URLSearchParams({latitude:locations.map(p=>p.lat).join(','),longitude:locations.map(p=>p.lon).join(','),elevation:locations.map(()=>'nan').join(','),models:config.apiModel,hourly:variables.join(','),start_hour:start,end_hour:end,timezone:'GMT',wind_speed_unit:'ms',cell_selection:'nearest'});
   const response=await fetch(`https://api.open-meteo.com/v1/forecast?${q}`,{signal:AbortSignal.timeout(30000)});
-  if(response.status===429){const body=await response.json() as {reason?:string};if(/daily|hourly/i.test(body.reason??''))throw Error('Open-Meteo’s free-service quota is temporarily exhausted. Cached maps and direct NOAA GFS are still available.');throw new OpenMeteoRateLimit('Open-Meteo’s short-term limit paused this download. It will resume automatically; downloaded sections are saved.');}
+  if(response.status===429){const body=await response.json() as {reason?:string};if(/daily|hourly/i.test(body.reason??''))throw Error('Open-Meteo’s free-service quota is temporarily exhausted. Reuse downloaded maps or choose a direct source below.');const header=response.headers.get('Retry-After'),seconds=header?(Number(header)||Math.ceil((Date.parse(header)-Date.now())/1000)):65,wait=Number.isFinite(seconds)?Math.max(65,seconds):65;await pauseOpenMeteo(wait);throw new OpenMeteoRateLimit('Open-Meteo’s short-term limit paused this download. Downloaded sections are saved. Wait for the automatic retry or choose a direct source below.',wait);}
   if(!response.ok)throw Error(`Open-Meteo could not provide this map (${response.status}). Please retry.`);
   const data=await response.json() as Location[];if(!Array.isArray(data)||data.length!==60)throw Error('Open-Meteo returned an incomplete hemisphere.');
   for(let i=0;i<data.length;i++){
@@ -46,6 +50,7 @@ async function loadBundle(model:ModelId,run:string,level:number):Promise<Bundle>
    }
   }
   bundle.nextOffset=offset+60;partial.set(key,bundle);if(partial.size>6)partial.delete(partial.keys().next().value!);
+  await writeOpenMeteo(key,bundle,ttl);
   await writeCachedJson(cacheKey,bundle,1800);
  }
  partial.delete(key);

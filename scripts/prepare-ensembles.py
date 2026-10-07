@@ -192,8 +192,10 @@ def save_frame(path, model, run, hour, level, planes, zonal):
     stamp = run.isoformat(timespec='milliseconds').replace('+00:00', 'Z')
     metadata = {'version': 1, 'model': model, 'run': stamp, 'hour': hour, 'level': level, 'count': CONFIG[model]['count'], 'grid': {'nx': 360, 'ny': 91, 'lat0': 90, 'lon0': 0, 'dx': 1, 'dy': -1}, 'zonalWind60N': zonal, 'preparedAt': datetime.now(timezone.utc).isoformat(), 'scale': 100, 'planes': 7, 'source': NOAA_ORIGIN if model == 'gefs' else EC_ORIGIN}
     header = json.dumps(metadata, separators=(',', ':')).encode()
-    arrays = np.rint(np.stack(planes)*100).astype('<i4')
-    assert np.isfinite(planes).all()
+    values = np.stack(planes)
+    assert values.shape == (7, 91, 360) and np.isfinite(values).all()
+    assert np.max(np.abs(values)) < 10_000_000, 'Value exceeds packed representation'
+    arrays = np.rint(values*100).astype('<i4')
     # Row differences compress smoothly varying fields without losing precision.
     arrays[:, :, 1:] = arrays[:, :, 1:] - arrays[:, :, :-1]
     payload = gzip.compress(b'STRAT001' + struct.pack('<I', len(header)) + header + arrays.tobytes(), compresslevel=6, mtime=0)
