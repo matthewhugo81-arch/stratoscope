@@ -178,6 +178,16 @@ if __name__ == '__main__':
     except Exception as error:
         # Do not print arbitrary API exception bodies that could include auth.
         print(f'GloSea preparation failed ({type(error).__name__}). Nothing published.', file=sys.stderr)
+        response = getattr(error, 'response', None)
+        if response is not None:
+            print(f'CDS HTTP status: {response.status_code}', file=sys.stderr)
+            detail = response.text.lower()
+            if any(word in detail for word in ['licence', 'license', 'terms of use', 'terms and conditions']):
+                print('CDS reports a licence/terms requirement. Accept the seasonal pressure-level dataset terms in the CDS account associated with this token.', file=sys.stderr)
+            elif any(word in detail for word in ['invalid token', 'invalid key', 'authentication', 'unauthorized']):
+                print('CDS reports an authentication problem. Check the stored personal API token.', file=sys.stderr)
+            elif response.status_code == 400:
+                print('CDS rejected the dataset selection; the request needs review.', file=sys.stderr)
         if isinstance(error, ValueError):
             print(str(error), file=sys.stderr)
         sys.exit(1)
