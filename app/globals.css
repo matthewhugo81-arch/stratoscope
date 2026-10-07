@@ -198,4 +198,5 @@ footer{font-size:11px;line-height:1.5}
 .seasonal-values{display:flex;gap:10px 24px;flex-wrap:wrap;padding:14px;background:#142d35;border:1px solid #34545e;border-radius:6px;font-size:12px;color:#a7c6d0}.seasonal-values strong{color:#c6e8e2}.seasonal-values b{color:#b5efdd;font-family:monospace}
 .seasonal-pending{border-left:2px solid #d6a66b;padding-left:10px}.seasonal-refresh{background:#17313a;border:1px solid #42616b;border-radius:4px;padding:7px 12px;color:#b5efdd;font-size:12px}.seasonal-source{align-items:center;margin-top:16px;font-size:12px}.seasonal-source a{text-decoration:underline}
 .seasonal-empty{min-height:260px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;color:#b4ced8;border:1px dashed #36505b;border-radius:6px;margin:18px 0;padding:24px}
-@media(max-width:580px){.seasonal-values{gap:8px}.seasonal-values>strong{width:100%}.seasonal-legend{font-size:10px;gap:6px 12px}.seasonal-chart-options{gap:10px;flex-wrap:wrap}}
+.seasonal-plot{overflow-x:auto}
+@media(max-width:580px){.seasonal-plot svg{min-width:600px}.seasonal-values{gap:8px}.seasonal-values>strong{width:100%}.seasonal-legend{font-size:10px;gap:6px 12px}.seasonal-chart-options{gap:10px;flex-wrap:wrap}}
