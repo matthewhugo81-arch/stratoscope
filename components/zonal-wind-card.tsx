@@ -3,17 +3,17 @@ import {useEffect,useState} from 'react';
 import {RefreshCw} from 'lucide-react';
 import type {Frame} from '@/lib/grib';
 import {isEnsemble,memberCount,supports,type ModelId} from '@/lib/models';
-import {loadForecast,peekForecast} from '@/lib/forecast-client';
+import {loadForecast,peekForecast,peekForecastZonal} from '@/lib/forecast-client';
 import {frameZonalWind,matchesZonalFrame,windDisplay} from '@/lib/zonal-wind';
 
-type Props={model:ModelId;run:string;hour:number;member:number;mapLevel:number;mapFrame:Frame|null;mapBusy:boolean;mapError:string;mapProgress:number;refresh:number};
-export function ZonalWindCard({model,run,hour,member,mapLevel,mapFrame,mapBusy,mapError,mapProgress,refresh}:Props){
+type Props={model:ModelId;run:string;hour:number;member:number;mapLevel:number;mapFrame:Frame|null;mapBusy:boolean;mapError:string;mapProgress:number;refresh:number;onReady?:(key:string)=>void};
+export function ZonalWindCard({model,run,hour,member,mapLevel,mapFrame,mapBusy,mapError,mapProgress,refresh,onReady}:Props){
  const [loaded,setLoaded]=useState<{key:string;frame:Frame}|null>(null),[failure,setFailure]=useState<{key:string;message:string}|null>(null),[progress,setProgress]=useState(0),[attempt,setAttempt]=useState(0);
  const available=supports(model,10),ensemble=isEnsemble(model),key=`${model}/${run}/${hour}/${member}/${refresh}`;
  const direct=matchesZonalFrame(mapFrame,model,run,hour,member)?mapFrame:null;
  const candidate=direct??(loaded?.key===key&&matchesZonalFrame(loaded.frame,model,run,hour,member)?loaded.frame:null);
  useEffect(()=>{
-  if(!available||!run||mapLevel===10)return;
+  if(!available||!run||mapLevel===10||peekForecastZonal(model,run,hour,member))return;
   const c=new AbortController();setFailure(null);setProgress(0);
   const cached=peekForecast(model,run,hour,10,member);
   if(cached){setLoaded({key,frame:cached.frame});return;}
@@ -23,8 +23,10 @@ export function ZonalWindCard({model,run,hour,member,mapLevel,mapFrame,mapBusy,m
   void loadForecast(model,run,hour,10,member,c.signal,n=>{if(!c.signal.aborted)setProgress(n)}).then(result=>{if(!c.signal.aborted)setLoaded({key,frame:result.frame});}).catch(error=>{if(!c.signal.aborted)setFailure({key,message:error.name==='TimeoutError'?'The 10 hPa download timed out.':error.message});});
   return()=>c.abort();
  },[available,run,model,hour,member,mapLevel,mapBusy,key,attempt]);
- let diagnostic=null,issue=mapLevel===10?mapError:failure?.key===key?failure.message:'';
+ let diagnostic=peekForecastZonal(model,run,hour,member)??null,issue=mapLevel===10?mapError:failure?.key===key?failure.message:'';
  if(candidate)try{diagnostic=frameZonalWind(candidate);}catch(error){issue=error instanceof Error?error.message:'The latitude circle is incomplete.';}
+ const settled=!available||!!diagnostic||!!issue;
+ useEffect(()=>{if(settled)onReady?.(key);},[settled,key,onReady]);
  const presentation=diagnostic?windDisplay(diagnostic.value):null;
  const description=ensemble?(member<0?`Ensemble mean · ${memberCount(model)} members`:member===0?'Control member':`Member ${String(member).padStart(2,'0')}`):'Zonal-mean u wind';
  const valid=run?new Date(Date.parse(run)+hour*3600000).toISOString():'';

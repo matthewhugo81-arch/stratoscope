@@ -1,6 +1,6 @@
 'use client';
-import {useEffect,useState} from 'react';
-import {Orbit,RefreshCw,Layers,ChevronLeft,ChevronRight,Info} from 'lucide-react';
+import {useEffect,useRef,useState} from 'react';
+import {Orbit,RefreshCw,Layers,ChevronLeft,ChevronRight,Info,Repeat2,Pause,Images} from 'lucide-react';
 import {Slider} from '@/components/ui/slider';
 import {Switch} from '@/components/ui/switch';
 import {Tabs,TabsList,TabsTrigger} from '@/components/ui/tabs';
@@ -8,8 +8,9 @@ import {RadioGroup,RadioGroupItem} from '@/components/ui/radio-group';
 import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue} from '@/components/ui/select';
 import {PolarMap} from '@/components/polar-map';
 import {ZonalWindCard} from '@/components/zonal-wind-card';
+import {ForecastStamps} from '@/components/forecast-stamps';
 import {MODELS,isModel,isCycle,isEnsemble,memberCount,supports,type ModelId,type ForecastMeta,type EnsembleView} from '@/lib/models';
-import {loadForecast,peekForecast,clearForecastCache} from '@/lib/forecast-client';
+import {loadForecast,peekForecast,clearForecastCache,activateForecastSequence} from '@/lib/forecast-client';
 import {forecastMeta} from '@/lib/forecast-transport';
 import {temperatureGradient,temperaturePosition,temperatureTicks} from '@/lib/temperature-scale';
 import type {Frame} from '@/lib/grib';
@@ -19,12 +20,19 @@ const date=(v:string)=>new Date(v).toLocaleString('en-GB',{timeZone:'UTC',day:'2
 export default function Home(){
  const [model,setModel]=useState<ModelId>('gfs'),[meta,setMeta]=useState<ForecastMeta|null>(null),[level,setLevel]=useState(10),[hour,setHour]=useState(0),[field,setField]=useState('temperature'),[contours,setContours]=useState(true),[grid,setGrid]=useState(true),[rawFrame,setFrame]=useState<Frame|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(''),[refresh,setRefresh]=useState(0),[retryAt,setRetryAt]=useState(0),[attempt,setAttempt]=useState(0),[retryTick,setRetryTick]=useState(0);
  const [view,setView]=useState<EnsembleView>('mean'),[member,setMember]=useState(0),[progress,setProgress]=useState(0),[pair,setPair]=useState<{mean:Frame;spread:Frame}|null>(null);
+ const [playing,setPlaying]=useState(false),[delay,setDelay]=useState(1000),[showStamps,setShowStamps]=useState(false),[zonalReady,setZonalReady]=useState(''),[,setCacheVersion]=useState(0);
+ const direction=useRef(1);
  const config=MODELS[model],maxHour=config.maxHour,run=meta?.model===model?meta.run:'',cyclic=isCycle(model),ensemble=isEnsemble(model),count=ensemble?memberCount(model):0,selectionMember=ensemble&&view==='member'?member:-1;
- const pairMatches=pair&&pair.mean.model===model&&pair.mean.run===run&&pair.mean.level===level&&pair.mean.hour===hour;
- const frame=ensemble&&view!=='member'&&pairMatches?pair[view]:rawFrame,displaySpread=frame?.ensemble?.view==='spread';
+ const selected=peekForecast(model,run,hour,level,selectionMember);
+ const currentPair=selected?.pair??pair,pairMatches=currentPair&&currentPair.mean.model===model&&currentPair.mean.run===run&&currentPair.mean.level===level&&currentPair.mean.hour===hour;
+ const frame=ensemble&&view!=='member'&&pairMatches?currentPair[view]:selected?.frame??rawFrame,displaySpread=frame?.ensemble?.view==='spread';
  const absoluteTemperature=field==='temperature'&&!displaySpread;
- function chooseModel(value:string){if(!isModel(value))return;setModel(value);if(!supports(value,level))setLevel(MODELS[value].levels[0]);setHour(h=>Math.min(h,MODELS[value].maxHour));if(isEnsemble(value))setMember(m=>Math.min(m,memberCount(value)-1));}
- function refreshData(){clearForecastCache(model);setRefresh(v=>v+1)}
+ function chooseHour(value:number){setPlaying(false);direction.current=value<hour?-1:1;setHour(Math.max(0,Math.min(maxHour,value)));}
+ function chooseModel(value:string){if(!isModel(value))return;setPlaying(false);setModel(value);if(!supports(value,level))setLevel(MODELS[value].levels[0]);setHour(h=>Math.min(h,MODELS[value].maxHour));if(isEnsemble(value))setMember(m=>Math.min(m,memberCount(value)-1));}
+ function refreshData(){setPlaying(false);clearForecastCache(model);setRefresh(v=>v+1)}
+ useEffect(()=>{activateForecastSequence(model,run,level,selectionMember);setCacheVersion(v=>v+1);setPlaying(false);},[model,run,level,selectionMember,refresh]);
+ useEffect(()=>{setPlaying(false);},[view]);
+ useEffect(()=>{const hidden=()=>{if(document.hidden)setPlaying(false);};document.addEventListener('visibilitychange',hidden);return()=>document.removeEventListener('visibilitychange',hidden);},[]);
  useEffect(()=>{
   const c=new AbortController();setMeta(null);setLoading(true);setError('');setRetryAt(0);
   forecastMeta(model,AbortSignal.any([c.signal,AbortSignal.timeout(55000)])).then(setMeta).catch(e=>{if(e.name!=='AbortError'){setError(e.name==='TimeoutError'?'Finding the latest forecast took too long. Please retry.':e.message);setLoading(false)}});
@@ -36,11 +44,12 @@ export default function Home(){
   const apply=(result:Awaited<ReturnType<typeof loadForecast>>)=>{
    if(c.signal.aborted)return;setFrame(result.frame);if(result.pair)setPair(result.pair);setLoading(false);
    // Only one adjacent single frame: no speculative 31/51-member or Open-Meteo downloads.
-   if(cyclic&&(!ensemble||selectionMember>=0)&&hour<maxHour)preload=setTimeout(()=>{
+   const adjacent=hour+direction.current*6;
+   if(cyclic&&(!ensemble||selectionMember>=0)&&adjacent>=0&&adjacent<=maxHour)preload=setTimeout(()=>{
     const connection=(navigator as Navigator & {connection?:{saveData?:boolean;effectiveType?:string}}).connection;
     if(document.visibilityState!=='visible'||connection?.saveData||connection?.effectiveType?.includes('2g'))return;
-    void loadForecast(model,run,hour+6,level,selectionMember,c.signal,()=>{}).catch(()=>{});
-   },700);
+    void loadForecast(model,run,adjacent,level,selectionMember,c.signal,()=>{}).then(()=>{if(!c.signal.aborted)setCacheVersion(v=>v+1)}).catch(()=>{});
+   },120);
   };
   const cached=peekForecast(model,run,hour,level,selectionMember);
   if(cached)apply(cached);else void loadForecast(model,run,hour,level,selectionMember,c.signal,n=>{if(!c.signal.aborted)setProgress(n)}).then(apply).catch(e=>{if(!c.signal.aborted){if(e.retryAfter)setRetryAt(Date.now()+e.retryAfter*1000);setError(e.name==='TimeoutError'?'The model download took too long. Please retry.':e.message);setLoading(false)}});
@@ -51,22 +60,32 @@ export default function Home(){
    if(e.defaultPrevented||e.altKey||e.ctrlKey||e.metaKey||e.shiftKey||!['ArrowLeft','ArrowRight'].includes(e.key))return;
    const target=e.target instanceof Element?e.target:null;
    if(target?.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="slider"],[role="tablist"],[role="radiogroup"],[role="combobox"],[role="listbox"],[role="menu"],[role="dialog"]'))return;
-   e.preventDefault();if(!e.repeat)setHour(h=>Math.max(0,Math.min(maxHour,h+(e.key==='ArrowRight'?6:-6))));
+   e.preventDefault();if(!e.repeat)chooseHour(hour+(e.key==='ArrowRight'?6:-6));
   };
   window.addEventListener('keydown',step);return()=>window.removeEventListener('keydown',step);
- },[maxHour]);
+ },[maxHour,hour]);
  useEffect(()=>{
   const context=(document as Document & {modelContext?:{registerTool:(tool:unknown,options:{signal:AbortSignal})=>unknown}}).modelContext;
   if(!context?.registerTool)return;const lifecycle=new AbortController();
   const tool={name:'select_forecast',title:'Select a stratosphere forecast',description:'Select model, pressure, lead time, field and ensemble view. GEFS has 31 members and 16 days. ECMWF ENS and AIFS ENS have 51 members and 15 days at 10, 50 and 100 hPa. Member 0 is the control. Data loads after selection.',inputSchema:{type:'object',properties:{model:{type:'string',enum:Object.keys(MODELS)},level:{type:'integer',enum:levels},hour:{type:'integer',minimum:0,maximum:384,multipleOf:6},field:{type:'string',enum:['temperature','wind']},view:{type:'string',enum:['mean','spread','member']},member:{type:'integer',minimum:0,maximum:50}},required:['level','hour','field'],additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:false},execute:async(input:unknown)=>{
    const v=input as {model?:string;level:number;hour:number;field:string;view?:EnsembleView;member?:number},m=v?.model??model;
    if(!v||!isModel(m)||!supports(m,v.level)||!Number.isInteger(v.hour)||v.hour<0||v.hour>MODELS[m].maxHour||v.hour%6||!['temperature','wind'].includes(v.field)||v.view&&!['mean','spread','member'].includes(v.view)||v.member!==undefined&&(!isEnsemble(m)||!Number.isInteger(v.member)||v.member<0||v.member>=memberCount(m)))throw Error('Unsupported model, level, hour, field or ensemble member.');
-   setModel(m);setLevel(v.level);setHour(v.hour);setField(v.field);if(isEnsemble(m)){setView(v.view??'mean');setMember(v.member??0);}await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));return {status:'selected',model:m,level:v.level,hour:v.hour,field:v.field,view:v.view??'mean',member:v.member??0};
+   setPlaying(false);setModel(m);setLevel(v.level);setHour(v.hour);setField(v.field);if(isEnsemble(m)){setView(v.view??'mean');setMember(v.member??0);}await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));return {status:'selected',model:m,level:v.level,hour:v.hour,field:v.field,view:v.view??'mean',member:v.member??0};
   }};
   try{Promise.resolve(context.registerTool(tool,{signal:lifecycle.signal})).catch(()=>{})}catch{}return()=>lifecycle.abort();
  },[model]);
  const valid=run?new Date(Date.parse(run)+hour*3600000).toISOString():'';
  const matching=frame&&frame.hour===hour&&frame.level===level&&frame.run===run&&(frame.model??'gfs')===model&&(!ensemble||(frame.ensemble?.view===view&&(view!=='member'||frame.ensemble.member===member)));
+ const zonalKey=`${model}/${run}/${hour}/${selectionMember}/${refresh}`;
+ useEffect(()=>{
+  if(error){setPlaying(false);return;}
+  if(!playing||loading||!matching||zonalReady!==zonalKey)return;
+  // Start the dwell time only after the displayed map and wind readout settle.
+  const timer=setTimeout(()=>{direction.current=1;setHour(h=>h>=maxHour?0:h+6);},delay);
+  return()=>clearTimeout(timer);
+ },[playing,loading,matching,error,zonalReady,zonalKey,hour,maxHour,delay]);
+ const times=Array.from({length:maxHour/6+1},(_,i)=>{const h=i*6,result=peekForecast(model,run,h,level,selectionMember);return {hour:h,frame:result?.pair&&view!=='member'?result.pair[view]:result?.frame};});
+ const readyCount=times.filter(t=>t.frame).length;
  const previousName=frame&&isModel(frame.model??'gfs')?MODELS[(frame.model??'gfs') as ModelId].label:'';
  useEffect(()=>{if(!retryAt)return;const timer=setTimeout(()=>{setRetryAt(0);setAttempt(v=>v+1)},Math.max(0,retryAt-Date.now())),tick=setInterval(()=>setRetryTick(v=>v+1),1000);return()=>{clearTimeout(timer);clearInterval(tick)}},[retryAt]);
  const retrySeconds=retryTick>=0?Math.max(0,Math.ceil((retryAt-Date.now())/1000)):0;
@@ -94,9 +113,21 @@ export default function Home(){
     <div className="map-shell"><PolarMap frame={frame} field={field} contours={contours} graticule={grid}/>{loading&&<div className="map-status" role="status"><RefreshCw size={14} className="spin"/> Loading {config.label} · {level} hPa{ensemble&&view!=='member'?` · ${progress}/${count} members`:model!=='gfs'?' · first download may take a moment':''}</div>}{error&&<div className="map-error" role="alert"><strong>{retryAt?'Download paused':'Forecast unavailable'}</strong><span>{error}</span>{retryAt?<span>Resuming in {retrySeconds} seconds</span>:<button onClick={refreshData}>Try again</button>}</div>}{frame&&!matching&&<div className="previous-label">Previous plot: {previousName}{frame.ensemble?` · ${frame.ensemble.view}${frame.ensemble.view==='member'?` ${frame.ensemble.member}`:''}`:''} · {frame.level} hPa · {date(frame.valid)} UTC</div>}</div>
     <div className="legend"><div><span>{field==='temperature'?'TEMPERATURE':'WIND SPEED'}{displaySpread?' SPREAD (1σ)':''}</span><span>{field==='temperature'?'°C':'m/s'}</span></div><div className={`color-ramp ${absoluteTemperature?'':'wind-ramp'}`} style={absoluteTemperature?{background:temperatureGradient}:undefined}/><div className={`legend-ticks ${absoluteTemperature?'temperature-ticks':''}`}>{(displaySpread?(field==='temperature'?[0,2.5,5,7.5,10,12.5,15]:[0,5,10,15,20,25,30]):absoluteTemperature?temperatureTicks:[0,20,40,60,80,100,120]).map(v=><span key={v} style={absoluteTemperature?{left:`${temperaturePosition(v)}%`}:undefined}>{absoluteTemperature&&v>0?'+':''}{v}{displaySpread&&v===(field==='temperature'?15:30)?'+':''}</span>)}</div>{displaySpread&&<p className="spread-note">Higher spread = less agreement · contours show mean height</p>}</div>
    </div>
-   <aside className="readout"><div className="eyebrow">VALID AT</div><h3>{valid?new Date(valid).toLocaleDateString('en-GB',{timeZone:'UTC',day:'numeric',month:'long'}):'—'}</h3><div className="valid-hour">{valid?valid.slice(11,16):'—'} <span>UTC</span></div><span className="forecast-badge">{label}</span><ZonalWindCard model={model} run={run} hour={hour} member={selectionMember} mapLevel={level} mapFrame={frame} mapBusy={loading} mapError={error} mapProgress={progress} refresh={refresh}/><div className="readout-rule"/><div className="contour-key"><span/> {frame?.ensemble&&frame.ensemble.view!=='member'?'Mean geopotential height':'Geopotential height'}</div><p className="muted">Contours every 400 m, labelled in decametres (dam).</p><p className="muted">Only the Northern Hemisphere has weather data. The unshaded south is outside this viewer’s coverage.</p><details><summary><Info size={14}/> Data & method</summary><p>{config.provider}. {method}</p>{ecSource&&<p>Contains modified ECMWF forecast data (2026), supplied under CC BY 4.0. The display samples and converts the original fields; ECMWF does not endorse this viewer.</p>}{model==='ecmwf'&&<p>Open-Meteo ECMWF IFS 0.25° supplies 50 and 100 hPa. Select the direct ECMWF source for 10 hPa.</p>}{ensemble&&<p>The first mean or spread download retrieves all {count} members and may take a few minutes. Progress shows completed members; incomplete ensembles are never plotted. Switching between mean and spread reuses the same download.</p>}{model==='ifs_ens'&&<p>The IFS control comes from ECMWF’s oper/fc feed, which has supplied the ENS control since Cycle 50r1.</p>}<p>The timeline uses six-hour steps{cyclic?', measured from the model initialization time. The initial field is forecast hour zero.':', measured from today at 00 UTC, not from a model initialisation time. Open-Meteo timelines are cached for up to 30 minutes.'}</p><p>Globe lighting gives depth; use the pointer values for precise numbers. ← / → step through forecast times. With the globe focused, Shift + arrows rotate, +/− zoom and Home restores the north-pole view.</p><p>The polar-vortex wind indicator averages the signed eastward wind component (u) around the complete 60°N latitude circle at 10 hPa. Positive is westerly; negative is easterly. It uses every longitude on the downloaded source grid before display sampling; older cached frames are explicitly labelled as display-grid estimates. Ensemble Mean and Spread views both show the ensemble-mean zonal wind, while Member shows that member. It follows the selected forecast time and stays at 10 hPa when the map level changes.</p><p>This is an instantaneous model field, not a daily mean or an SSW event declaration. An easterly value is a reversal signal to monitor; formal major-warming identification also depends on winter timing and event criteria. <a href="https://www.ncei.noaa.gov/access/metadata/landing-page/bin/iso?id=gov.noaa.ncdc:C00960" target="_blank" rel="noreferrer">NOAA SSW reference</a></p><p>Model forecasts are not observations. Coastlines: Natural Earth.</p><a href={documentation} target="_blank" rel="noreferrer">{noaaSource?'NOAA documentation':ecSource?'ECMWF data & licence':'Weather data by Open-Meteo'}</a>{frame?.fetchedAt&&<p>Map downloaded {date(frame.fetchedAt)} UTC.</p>}</details></aside>
+   <aside className="readout"><div className="eyebrow">VALID AT</div><h3>{valid?new Date(valid).toLocaleDateString('en-GB',{timeZone:'UTC',day:'numeric',month:'long'}):'—'}</h3><div className="valid-hour">{valid?valid.slice(11,16):'—'} <span>UTC</span></div><span className="forecast-badge">{label}</span><ZonalWindCard model={model} run={run} hour={hour} member={selectionMember} mapLevel={level} mapFrame={frame} mapBusy={loading} mapError={error} mapProgress={progress} refresh={refresh} onReady={setZonalReady}/><div className="readout-rule"/><div className="contour-key"><span/> {frame?.ensemble&&frame.ensemble.view!=='member'?'Mean geopotential height':'Geopotential height'}</div><p className="muted">Contours every 400 m, labelled in decametres (dam).</p><p className="muted">Only the Northern Hemisphere has weather data. The unshaded south is outside this viewer’s coverage.</p><details><summary><Info size={14}/> Data & method</summary><p>{config.provider}. {method}</p>{ecSource&&<p>Contains modified ECMWF forecast data (2026), supplied under CC BY 4.0. The display samples and converts the original fields; ECMWF does not endorse this viewer.</p>}{model==='ecmwf'&&<p>Open-Meteo ECMWF IFS 0.25° supplies 50 and 100 hPa. Select the direct ECMWF source for 10 hPa.</p>}{ensemble&&<p>The first mean or spread download retrieves all {count} members and may take a few minutes. Progress shows completed members; incomplete ensembles are never plotted. Switching between mean and spread reuses the same download.</p>}{model==='ifs_ens'&&<p>The IFS control comes from ECMWF’s oper/fc feed, which has supplied the ENS control since Cycle 50r1.</p>}<p>The timeline uses six-hour steps{cyclic?', measured from the model initialization time. The initial field is forecast hour zero.':', measured from today at 00 UTC, not from a model initialisation time. Open-Meteo timelines are cached for up to 30 minutes.'}</p><p>Globe lighting gives depth; use the pointer values for precise numbers. ← / → step through forecast times. With the globe focused, Shift + arrows rotate, +/− zoom and Home restores the north-pole view.</p><p>The polar-vortex wind indicator averages the signed eastward wind component (u) around the complete 60°N latitude circle at 10 hPa. Positive is westerly; negative is easterly. It uses every longitude on the downloaded source grid before display sampling; older cached frames are explicitly labelled as display-grid estimates. Ensemble Mean and Spread views both show the ensemble-mean zonal wind, while Member shows that member. It follows the selected forecast time and stays at 10 hPa when the map level changes.</p><p>This is an instantaneous model field, not a daily mean or an SSW event declaration. An easterly value is a reversal signal to monitor; formal major-warming identification also depends on winter timing and event criteria. <a href="https://www.ncei.noaa.gov/access/metadata/landing-page/bin/iso?id=gov.noaa.ncdc:C00960" target="_blank" rel="noreferrer">NOAA SSW reference</a></p><p>Model forecasts are not observations. Coastlines: Natural Earth.</p><a href={documentation} target="_blank" rel="noreferrer">{noaaSource?'NOAA documentation':ecSource?'ECMWF data & licence':'Weather data by Open-Meteo'}</a>{frame?.fetchedAt&&<p>Map downloaded {date(frame.fetchedAt)} UTC.</p>}</details></aside>
   </section>
-  <section className="timeline" aria-label="Forecast timeline" aria-keyshortcuts="ArrowLeft ArrowRight"><div className="timeline-title"><span className="eyebrow">FORECAST TIMELINE</span><strong>{hour===0?initialLabel:`+${hour} hours`}<span> / {maxHour/24} days</span></strong><span className="keyboard-hint">← / → step 6 hours</span></div><div className="step-buttons"><button aria-label="Previous forecast" title="Previous forecast (←)" disabled={hour===0} onClick={()=>setHour(v=>Math.max(0,v-6))}><ChevronLeft size={20}/></button><button aria-label="Next forecast" title="Next forecast (→)" disabled={hour===maxHour} onClick={()=>setHour(v=>Math.min(maxHour,v+6))}><ChevronRight size={20}/></button></div><div className="timeline-track"><Slider aria-label="Forecast hour" value={[hour]} min={0} max={maxHour} step={6} onValueChange={v=>setHour(v[0])}/><div className="day-ticks">{Array.from({length:maxHour/24+1},(_,i)=><button key={i} onClick={()=>setHour(i*24)} className={hour===i*24?'active':''}>{i===0?(cyclic?'Run':'00Z'):`+${i}d`}</button>)}</div></div></section>
+  <section className="timeline" aria-label="Forecast timeline" aria-keyshortcuts="ArrowLeft ArrowRight">
+   <div className="timeline-title"><span className="eyebrow">FORECAST TIMELINE</span><strong>{hour===0?initialLabel:`+${hour} hours`}<span> / {maxHour/24} days</span></strong><span className="keyboard-hint">← / → step 6 hours</span></div>
+   <div className="timeline-actions"><div className="step-buttons"><button aria-label="Previous forecast" title="Previous forecast (←)" disabled={hour===0} onClick={()=>chooseHour(hour-6)}><ChevronLeft size={20}/></button><button aria-label="Next forecast" title="Next forecast (→)" disabled={hour===maxHour} onClick={()=>chooseHour(hour+6)}><ChevronRight size={20}/></button></div>
+    <button className={`loop-button ${playing?'active':''}`} aria-label={playing?'Pause forecast loop':'Play forecast loop'} aria-pressed={playing} disabled={!run||!!error} onClick={()=>{direction.current=1;setPlaying(v=>!v)}} title="Play every six-hour frame, waiting for each download. Repeats from memory once loaded.">{playing?<Pause size={16}/>:<Repeat2 size={17}/>}<span>{playing?'Pause':'Loop'}</span></button>
+    <select className="playback-speed" aria-label="Playback speed" value={delay} onChange={e=>setDelay(Number(e.target.value))}><option value={2000}>0.5×</option><option value={1000}>1×</option><option value={500}>2×</option></select>
+    <button className="stamps-toggle" aria-label={showStamps?'Hide frame previews':'Show frame previews'} aria-expanded={showStamps} aria-controls="forecast-stamps" onClick={()=>setShowStamps(v=>!v)} title="Show downloaded forecast thumbnails"><Images size={17}/><span>Frames</span></button>
+   </div>
+   <div className="timeline-track"><Slider aria-label="Forecast hour" value={[hour]} min={0} max={maxHour} step={6} onValueChange={v=>chooseHour(v[0])}/><div className="day-ticks">{Array.from({length:maxHour/24+1},(_,i)=><button key={i} onClick={()=>chooseHour(i*24)} className={hour===i*24?'active':''}>{i===0?(cyclic?'Run':'00Z'):`+${i}d`}</button>)}</div>
+    <div className="playback-status" role="status">{error?'Paused after download error':playing?(loading||!matching?'Buffering':zonalReady!==zonalKey?'Waiting for 10 hPa wind':readyCount===times.length?'Looping from memory':'Playing & loading'):loading?'Loading selected frame':'Ready'} · {readyCount}/{times.length} frames in memory{ensemble&&view!=='member'&&readyCount<times.length?' · each new frame loads the full ensemble':''}</div>
+   </div>
+  </section>
+  {showStamps&&<ForecastStamps times={times} hour={hour} run={run} field={field} onSelect={chooseHour}/>}
+
   <footer><span>STRATOSCOPE <b> / </b> NORTHERN HEMISPHERE</span><span>{noaaSource?'NOAA / NCEP':ecSource?<a href="https://www.ecmwf.int/en/forecasts/datasets/open-data" target="_blank" rel="noreferrer">ECMWF · CC BY 4.0</a>:<a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Weather data by Open-Meteo</a>} <i>·</i> All times UTC</span></footer>
  </main>
 }

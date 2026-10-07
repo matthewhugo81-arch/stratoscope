@@ -12,7 +12,7 @@ async function moduleUrl(name){
  const {outputText}=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}});
  return 'data:text/javascript;base64,'+Buffer.from(outputText).toString('base64');
 }
-const {loadForecast,peekForecast,clearForecastCache}=await import(await moduleUrl('forecast-client'));
+const {loadForecast,peekForecast,clearForecastCache,activateForecastSequence,peekForecastZonal}=await import(await moduleUrl('forecast-client'));
 const originalFetch=globalThis.fetch,run='2026-10-07T00:00:00.000Z';
 const controller=()=>new AbortController(),pause=()=>new Promise(resolve=>setTimeout(resolve,10));
 const request=(hour=0,signal=controller().signal,model='ecmwf_direct',member=-1)=>loadForecast(model,run,hour,10,member,signal,()=>{});
@@ -65,4 +65,52 @@ test('ensemble mean and spread reuse a complete 51-member result with bounded co
  assert.equal(calls,51);assert.ok(maxActive<=2);assert.equal(first.pair.mean.ensemble.count,51);
  const cached=peekForecast('ifs_ens',run,24,10,-1);assert.equal(cached.pair.spread.temperature[0],0);
  await request(24,controller().signal,'ifs_ens');assert.equal(calls,51);
+});
+
+test('a complete 41-frame loop replays without downloads beyond the 24-frame general cache',async()=>{
+ let calls=0;globalThis.fetch=async url=>{calls++;return Response.json(frame(url));};
+ activateForecastSequence('ecmwf_direct',run,10,-1);
+ for(let hour=0;hour<=240;hour+=6)await request(hour);
+ assert.equal(calls,41);
+ for(let hour=0;hour<=240;hour+=6)assert.equal((await request(hour)).frame.hour,hour);
+ assert.equal(calls,41);
+ // Releasing a sequence frees its pinned frames; a different pressure cannot reuse them.
+ activateForecastSequence('ecmwf_direct',run,50,-1);
+ assert.equal(peekForecast('ecmwf_direct',run,0,50,-1),undefined);
+ assert.equal(peekForecast('ecmwf_direct',run,0,10,-1),undefined);
+});
+
+test('selected ensemble loops retain mean and spread beyond the six-pair general cache',async()=>{
+ let calls=0;globalThis.fetch=async url=>{calls++;return Response.json(frame(url));};
+ activateForecastSequence('ifs_ens',run,10,-1);
+ for(let hour=0;hour<=42;hour+=6)await request(hour,controller().signal,'ifs_ens');
+ assert.equal(calls,8*51);
+ for(let hour=0;hour<=42;hour+=6){const result=await request(hour,controller().signal,'ifs_ens');assert.equal(result.pair.mean.hour,hour);assert.equal(result.pair.spread.hour,hour);}
+ assert.equal(calls,8*51);
+ assert.equal(peekForecast('ifs_ens',run,0,10,0),undefined);
+});
+
+test('loop diagnostics survive grid eviction and refresh clears the whole selected sequence',async()=>{
+ globalThis.fetch=async url=>Response.json({...frame(url),zonalWind60N:{value:-4,samples:360,longitudeStep:1,basis:'native'}});
+ activateForecastSequence('ecmwf_direct',run,50,-1);
+ for(let hour=0;hour<=240;hour+=6)await request(hour);
+ assert.equal(peekForecast('ecmwf_direct',run,0,10,-1),undefined);
+ assert.equal(peekForecastZonal('ecmwf_direct',run,0,-1).value,-4);
+ assert.equal(peekForecastZonal('ecmwf_direct',run,0,0),undefined);
+ await loadForecast('ecmwf_direct',run,0,50,-1,controller().signal,()=>{});
+ clearForecastCache('ecmwf_direct');
+ assert.equal(peekForecast('ecmwf_direct',run,0,50,-1),undefined);
+ assert.equal(peekForecastZonal('ecmwf_direct',run,0,-1),undefined);
+});
+
+test('retained sequences obey expiry and cannot be filled by an abandoned selection',async()=>{
+ const now=Date.now;let clock=now(),release;Date.now=()=>clock;
+ globalThis.fetch=async url=>Response.json(frame(url));
+ try{
+  activateForecastSequence('ecmwf_direct',run,10,-1);await request();
+  clock+=6*3600000;assert.equal(peekForecast('ecmwf_direct',run,0,10,-1),undefined);
+  globalThis.fetch=async url=>{await new Promise(resolve=>release=resolve);return Response.json(frame(url));};
+  const job=request(6);await pause();activateForecastSequence('ecmwf_direct',run,50,-1);release();await job;
+  assert.equal(peekForecast('ecmwf_direct',run,6,50,-1),undefined);
+ }finally{Date.now=now;}
 });
