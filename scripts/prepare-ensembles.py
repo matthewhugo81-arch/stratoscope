@@ -4,7 +4,7 @@ Only compact sampled statistics are published; raw fields stay in runner memory.
 No credentials, paid APIs, Actions artifacts, caches or cloud resources are used.
 """
 import argparse
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from datetime import datetime, timezone, timedelta
 import gzip
 import hashlib
@@ -253,6 +253,24 @@ def already_published(model,run):
         raise
     return previous.get('complete') is True and datetime.fromisoformat(previous['run'].replace('Z','+00:00'))>=run
 
+
+def prepare_hour(task):
+    """Independent processes keep native GRIB decoding safe and use both runner CPUs."""
+    model, run, hour, levels, workers, output = task
+    started = time.monotonic()
+    run_key = run.strftime('%Y%m%d%H')
+    panels = {}
+    def panel_writer(values, diagnostics):
+        filename = f'{run_key}/10/{hour}.members.bin.gz'
+        panels[str(hour)] = {'path': filename, **save_panels(output/filename, model, run, hour, values, diagnostics)}
+    result = calculate(model, run, hour, levels, workers, panel_writer)
+    files = {}
+    for level, (planes, zonal) in result.items():
+        filename = f'{run_key}/{level}/{hour}.bin.gz'
+        files[f'{level}/{hour}'] = {'path': filename, **save_frame(output/filename, model, run, hour, level, planes, zonal)}
+    print(json.dumps({'model': model, 'hour': hour, 'seconds': round(time.monotonic()-started, 2)}), flush=True)
+    return files, panels
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', choices=CONFIG, required=True)
@@ -260,6 +278,7 @@ def main():
     parser.add_argument('--hours', type=int, nargs='+')
     parser.add_argument('--levels', type=int, nargs='+')
     parser.add_argument('--workers', type=int, default=6)
+    parser.add_argument('--hour-workers', type=int, choices=[1, 2], default=1)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--skip-published', action='store_true')
     args = parser.parse_args()
@@ -272,16 +291,12 @@ def main():
     assert all(h in range(0, config['maxHour']+1, 6) for h in hours) and all(l in config['levels'] for l in levels)
     run_key = run.strftime('%Y%m%d%H')
     manifest = {'version': 1, 'model': args.model, 'run': run.isoformat(timespec='milliseconds').replace('+00:00', 'Z'), 'maxHour': max(hours), 'levels': levels, 'step': 6, 'count': config['count'], 'files': {}, 'complete': hours == list(range(0, config['maxHour']+1, 6)) and levels == config['levels']}
-    for hour in hours:
-        started = time.monotonic()
-        def panel_writer(values,diagnostics):
-            filename=f'{run_key}/10/{hour}.members.bin.gz'
-            manifest.setdefault('panels',{})[str(hour)]={'path':filename,**save_panels(args.output/filename,args.model,run,hour,values,diagnostics)}
-        result = calculate(args.model, run, hour, levels, args.workers,panel_writer)
-        for level, (planes, zonal) in result.items():
-            filename = f'{run_key}/{level}/{hour}.bin.gz'
-            manifest['files'][f'{level}/{hour}'] = {'path': filename, **save_frame(args.output/filename, args.model, run, hour, level, planes, zonal)}
-        print(json.dumps({'model': args.model, 'hour': hour, 'seconds': round(time.monotonic()-started, 2), 'files': len(manifest['files'])}), flush=True)
+    tasks = [(args.model, run, hour, levels, args.workers, args.output) for hour in hours]
+    # Only the parent creates the public catalogue after every hour succeeds.
+    with ProcessPoolExecutor(max_workers=args.hour_workers) as pool:
+        for files, panels in pool.map(prepare_hour, tasks):
+            manifest['files'].update(files)
+            manifest.setdefault('panels', {}).update(panels)
     manifest['preparedAt'] = datetime.now(timezone.utc).isoformat()
     (args.output/'latest.json').write_text(json.dumps(manifest, separators=(',', ':')), encoding='utf-8')
     print('COMPLETE', args.model, len(manifest['files']), sum(v['bytes'] for v in manifest['files'].values()), flush=True)
