@@ -2,7 +2,7 @@ name: Prepare northern diagnostic charts
 on:
   workflow_dispatch:
   workflow_run:
-    workflows: [Prepare public ensemble maps]
+    workflows: [Prepare public ensemble maps, Prepare GEFS model maps]
     types: [completed]
   schedule:
     - cron: '43 * * * *'
