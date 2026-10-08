@@ -7,7 +7,11 @@ from pathlib import Path
 import struct
 import tempfile
 import unittest
-from unittest.mock import patch
+import pickle
+import urllib.error
+from email.utils import format_datetime
+from datetime import timedelta
+from unittest.mock import patch, MagicMock
 
 import numpy as np
 
@@ -18,6 +22,37 @@ RUN = datetime(2026, 10, 7, tzinfo=timezone.utc)
 
 
 class PreparationTests(unittest.TestCase):
+    def test_rate_limit_retry_waits_for_provider_before_retrying(self):
+        error=urllib.error.HTTPError('https://test.invalid/data',429,'Too Many Requests',{'Retry-After':'180'},None)
+        response=MagicMock();response.__enter__.return_value.read.return_value=b'valid'
+        with patch.object(p.urllib.request,'urlopen',side_effect=[error,response]) as fetch, patch.object(p.time,'sleep') as sleep:
+            self.assertEqual(p.request('https://test.invalid/data'),b'valid')
+        sleep.assert_called_once_with(180)
+        self.assertEqual(fetch.call_count,2)
+
+    def test_rate_limit_backoff_and_http_date_are_respected(self):
+        for attempt,expected in enumerate([60,120,240,300]):
+            error=urllib.error.HTTPError('https://test.invalid',429,'Limited',{},None)
+            self.assertEqual(p.retry_delay(error,attempt),expected)
+        deadline=p.datetime.now(timezone.utc)+timedelta(seconds=180)
+        error=urllib.error.HTTPError('https://test.invalid',503,'Busy',{'Retry-After':format_datetime(deadline)},None)
+        self.assertGreater(p.retry_delay(error,0),175)
+        self.assertLessEqual(p.retry_delay(error,0),180)
+
+    def test_rate_limited_discovery_does_not_claim_an_older_run_is_latest(self):
+        error=urllib.error.HTTPError('https://test.invalid',429,'Limited',{},None)
+        with patch.object(p,'request',side_effect=error) as fetch:
+            with self.assertRaises(urllib.error.HTTPError):p.discover('gefs',RUN)
+        fetch.assert_called_once()
+
+    def test_worker_failure_keeps_http_cause_and_is_serializable(self):
+        with tempfile.TemporaryFile() as stream:
+            error=urllib.error.HTTPError('https://test.invalid',429,'Too Many Requests',{},stream)
+            with patch.object(p,'_prepare_hour',side_effect=error):
+                with self.assertRaisesRegex(RuntimeError,'aifs_ens forecast \\+192h failed: HTTPError: HTTP Error 429') as caught:
+                    p.prepare_hour(('aifs_ens',RUN,192,[10],3,Path('unused')))
+            self.assertEqual(str(pickle.loads(pickle.dumps(caught.exception))),str(caught.exception))
+
     def test_gefs_18z_is_selected_when_newer_00z_is_incomplete(self):
         now=datetime(2026,10,8,5,tzinfo=timezone.utc)
         def inventory(url,**kwargs):

@@ -6,6 +6,7 @@ No credentials, paid APIs, Actions artifacts, caches or cloud resources are used
 import argparse
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from datetime import datetime, timezone, timedelta
+from email.utils import parsedate_to_datetime
 import gzip
 import hashlib
 import json
@@ -14,6 +15,7 @@ import struct
 from threading import Lock
 import time
 import urllib.request
+import urllib.error
 
 import eccodes as ec
 import numpy as np
@@ -27,6 +29,23 @@ KEYS = ['temperature', 'height', 'u', 'v']
 EC_ORIGIN = 'https://data.ecmwf.int/forecasts'
 NOAA_ORIGIN = 'https://noaa-gefs-pds.s3.amazonaws.com'
 DECODE_LOCK = Lock()
+
+
+def retry_delay(error, attempt):
+    """Respect provider throttling instead of retrying a 429 within seconds."""
+    delay = 2 ** attempt
+    if isinstance(error, urllib.error.HTTPError) and error.code in [429, 503]:
+        delay = min(300, 60 * 2 ** attempt)
+        value = error.headers.get('Retry-After', '') if error.headers else ''
+        try:
+            requested = float(value)
+        except ValueError:
+            try:
+                requested = (parsedate_to_datetime(value) - datetime.now(timezone.utc)).total_seconds()
+            except (TypeError, ValueError, OverflowError):
+                requested = 0
+        delay = max(delay, requested)
+    return delay
 
 
 def request(url, start=None, length=None, attempts=4):
@@ -43,10 +62,14 @@ def request(url, start=None, length=None, attempts=4):
                 if length is not None:
                     assert len(data) == length, 'Truncated provider response'
                 return data
-        except Exception:
+        except Exception as error:
             if attempt == attempts-1:
                 raise
-            time.sleep(2 ** attempt)
+            delay = retry_delay(error, attempt)
+            if isinstance(error, urllib.error.HTTPError):
+                print(f'Provider HTTP {error.code}; retrying after {delay:g} seconds', flush=True)
+                error.close()
+            time.sleep(delay)
 
 
 def ec_base(model, run, hour, control=False):
@@ -242,6 +265,9 @@ def discover(model, now=None):
             print('Newest complete provider cycle:',model,run.isoformat(),flush=True)
             return run
         except Exception as e:
+            if isinstance(e, urllib.error.HTTPError) and e.code in [429, 503]:
+                # Throttling is not evidence that a newer cycle is incomplete.
+                raise
             print('Cycle not complete:',model,run.isoformat(),type(e).__name__,flush=True)
     raise RuntimeError('No complete provider cycle found for '+model)
 
@@ -255,6 +281,15 @@ def already_published(model,run):
 
 
 def prepare_hour(task):
+    try:
+        return _prepare_hour(task)
+    except Exception as error:
+        # HTTPError can retain a response stream that ProcessPool cannot pickle.
+        # Return a plain failure without hiding the actual provider status.
+        raise RuntimeError(f'{task[0]} forecast +{task[2]}h failed: {type(error).__name__}: {error}') from None
+
+
+def _prepare_hour(task):
     """Independent processes keep native GRIB decoding safe and use both runner CPUs."""
     model, run, hour, levels, workers, output = task
     started = time.monotonic()
