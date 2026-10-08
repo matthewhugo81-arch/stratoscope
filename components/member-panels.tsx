@@ -3,7 +3,7 @@ import {memo,useEffect,useRef,useState} from 'react';
 import type {Frame} from '@/lib/grib';
 import {MODELS,type EnsembleModel} from '@/lib/models';
 import {isEasterly,loadMemberPanels} from '@/lib/member-panels';
-import {color,inverseGlobe,projectGlobe,sample,sampleWind,viewBasis} from '@/lib/globe';
+import {color,inverseGlobe,projectGlobe,sample,sampleWind,viewBasis,windGradient,windMax} from '@/lib/globe';
 import {temperatureGradient} from '@/lib/temperature-scale';
 const basis=viewBasis(90,0);
 const Panel=memo(function Panel({frame,field,coast,onSelect}:{frame:Frame;field:string;coast:number[][][];onSelect:()=>void}){
@@ -46,7 +46,7 @@ export function MemberPanels({model,run,hour,field,onClose,onInspect}:{model:Ens
  return <dialog ref={dialog} className="member-maps-dialog" onCancel={onClose} aria-label="All ensemble member maps">
   <header><div><h2>{MODELS[model].label} · All members</h2><span>10 hPa · {valid} UTC · +{lead}h · run {run.slice(0,10)} {run.slice(11,16)} UTC</span></div><button onClick={onClose} aria-label="Close member panels">Close ×</button></header>
   <div className="member-maps-toolbar"><button disabled={lead===0} onClick={()=>setLead(h=>h-6)}>← Previous</button><input type="range" min={0} max={MODELS[model].maxHour} step={6} value={lead} onChange={e=>setLead(Number(e.target.value))} aria-label="Member panel forecast hour"/><button disabled={lead===MODELS[model].maxHour} onClick={()=>setLead(h=>h+6)}>Next →</button><select value={variable} onChange={e=>setVariable(e.target.value)} aria-label="Member panel field"><option value="temperature">Temperature</option><option value="wind">Wind speed</option></select></div>
-  <div className="member-maps-key"><span>Red border / E: zonal-mean u &lt; 0 m/s at 60°N, 10 hPa{data?` · ${negative}/${data.length} members`:''}</span><div><span>{variable==='temperature'?'−90°C':'0 m/s'}</span><i style={{background:variable==='temperature'?temperatureGradient:'linear-gradient(90deg,#17314a,#167c8c,#66c9ac,#edcc73,#ee944b,#bd3352)'}}/><span>{variable==='temperature'?'+20°C':'120 m/s'}</span></div></div>
+  <div className="member-maps-key"><span>Red border / E: zonal-mean u &lt; 0 m/s at 60°N, 10 hPa{data?` · ${negative}/${data.length} members`:''}</span><div><span>{variable==='temperature'?'−90°C':'0 m/s'}</span><i style={{background:variable==='temperature'?temperatureGradient:windGradient}}/><span>{variable==='temperature'?'+20°C':`${windMax}+ m/s`}</span></div></div>
   {data?<div ref={grid} className="member-maps-grid" style={{gridTemplateColumns:`repeat(${columns},minmax(0,1fr))`}}>{data.map(f=><Panel key={f.ensemble!.member} frame={f} field={variable} coast={coast} onSelect={()=>onInspect(f.ensemble!.member!,lead,variable)}/>)}</div>:<div className="member-maps-pending" role="status">{error?<><p>{error}</p><button onClick={()=>setRetry(n=>n+1)}>Check again</button></>:<p>Loading one compact member-panel file…</p>}</div>}
   <footer>North-pole views · identical scales · 2° overview grids · click a member for the detailed globe. Red indicates easterly wind at this time, not a confirmed SSW event.</footer>
  </dialog>;
