@@ -13,6 +13,11 @@ JMA_DAYS={1:[16,31],2:[10,25],3:[12,27],4:[11,26],5:[16,31],6:[15,30],7:[15,30],
 YEARS=list(range(1993,2017));STEPS=360;HALF=timedelta(hours=12)
 SOURCE='https://cds.climate.copernicus.eu/datasets/seasonal-original-pressure-levels'
 ERA_SOURCE='https://cds.climate.copernicus.eu/datasets/reanalysis-era5-pressure-levels'
+# CDS live constraints for BOM system 2 expose only 24-hour leads (verified 2026-10-08).
+def forecast_interval(model):return 24 if model=='ammc' else 12
+def forecast_steps(model):return 4320//forecast_interval(model)
+def forecast_dates(model,nominal):return [nominal+timedelta(hours=forecast_interval(model)*(i+1)) for i in range(forecast_steps(model))]
+
 def iso(d):return d.strftime('%Y-%m-%dT%H:%M:%S.000Z')
 def latest(model,now):
  first=now.replace(day=1,hour=0,minute=0,second=0,microsecond=0)
@@ -34,5 +39,5 @@ def requests_for(model,nominal,hindcast=False):
  result=[]
  for (year,month),starts in sorted(groups.items()):
   maxlag=max(int((nominal-s).total_seconds()/3600) for s in starts)
-  result.append(dict(originating_centre=cfg['centre'],system=cfg['system'],variable=['u_component_of_wind'],pressure_level=['10'],year=[str(year)],month=[f'{month:02}'],day=[f'{s.day:02}' for s in sorted(starts)],leadtime_hour=[str(h) for h in range(12,STEPS*12+maxlag+1,12)],area=[61.25,-180,58.75,180],data_format='grib'))
+  result.append(dict(originating_centre=cfg['centre'],system=cfg['system'],variable=['u_component_of_wind'],pressure_level=['10'],year=[str(year)],month=[f'{month:02}'],day=[f'{s.day:02}' for s in sorted(starts)],leadtime_hour=[str(h) for h in range(12 if hindcast else forecast_interval(model),STEPS*12+maxlag+1,12 if hindcast else forecast_interval(model))],area=[61.25,-180,58.75,180],data_format='grib'))
  return result

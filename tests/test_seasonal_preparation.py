@@ -83,9 +83,15 @@ class SeasonalTests(unittest.TestCase):
   self.assertEqual(len(result),55);self.assertEqual(result[0]['values'][0],0)
   with self.assertRaises(ValueError):s.ensemble(records[:-1],'rjtd',N)
   with self.assertRaises(ValueError):s.ensemble(records+[records[0]],'rjtd',N)
+ def test_bom_requires_all_55_members_and_all_180_daily_dates(self):
+  records=[(start,member,date,10.) for start in starts_for('ammc',N) for member in range(11) for date in forecast_dates('ammc',N)]
+  result=s.ensemble(records,'ammc',N)
+  self.assertEqual(len(result),55);self.assertEqual(len(result[0]['values']),180)
+  with self.assertRaises(ValueError):s.ensemble(records[:-1],'ammc',N)
+  with self.assertRaises(ValueError):s.ensemble(records+[records[0]],'ammc',N)
  def test_request_has_12h_resolution_and_native_system(self):
   for model,cfg in MODELS.items():
    req=requests_for(model,N)
-   self.assertEqual(req[-1]['system'],cfg['system']);self.assertEqual(req[-1]['leadtime_hour'][:2],['12','24'])
+   self.assertEqual(req[-1]['system'],cfg['system']);self.assertEqual(req[-1]['leadtime_hour'][:2],['24','48'] if model=='ammc' else ['12','24'])
    self.assertGreaterEqual(int(req[0]['leadtime_hour'][-1]),4320)
 if __name__=='__main__':unittest.main()

@@ -66,12 +66,12 @@ def read_grib(file,model=None):
     yield start,int(get('number')) if model else 0,valid,value
    finally:ec.codes_release(g)
 def ensemble(records,model,nominal,hindcast=False):
- cfg=MODELS[model];starts=set(starts_for(model,nominal,hindcast));dates=[nominal+HALF*(i+1) for i in range(STEPS)];indices={d:i for i,d in enumerate(dates)};series={}
+ cfg=MODELS[model];starts=set(starts_for(model,nominal,hindcast));dates=([nominal+HALF*(i+1) for i in range(STEPS)] if hindcast else forecast_dates(model,nominal));indices={d:i for i,d in enumerate(dates)};series={}
  for start,member,valid,value in records:
   if start not in starts or member<0:raise ValueError('Unexpected ensemble start or member')
   if valid not in indices:continue
   if not np.isfinite(value) or abs(value)>=200:raise ValueError('Invalid zonal mean')
-  key=(start,member);values=series.setdefault(key,[None]*STEPS);i=indices[valid]
+  key=(start,member);values=series.setdefault(key,[None]*len(dates));i=indices[valid]
   if values[i] is not None:raise ValueError('Duplicate member/time field')
   values[i]=round(value,4)
  expected=cfg['hindcast' if hindcast else 'forecast'];per=cfg['hc_per_start' if hindcast else 'per_start']
@@ -118,7 +118,14 @@ def retrieve(client,dataset,request,label):
 def prepare_ensemble(client,model,nominal,hindcast=False):
  records=[]
  for i,request in enumerate(requests_for(model,nominal,hindcast)):
-  file=retrieve(client,'seasonal-original-pressure-levels',request,f'{model}-{nominal:%Y%m}-{i}')
+  label=f'{model}-{nominal:%Y%m}-{i}'
+  saved=load('requests/'+label+'.json')
+  # Reuse the exact accepted request from before BOM daily availability was verified.
+  # Only this known superset of requested leads is compatible; all other fields must match.
+  if model=='ammc' and not hindcast and saved:
+   legacy={**request,'leadtime_hour':[str(h) for h in range(12,int(request['leadtime_hour'][-1])+1,12)]}
+   if saved.get('request')==legacy:request=legacy
+  file=retrieve(client,'seasonal-original-pressure-levels',request,label)
   records.extend(read_grib(file,model));file.unlink()
  return ensemble(records,model,nominal,hindcast)
 def forecast(client,model,nominal):
@@ -126,7 +133,7 @@ def forecast(client,model,nominal):
  if old and old['nominal']==iso(nominal) and old['system']==cfg['system']:
   print('Forecast already prepared:',model,iso(nominal));return
  members=prepare_ensemble(client,model,nominal);array=np.array([m['values'] for m in members])
- data=dict(version=2,complete=True,model=model,name=cfg['name'],system=cfg['system'],nominal=iso(nominal),preparedAt=iso(datetime.now(timezone.utc)),latitude=60,level=10,units='m/s',sampling='12-hourly instantaneous',dates=[iso(nominal+HALF*(i+1)) for i in range(STEPS)],members=members,memberCount=len(members),mean=np.round(array.mean(axis=0),4).tolist(),easterlyFraction=np.round((array<0).mean(axis=0),6).tolist(),source=SOURCE,climateKey=f"{model}-{cfg['system']}-{nominal.month:02}",attribution='Contains modified Copernicus Climate Change Service information (2026). '+cfg['name']+'. Source terms and attribution: '+SOURCE)
+ data=dict(version=2,complete=True,model=model,name=cfg['name'],system=cfg['system'],nominal=iso(nominal),preparedAt=iso(datetime.now(timezone.utc)),latitude=60,level=10,units='m/s',sampling=f'{forecast_interval(model)}-hourly instantaneous',dates=[iso(d) for d in forecast_dates(model,nominal)],members=members,memberCount=len(members),mean=np.round(array.mean(axis=0),4).tolist(),easterlyFraction=np.round((array<0).mean(axis=0),6).tolist(),source=SOURCE,climateKey=f"{model}-{cfg['system']}-{nominal.month:02}",attribution='Contains modified Copernicus Climate Change Service information (2026). '+cfg['name']+'. Source terms and attribution: '+SOURCE)
  publish(name,data)
 def climate(client,model,nominal):
  cfg=MODELS[model];key=f"{model}-{cfg['system']}-{nominal.month:02}";final=f'climate/{key}.json'

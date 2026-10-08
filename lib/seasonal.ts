@@ -19,14 +19,14 @@ function check(v:unknown):asserts v{if(!v)throw Error('Seasonal data failed vali
 const stamp=(s:unknown):s is string=>typeof s==='string'&&/^\d{4}-\d{2}-\d{2}T(00|12):00:00\.000Z$/.test(s)&&Number.isFinite(Date.parse(s));
 const finite=(a:unknown,n=360):a is number[]=>Array.isArray(a)&&a.length===n&&a.every(v=>typeof v==='number'&&Number.isFinite(v)&&Math.abs(v)<200);
 export function validateForecast(input:unknown,id:SeasonalId):SeasonalForecast{
- const d=input as SeasonalForecast,cfg=SEASONAL_MODELS.find(m=>m.id===id)!;
+ const d=input as SeasonalForecast,cfg=SEASONAL_MODELS.find(m=>m.id===id)!,hours=id==='ammc'?24:12,n=4320/hours;
  check(d&&d.version===2&&d.complete===true&&d.model===id&&d.system===cfg.system&&d.name===cfg.name&&d.latitude===60&&d.level===10&&d.units==='m/s'&&d.source===SOURCE);
  check(stamp(d.nominal)&&d.nominal.slice(8,10)==='01'&&d.nominal.slice(11,13)==='00'&&Number.isFinite(Date.parse(d.preparedAt))&&Date.parse(d.preparedAt)>=Date.parse(d.nominal));
- check(d.sampling==='12-hourly instantaneous'&&Array.isArray(d.dates)&&d.dates.length===360&&d.dates.every((v,i)=>stamp(v)&&Date.parse(v)===Date.parse(d.nominal)+(i+1)*43200000));
- check(d.memberCount===cfg.members&&Array.isArray(d.members)&&d.members.length===cfg.members&&finite(d.mean)&&finite(d.easterlyFraction));
+ check(d.sampling===`${hours}-hourly instantaneous`&&Array.isArray(d.dates)&&d.dates.length===n&&d.dates.every((v,i)=>stamp(v)&&Date.parse(v)===Date.parse(d.nominal)+(i+1)*hours*3600000));
+ check(d.memberCount===cfg.members&&Array.isArray(d.members)&&d.members.length===cfg.members&&finite(d.mean,n)&&finite(d.easterlyFraction,n));
  const ids=new Set<string>();
- for(const m of d.members){check(m&&typeof m.id==='string'&&!ids.has(m.id)&&stamp(m.start)&&Date.parse(m.start)<=Date.parse(d.nominal)&&Date.parse(m.start)>=Date.parse(d.nominal)-31*86400000&&finite(m.values));ids.add(m.id);}
- for(let i=0;i<360;i++){check(Math.abs(d.mean[i]-d.members.reduce((s,m)=>s+m.values[i],0)/cfg.members)<.00011);check(Math.abs(d.easterlyFraction[i]-d.members.filter(m=>m.values[i]<0).length/cfg.members)<.0000011);}
+ for(const m of d.members){check(m&&typeof m.id==='string'&&!ids.has(m.id)&&stamp(m.start)&&Date.parse(m.start)<=Date.parse(d.nominal)&&Date.parse(m.start)>=Date.parse(d.nominal)-31*86400000&&finite(m.values,n));ids.add(m.id);}
+ for(let i=0;i<n;i++){check(Math.abs(d.mean[i]-d.members.reduce((s,m)=>s+m.values[i],0)/cfg.members)<.00011);check(Math.abs(d.easterlyFraction[i]-d.members.filter(m=>m.values[i]<0).length/cfg.members)<.0000011);}
  check(d.climateKey===`${id}-${cfg.system}-${d.nominal.slice(5,7)}`&&typeof d.attribution==='string'&&d.attribution.length<1000);
  return d;
 }
