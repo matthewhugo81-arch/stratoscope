@@ -85,7 +85,7 @@ Cached frames switch without an artificial delay. After a direct forecast or pre
 
 ## Preparing ensembles once per run
 
-`.github/workflows/prepare-ensembles.yml` starts at 09:23 and 21:23 UTC and can be run manually. It is restricted to this **public** repository and standard `ubuntu-latest` runners, which GitHub provides free for public repositories. It does not use larger runners, Actions artifacts, Actions caches, API keys or external compute accounts. Scheduling and provider availability can delay publication. A new run replaces the catalogue only after every member, pressure level and six-hour forecast time succeeds; an unsuccessful preparation leaves the preceding published run available.
+`.github/workflows/prepare-ensembles.yml` checks hourly at minute 23 UTC and can be run manually. It is restricted to this **public** repository and standard `ubuntu-latest` runners, which GitHub provides free for public repositories. It does not use larger runners, Actions artifacts, Actions caches, API keys or external compute accounts. Scheduling and provider availability can delay publication. A new run replaces the catalogue only after every member, pressure level and six-hour forecast time succeeds; an unsuccessful preparation leaves the preceding published run available.
 
 `scripts/prepare-ensembles.py` downloads only the required official GRIB byte ranges, with six concurrent transfers per model and serialized native ecCodes decoding. It validates run, lead, variable, pressure, grid and member identities. All 31 GEFS or 51 ECMWF members contribute equally. Statistics use full decoded precision; only the finished display fields are rounded to 0.01 units, encoded as row differences and gzip-compressed. The 60°N signed-wind diagnostic retains its unrounded native-grid ensemble average. No raw member fields are published.
 
@@ -107,7 +107,7 @@ Direct ECMWF uses the public JSON index to request only the four required GRIB2 
 
 ## Preparing direct DWD ICON maps
 
-`.github/workflows/prepare-icon.yml` runs at 09:31 and 21:31 UTC, with the same public-repository and standard-runner guard as the ensemble pipeline. It downloads anonymous bzip2 GRIB2 pressure-level files from `https://opendata.dwd.de/weather/nwp/icon/grib/`, plus the matching CLAT/CLON coordinates. Four concurrent downloads and serialized ecCodes decoding keep resource use bounded. No paid resources, API keys, Actions artifacts or Actions caches are used.
+`.github/workflows/prepare-icon.yml` checks hourly at minute 31 UTC, with the same public-repository and standard-runner guard as the ensemble pipeline. It downloads anonymous bzip2 GRIB2 pressure-level files from `https://opendata.dwd.de/weather/nwp/icon/grib/`, plus the matching CLAT/CLON coordinates. Four concurrent downloads and serialized ecCodes decoding keep resource use bounded. No paid resources, API keys, Actions artifacts or Actions caches are used.
 
 `scripts/prepare-icon.py` verifies model run, valid time, pressure, variable, units, complete finite values and the coordinate/field grid UUID. A spherical nearest-cell lookup samples native global triangular cells onto the northern 360 × 91 display grid; the one-degree display is not the native model resolution. Celsius = kelvin − 273.15; geopotential height = geopotential / 9.80665. Eastward and northward winds are retained with their signs. Finished arrays are rounded to 0.01 units and gzip-compressed. No 10 hPa diagnostic is fabricated for ICON.
 

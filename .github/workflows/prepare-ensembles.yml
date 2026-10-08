@@ -2,7 +2,7 @@ name: Prepare public ensemble maps
 on:
   workflow_dispatch:
   schedule:
-    - cron: '23 9,21 * * *'
+    - cron: '23 * * * *'
 
 permissions:
   contents: write
@@ -29,10 +29,11 @@ jobs:
       - name: Install native GRIB decoder
         run: python -m pip install --disable-pip-version-check -r scripts/ensemble-requirements.txt
       - name: Prepare all forecast times from official public feeds
-        run: python -u scripts/prepare-ensembles.py --model "$MODEL" --output work/prepared --workers 6
+        run: python -u scripts/prepare-ensembles.py --model "$MODEL" --output work/prepared --workers 6 --skip-published
         env:
           MODEL: ${{ matrix.model }}
       - name: Publish compact data snapshot
+        if: hashFiles('work/prepared/latest.json') != ''
         env:
           GH_TOKEN: ${{ github.token }}
           MODEL: ${{ matrix.model }}

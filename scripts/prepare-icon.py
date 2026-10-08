@@ -26,7 +26,7 @@ def filename(run,hour,level,key):
     return f'icon_global_icosahedral_pressure-level_{run:%Y%m%d%H}_{hour:03}_{level}_{key.upper()}.grib2.bz2'
 
 def discover():
-    start=datetime.now(timezone.utc)-timedelta(hours=8)
+    start=datetime.now(timezone.utc)
     start=start.replace(hour=12 if start.hour>=12 else 0,minute=0,second=0,microsecond=0)
     for back in range(4):
         run=start-timedelta(hours=12*back)
@@ -81,8 +81,13 @@ def convert(values,key,indices):
     return np.round(result,2).tolist()
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--output',type=Path,required=True);parser.add_argument('--hours',type=int,nargs='+');args=parser.parse_args()
-    run=discover();stamp=run.isoformat(timespec='milliseconds').replace('+00:00','Z');run_key=run.strftime('%Y%m%d%H')
+    parser=argparse.ArgumentParser();parser.add_argument('--skip-published',action='store_true');parser.add_argument('--output',type=Path,required=True);parser.add_argument('--hours',type=int,nargs='+');args=parser.parse_args()
+    run=discover()
+    if args.skip_published:
+        from importlib import import_module
+        if import_module('prepare-ensembles').already_published('icon',run):
+            print('Current complete ICON cycle is already published; no downloads needed',flush=True);return
+    stamp=run.isoformat(timespec='milliseconds').replace('+00:00','Z');run_key=run.strftime('%Y%m%d%H')
     coords={};identity=None
     for key in ['clat','clon']:
         url=f'{ORIGIN}/{run:%H}/{key}/icon_global_icosahedral_time-invariant_{run_key}_{key.upper()}.grib2.bz2'

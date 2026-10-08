@@ -35,6 +35,7 @@ old_sha = remote.split()[0] if remote else ''
 if old_sha:
     git('fetch', '--depth=1', 'origin', branch)
     previous = json.loads(git('show', old_sha + ':latest.json'))
+    assert previous['run'] <= manifest['run'], 'Refusing to replace a newer published run'
     old_run = previous['run'].replace('-', '').replace(':', '')[:10]
     new_run = manifest['run'].replace('-', '').replace(':', '')[:10]
     # Use the actual validated numeric run directory from the manifest.

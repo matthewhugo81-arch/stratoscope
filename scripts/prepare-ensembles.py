@@ -29,8 +29,8 @@ NOAA_ORIGIN = 'https://noaa-gefs-pds.s3.amazonaws.com'
 DECODE_LOCK = Lock()
 
 
-def request(url, start=None, length=None):
-    for attempt in range(4):
+def request(url, start=None, length=None, attempts=4):
+    for attempt in range(attempts):
         try:
             headers = {'User-Agent': 'Stratoscope-public-ensemble-preparation/1'}
             if start is not None:
@@ -44,7 +44,7 @@ def request(url, start=None, length=None):
                     assert len(data) == length, 'Truncated provider response'
                 return data
         except Exception:
-            if attempt == 3:
+            if attempt == attempts-1:
                 raise
             time.sleep(2 ** attempt)
 
@@ -63,11 +63,11 @@ def noaa_base(run, hour, member, part):
     return f'{NOAA_ORIGIN}/gefs.{day}/{cycle}/atmos/pgrb2{part}p5/{name}.t{cycle}z.pgrb2{part}.0p50.f{hour:03}'
 
 
-def ec_entries(model, run, hour, levels):
+def ec_entries(model, run, hour, levels, probe=False):
     result = []
     for control in [False, True]:
         base = ec_base(model, run, hour, control)
-        entries = [json.loads(line) for line in request(base + '.index').decode().splitlines()]
+        entries = [json.loads(line) for line in request(base + '.index', attempts=1 if probe else 4).decode().splitlines()]
         params = {'t': 'temperature', 'z' if model == 'aifs_ens' else 'gh': 'height', 'u': 'u', 'v': 'v'}
         for item in entries:
             if item.get('levtype') != 'pl' or int(item.get('levelist', -1)) not in levels or item['param'] not in params:
@@ -218,6 +218,41 @@ def save_frame(path, model, run, hour, level, planes, zonal):
     return {'bytes': len(payload), 'sha256': hashlib.sha256(payload).hexdigest()}
 
 
+def discover(model, now=None):
+    now = now or datetime.now(timezone.utc)
+    interval = 6
+    start = datetime.fromtimestamp(int(now.timestamp())//(interval*3600)*(interval*3600), timezone.utc)
+    cfg = CONFIG[model]
+    for back in range(6):
+        run = start-timedelta(hours=interval*back)
+        try:
+            if model == 'gefs':
+                for member in [0,30]:
+                    for part in ['a','b']:
+                        lines = request(noaa_base(run,384,member,part)+'.idx',attempts=1).decode().splitlines()
+                        fields = {(line.split(':')[3],line.split(':')[4]) for line in lines}
+                        for level in cfg['levels']:
+                            if ('b' if level in [20,30,70] else 'a') != part:continue
+                            assert all((key,f'{level} mb') in fields for key in ['TMP','HGT','UGRD','VGRD'])
+            else:
+                entries = ec_entries(model,run,cfg['maxHour'],cfg['levels'],probe=True)
+                identities = {(m,l,k) for _,_,_,m,l,k in entries}
+                assert len(entries)==cfg['count']*len(cfg['levels'])*4
+                assert all((m,l,k) in identities for m in range(cfg['count']) for l in cfg['levels'] for k in KEYS)
+            print('Newest complete provider cycle:',model,run.isoformat(),flush=True)
+            return run
+        except Exception as e:
+            print('Cycle not complete:',model,run.isoformat(),type(e).__name__,flush=True)
+    raise RuntimeError('No complete provider cycle found for '+model)
+
+def already_published(model,run):
+    url=f"https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/forecast-data-{model.replace('_','-')}/latest.json"
+    try:previous=json.loads(request(url,attempts=2))
+    except urllib.error.HTTPError as e:
+        if e.code==404:return False
+        raise
+    return previous.get('complete') is True and datetime.fromisoformat(previous['run'].replace('Z','+00:00'))>=run
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', choices=CONFIG, required=True)
@@ -226,11 +261,14 @@ def main():
     parser.add_argument('--levels', type=int, nargs='+')
     parser.add_argument('--workers', type=int, default=6)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--skip-published', action='store_true')
     args = parser.parse_args()
     config = CONFIG[args.model]
-    run = datetime.fromisoformat(args.run.replace('Z', '+00:00')) if args.run else datetime.fromtimestamp(int((datetime.now(timezone.utc)-timedelta(hours=8)).timestamp())//43200*43200, timezone.utc)
+    run = datetime.fromisoformat(args.run.replace('Z', '+00:00')) if args.run else discover(args.model)
     hours, levels = args.hours or list(range(0, config['maxHour']+1, 6)), args.levels or config['levels']
-    assert run.hour in [0, 12] and run.minute == 0
+    assert run.hour in [0,6,12,18] and run.minute == 0
+    if args.skip_published and already_published(args.model,run):
+        print('Current complete cycle is already published; no downloads needed',flush=True);return
     assert all(h in range(0, config['maxHour']+1, 6) for h in hours) and all(l in config['levels'] for l in levels)
     run_key = run.strftime('%Y%m%d%H')
     manifest = {'version': 1, 'model': args.model, 'run': run.isoformat(timespec='milliseconds').replace('+00:00', 'Z'), 'maxHour': max(hours), 'levels': levels, 'step': 6, 'count': config['count'], 'files': {}, 'complete': hours == list(range(0, config['maxHour']+1, 6)) and levels == config['levels']}

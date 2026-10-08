@@ -18,6 +18,19 @@ RUN = datetime(2026, 10, 7, tzinfo=timezone.utc)
 
 
 class PreparationTests(unittest.TestCase):
+    def test_gefs_18z_is_selected_when_newer_00z_is_incomplete(self):
+        now=datetime(2026,10,8,5,tzinfo=timezone.utc)
+        def inventory(url,**kwargs):
+            if 'gefs.20261008/00/' in url:raise FileNotFoundError('cycle still publishing')
+            self.assertIn('gefs.20261007/18/',url)
+            levels=[20,30,70] if 'pgrb2bp5' in url else [10,50,100]
+            return '\n'.join(f'1:0:d=2026100718:{key}:{level} mb:384 hour fcst:' for level in levels for key in ['TMP','HGT','UGRD','VGRD']).encode()
+        with patch.object(p,'request',side_effect=inventory):
+            self.assertEqual(p.discover('gefs',now),datetime(2026,10,7,18,tzinfo=timezone.utc))
+    def test_existing_complete_run_skips_download_and_cannot_regress(self):
+        for stamp,complete,expected in [('2026-10-07T00:00:00.000Z',True,True),('2026-10-07T12:00:00.000Z',True,True),('2026-10-06T18:00:00.000Z',True,False),('2026-10-07T00:00:00.000Z',False,False)]:
+            with patch.object(p,'request',return_value=json.dumps({'run':stamp,'complete':complete}).encode()):
+                self.assertEqual(p.already_published('gefs',RUN),expected)
     def test_panel_encoding_preserves_each_native_diagnostic(self):
         values=np.zeros((51,3,46,180));values[:,0]=-60;values[:,1]=31000;values[:,2]=25
         diagnostics=[dict(value=-.00001 if i==0 else float(i),samples=1440,longitudeStep=.25,basis='native') for i in range(51)]

@@ -46,3 +46,13 @@ test('catalogue checksum binds the one compressed download to its prepared conte
  globalThis.fetch=async()=>new Response(preparedFixture('ifs_ens',6).packed);
  await assert.rejects(preparedPair('ifs_ens',run,0,10,signal()),/integrity check/);
 });
+
+test('GEFS and AIFS catalogues accept complete 06Z and 18Z cycles',async()=>{
+ for(const model of ['gefs','aifs_ens'])for(const cycle of ['06','18']){
+  const levels=model==='gefs'?[10,20,30,50,70,100]:[10,50,100],maxHour=model==='gefs'?384:360,files={};
+  for(const level of levels)for(let hour=0;hour<=maxHour;hour+=6)files[`${level}/${hour}`]={path:`20261007${cycle}/${level}/${hour}.bin.gz`,bytes:100,sha256:'a'.repeat(64)};
+  const run=`2026-10-07T${cycle}:00:00.000Z`;
+  globalThis.fetch=async()=>Response.json({version:1,model,run,maxHour,step:6,count:model==='gefs'?31:51,levels,complete:true,preparedAt:'2026-10-08T05:00:00Z',files});
+  assert.equal((await preparedMeta(model,signal())).run,run);
+ }
+});

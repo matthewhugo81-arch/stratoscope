@@ -23,7 +23,7 @@ function select(entries:Entry[],model:EnsembleModel,run:string,hour:number,level
 }
 export async function latestEnsembleRun(model:EnsembleModel){
  const hit=latest.get(model);if(hit&&Date.now()-hit.at<900000)return hit.run;
- const interval=model==='ifs_ens'?12:6,start=Math.floor((Date.now()-8*3600000)/(interval*3600000))*interval*3600000;
+ const interval=6,start=Math.floor((Date.now())/(interval*3600000))*interval*3600000;
  for(let back=0;back<4;back++){
   const run=new Date(start-back*interval*3600000).toISOString();
   try{

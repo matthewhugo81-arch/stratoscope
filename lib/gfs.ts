@@ -6,10 +6,10 @@ const frames=new Map<string,{at:number;data:Frame}>();
 let latest:{at:number;run:string}|undefined;
 export async function latestRun(){
  if(latest&&Date.now()-latest.at<900000)return latest.run;
- const base=Math.floor((Date.now()-5*3600000)/(6*3600000))*6*3600000;
+ const base=Math.floor((Date.now())/(6*3600000))*6*3600000;
  for(let back=0;back<5;back++){
   const run=new Date(base-back*6*3600000).toISOString(),day=run.slice(0,10).replaceAll('-',''),cycle=run.slice(11,13);
-  try{const entries=await noaaIndex(noaaFile('gfs',run,240,10));if(entries.some(p=>p[3]==='TMP'&&p[4]==='10 mb')){latest={at:Date.now(),run};return run;}}catch{}
+  try{const entries=await noaaIndex(noaaFile('gfs',run,240,10));if(LEVELS.every(level=>['TMP','HGT','UGRD','VGRD'].every(field=>entries.some(p=>p[3]===field&&p[4]===`${level} mb`)))){latest={at:Date.now(),run};return run;}}catch{}
  }
  throw Error('NOAA is not returning a complete GFS run. Please try again shortly.');
 }

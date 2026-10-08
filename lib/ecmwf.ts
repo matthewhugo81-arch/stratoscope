@@ -24,7 +24,7 @@ function select(entries:Entry[],run:string,hour:number,level:number){
 export async function latestEcmwfRun(){
  if(latest&&Date.now()-latest.at<900000)return latest.run;
  // Use completed 00/12 UTC cycles so every selected run spans all ten days.
- const start=Math.floor((Date.now()-8*3600000)/(12*3600000))*12*3600000;
+ const start=Math.floor((Date.now())/(12*3600000))*12*3600000;
  for(let back=0;back<4;back++){
   const run=new Date(start-back*12*3600000).toISOString();
   try{const entries=await inventory(run,240);for(const level of [10,50,100])select(entries,run,240,level);latest={at:Date.now(),run};return run;}catch{}
