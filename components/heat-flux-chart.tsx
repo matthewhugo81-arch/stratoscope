@@ -24,7 +24,7 @@ export function HeatFluxChart({catalogue,hour,displayedRun,onSelect}:{catalogue:
  return <div className="heat-flux-chart" aria-label="GEFS 100 hPa eddy heat flux">
   <div className="heat-flux-heading"><h3>Eddy heat flux <span>100 hPa · 45–75°N · K m/s</span></h3><label><input type="checkbox" checked={members} onChange={e=>setMembers(e.target.checked)}/>All 31 members</label></div>
   <div className="heat-flux-legend"><span>━ Ensemble mean</span><span>▰ 10–90% member range</span><span>┆ Displayed vortex time</span></div>
-  <div className="heat-flux-plot">{series?<svg viewBox={`0 0 ${w} ${h}`} role="img" aria-label="GEFS heat-flux forecast with ensemble mean and 10–90 percent member range">
+  <div className="heat-flux-plot">{series?<svg viewBox={`0 0 ${w} ${h}`} role="group" aria-label="GEFS heat-flux forecast with ensemble mean and 10–90 percent member range">
    {ticks.map(v=><g key={v}><line x1={left} x2={w-right} y1={y(v)} y2={y(v)} stroke={v===0?'#90aab9':'#29414c'} strokeDasharray={v===0?'5 4':undefined}/><text x={left-9} y={y(v)+4} textAnchor="end">{v}</text></g>)}
    <path d={line(points.map(p=>p.high))+' '+[...points].reverse().map(p=>`L${x(p.hour)},${y(p.low)}`).join(' ')+' Z'} fill="#9edfcf" fillOpacity=".16"/>
    {members&&Array.from({length:31},(_,m)=><path key={m} d={line(points.map(p=>p.members[m]))} fill="none" stroke="#78bec7" strokeOpacity=".24" strokeWidth=".7"/>)}
