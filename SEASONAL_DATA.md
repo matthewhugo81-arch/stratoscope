@@ -46,6 +46,16 @@ The `forecast-data-seasonal` branch contains:
 - `checkpoints/`: reduced intermediate historical values for resumability.
 
 Missing references are labelled as pending on the site and are never fabricated.
+The ERA5 notice above the plot shows the saved-year count and the time of the
+last independent progress check. The forecast-health workflow checks the ERA5
+archive every 20 minutes and after an ERA5 preparation run ends. If the final
+reference is absent and neither ERA5-capable workflow is active, it resumes the
+import (with a 15-minute dispatch cooldown). Completed years and accepted CDS
+request IDs are reused; the audit itself never submits CDS requests. Both ERA5
+entry points share a concurrency group. Completion requires all 366 valid daily
+values and the correct 24-year / six-leap-year sample counts.
+The read-only `Diagnose seasonal imports` workflow can inspect all outstanding
+ERA5 request states without submitting, replacing or cancelling any request.
 Models awaiting their first native file retain an explicitly labelled official
 Copernicus chart until the prepared data become available.
 Refresh the seasonal section to discover newly published files. Failed preparation

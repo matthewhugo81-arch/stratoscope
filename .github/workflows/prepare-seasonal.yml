@@ -15,7 +15,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: seasonal-${{ inputs.phase || 'update' }}
+  group: ${{ inputs.phase == 'era5' && 'era5-daily-reference' || format('seasonal-{0}', inputs.phase || 'update') }}
   cancel-in-progress: false
 jobs:
   prepare:

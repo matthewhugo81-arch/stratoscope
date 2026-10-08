@@ -9,6 +9,45 @@ h=importlib.util.module_from_spec(spec);spec.loader.exec_module(h)
 NOW=datetime(2026,10,8,10,tzinfo=timezone.utc)
 
 class HealthTests(unittest.TestCase):
+    def test_era5_reports_saved_years_without_duplicate_active_request(self):
+        run={'id':1,'status':'in_progress','created_at':'2026-10-08T09:00:00Z','html_url':'https://github.com/run/1'}
+        def api(path,payload=None):
+            self.assertIsNone(payload)
+            if '/git/ref/' in path:return {'object':{'sha':'snapshot'}}
+            if '/git/trees/' in path:return {'tree':[{'type':'blob','path':f'checkpoints/era5/{y}.json'} for y in range(1993,2008)]}
+            return {'workflow_runs':[] if 'prepare-seasonal' in path else [run]}
+        with patch.object(h,'github',side_effect=api):result=h.era_reference(True,NOW)
+        self.assertEqual(result['status'],'updating')
+        self.assertEqual(len(result['completedYears']),15)
+        self.assertEqual(result['nextYear'],2008)
+
+    def test_era5_resumes_after_timeout_but_never_overlaps_legacy_import(self):
+        sent=[]
+        run={'id':1,'status':'completed','conclusion':'cancelled','created_at':'2026-10-08T03:00:00Z','html_url':'https://github.com/run/1'}
+        legacy=[]
+        def api(path,payload=None):
+            if payload:sent.append((path,payload));return
+            if '/jobs' in path:return {'jobs':[{'name':'prepare (era5)','status':'in_progress'}]}
+            return {'workflow_runs':legacy if 'prepare-seasonal' in path else [run]}
+        with patch.object(h,'github',side_effect=api):
+            self.assertEqual(h.recovery('era5',True,NOW)[0],'updating')
+            self.assertEqual(sent,[('/actions/workflows/prepare-era5.yml/dispatches',{'ref':'main'})])
+            sent.clear();legacy.append({**run,'status':'in_progress'})
+            self.assertEqual(h.recovery('era5',True,NOW)[0],'updating')
+            self.assertEqual(sent,[])
+
+    def test_era5_complete_reference_validates_before_stopping_recovery(self):
+        days={(datetime(2000,1,1)+h.timedelta(days=i)).strftime('%m-%d') for i in range(366)}
+        data=dict(version=2,complete=True,period=[1993,2016],latitude=60,level=10,units='m/s',source='https://cds.climate.copernicus.eu/datasets/reanalysis-era5-pressure-levels',daily={d:20 for d in days},counts={d:6 if d=='02-29' else 24 for d in days})
+        def api(path,payload=None):
+            if '/git/ref/' in path:return {'object':{'sha':'snapshot'}}
+            return {'tree':[{'type':'blob','path':'climate/era5-1993-2016.json'}]}
+        with patch.object(h,'github',side_effect=api),patch.object(h,'public',return_value=data),patch.object(h,'recovery') as recovery:
+            self.assertEqual(h.era_reference(True,NOW)['status'],'complete')
+            data['counts']['02-29']=24
+            self.assertEqual(h.era_reference(True,NOW)['status'],'error')
+            recovery.assert_not_called()
+
     def test_active_model_not_duplicated(self):
         run={'id':1,'status':'in_progress','created_at':'2026-10-08T09:00:00Z','html_url':'https://github.com/run/1'}
         def api(path,payload=None):

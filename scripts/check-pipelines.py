@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
 import importlib.util
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -20,7 +21,8 @@ RAW = f'https://raw.githubusercontent.com/{REPO}/'
 MODELS = ['gfs', 'ecmwf_direct', 'gefs', 'ifs_ens', 'aifs_ens', 'icon']
 WORKFLOWS = {'gefs':'prepare-gefs.yml', 'ifs_ens':'prepare-ensembles.yml',
              'aifs_ens':'prepare-ensembles.yml', 'icon':'prepare-icon.yml',
-             'diagnostics':'prepare-diagnostics.yml', 'vortex':'prepare-vortex.yml'}
+             'diagnostics':'prepare-diagnostics.yml', 'vortex':'prepare-vortex.yml',
+             'era5':'prepare-era5.yml'}
 ACTIVE = {'queued', 'in_progress', 'waiting', 'pending', 'requested'}
 
 def stamp(d):
@@ -107,6 +109,14 @@ def matching_jobs(model, run):
 def recovery(model, recover, now):
     workflow=WORKFLOWS[model]
     runs=github('/actions/workflows/'+workflow+'/runs?per_page=12')['workflow_runs']
+    if model=='era5':
+        # The older seasonal workflow can also prepare ERA5. Never overlap it.
+        legacy=github('/actions/workflows/prepare-seasonal.yml/runs?per_page=12')['workflow_runs']
+        for run in legacy:
+            if run['status'] not in ACTIVE:continue
+            jobs=github(f"/actions/runs/{run['id']}/jobs")['jobs']
+            if not jobs or any(j['name']=='prepare (era5)' and j['status'] in ACTIVE for j in jobs):
+                return 'updating',run['html_url']
     for run in runs:
         if run['status'] in ACTIVE and matching_jobs(model,run):
             return 'updating',run['html_url']
@@ -119,6 +129,35 @@ def recovery(model, recover, now):
         github('/actions/workflows/'+workflow+'/dispatches',payload)
         return 'updating',f'https://github.com/{REPO}/actions/workflows/{workflow}'
     return 'behind',f'https://github.com/{REPO}/actions/workflows/{workflow}'
+
+def era_reference(recover, now):
+    """Report saved years and recover an idle import without submitting CDS jobs."""
+    result=dict(period=[1993,2016],totalYears=24,status='error')
+    try:
+        # Read one immutable snapshot so progress and final validation agree.
+        commit=github('/git/ref/heads/forecast-data-seasonal')['object']['sha']
+        tree=github('/git/trees/'+commit+'?recursive=1')
+        if tree.get('truncated'):raise ValueError('Incomplete data inventory')
+        paths={p['path'] for p in tree['tree'] if p['type']=='blob'}
+        years=[y for y in range(1993,2017) if f'checkpoints/era5/{y}.json' in paths]
+        result['completedYears']=years
+        final='climate/era5-1993-2016.json'
+        if final in paths:
+            data=public(commit,final)
+            assert data['version']==2 and data['complete'] is True and data['period']==[1993,2016]
+            assert data['latitude']==60 and data['level']==10 and data['units']=='m/s'
+            assert data['source']=='https://cds.climate.copernicus.eu/datasets/reanalysis-era5-pressure-levels'
+            expected={(datetime(2000,1,1)+timedelta(days=i)).strftime('%m-%d') for i in range(366)}
+            assert set(data['daily'])==expected and set(data['counts'])==expected
+            assert all(type(v) in (int,float) and math.isfinite(v) and abs(v)<200 for v in data['daily'].values())
+            assert all(data['counts'][d]==(6 if d=='02-29' else 24) for d in expected)
+            result['status']='complete'
+        else:
+            result['nextYear']=next((y for y in range(1993,2017) if y not in years),None)
+            result['status'],result['workflowUrl']=recovery('era5',recover,now)
+    except Exception:
+        result['status']='error'
+    return result
 
 def derived(results):
     out=[]
@@ -160,9 +199,10 @@ def main():
                 model=result['model']
                 if model not in recovered:recovered[model]=recovery(model,args.recover,now)
                 result['status'],result['workflowUrl']=recovered[model]
-    data=dict(version=1,checkedAt=stamp(now),models=results)
+    reference=era_reference(args.recover,now) if os.environ.get('GH_TOKEN') else None
+    data=dict(version=1,checkedAt=stamp(now),models=results,era5=reference)
     print(json.dumps(data,indent=2),flush=True)
     if args.publish:publish(data)
-    if any(d['status']=='error' for d in results):raise SystemExit(1)
+    if any(d['status']=='error' for d in results) or reference and reference['status']=='error':raise SystemExit(1)
 
 if __name__=='__main__':main()

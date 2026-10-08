@@ -3,8 +3,14 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import ts from 'typescript';
 const source=await readFile(new URL('../lib/seasonal.ts',import.meta.url),'utf8');
-const {validateForecast,validateClimate,validateEra}=await import('data:text/javascript;base64,'+Buffer.from(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText).toString('base64'));
+const {validateForecast,validateClimate,validateEra,validateEraProgress}=await import('data:text/javascript;base64,'+Buffer.from(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText).toString('base64'));
 const S='https://cds.climate.copernicus.eu/datasets/seasonal-original-pressure-levels';
+test('ERA5 progress rejects invented counts, years and inconsistent next year',()=>{
+ const report={version:1,checkedAt:'2026-10-08T15:00:00Z',era5:{period:[1993,2016],totalYears:24,completedYears:Array.from({length:15},(_,i)=>1993+i),nextYear:2008,status:'updating'}};
+ assert.equal(validateEraProgress(report).completedYears.length,15);
+ for(const mutate of [d=>d.era5.completedYears.push(2007),d=>d.era5.nextYear=2009,d=>d.era5.totalYears=15,d=>d.checkedAt='invalid']){const d=structuredClone(report);mutate(d);assert.throws(()=>validateEraProgress(d));}
+ assert.equal(validateEraProgress({version:1,checkedAt:report.checkedAt}),null);
+});
 function forecast(){const nominal='2026-09-01T00:00:00.000Z';return {version:2,complete:true,model:'ecmf',name:'ECMWF',system:'51',nominal,preparedAt:'2026-09-07T12:00:00.000Z',latitude:60,level:10,units:'m/s',sampling:'12-hourly instantaneous',dates:Array.from({length:360},(_,i)=>new Date(Date.parse(nominal)+(i+1)*43200000).toISOString()),members:Array.from({length:51},(_,i)=>({id:'m'+i,start:nominal,values:Array(360).fill(i-25)})),memberCount:51,mean:Array(360).fill(0),easterlyFraction:Array(360).fill(25/51),source:S,climateKey:'ecmf-51-09',attribution:'TEST ONLY'};}
 function climate(){return {version:2,complete:true,model:'ecmf',system:'51',month:9,period:[1993,2016],years:Array.from({length:24},(_,i)=>i+1993),sampleCount:600,steps:360,sampling:'12-hourly instantaneous',mean:Array(360).fill(20),min:Array(360).fill(-20),p10:Array(360).fill(0),p25:Array(360).fill(10),p75:Array(360).fill(30),p90:Array(360).fill(40),max:Array(360).fill(50),source:S,method:'TEST ONLY'};}
 test('native forecasts validate complete signed 12-hourly ensembles',()=>{assert.equal(validateForecast(forecast(),'ecmf').members.length,51);for(const mutate of [d=>d.members.pop(),d=>d.system='5',d=>d.model='egrr',d=>d.mean[0]=2,d=>d.easterlyFraction[0]=1,d=>d.dates[0]=d.nominal,d=>d.members[1].id=d.members[0].id]){const d=forecast();mutate(d);assert.throws(()=>validateForecast(d,'ecmf'));}});

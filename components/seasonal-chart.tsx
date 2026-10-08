@@ -1,10 +1,12 @@
 'use client';
-import {useState} from 'react';
-import type {SeasonalClimate,EraClimate} from '@/lib/seasonal';
+import {useEffect,useState} from 'react';
+import type {SeasonalClimate,EraClimate,EraProgress} from '@/lib/seasonal';
 export type WindPlot={name:string;nominal:string;dates:string[];members:{id:string;values:number[]}[];mean:number[];easterlyFraction:number[];sampling:string;attribution:string};
 const date=(s:string)=>new Date(s).toLocaleDateString('en-GB',{timeZone:'UTC',day:'numeric',month:'short',year:'numeric'});
 const signed=(v:number)=>(v>0?'+':'')+v.toFixed(1);
-export function SeasonalChart({data,climate,era,referenceError}:{data:WindPlot;climate:SeasonalClimate|null;era:EraClimate|null;referenceError?:boolean}){
+export function SeasonalChart({data,climate,era,eraProgress,referenceError}:{data:WindPlot;climate:SeasonalClimate|null;era:EraClimate|null;eraProgress?:EraProgress|null;referenceError?:boolean}){
+ const [now,setNow]=useState(()=>Date.now());
+ useEffect(()=>{if(era)return;const timer=setInterval(()=>setNow(Date.now()),60000);return()=>clearInterval(timer)},[era]);
  const [day,setDay]=useState(()=>{const i=data.dates.findIndex(s=>Date.parse(s)>=Date.now());return i<0?data.dates.length-1:i}),[members,setMembers]=useState(true),[history,setHistory]=useState(true),[reference,setReference]=useState(true);
  const n=data.dates.length;
  const indices=data.dates.map(s=>Math.round((Date.parse(s)-Date.parse(data.nominal))/43200000)-1);
@@ -19,6 +21,15 @@ export function SeasonalChart({data,climate,era,referenceError}:{data:WindPlot;c
  const inspect=(e:React.PointerEvent<SVGSVGElement>)=>{const r=e.currentTarget.getBoundingClientRect();setDay(Math.max(0,Math.min(n-1,Math.round(((e.clientX-r.left)/r.width*960-58)/882*(n-1)))))};
  return <div className="native-seasonal-chart">
   <div className="seasonal-issue"><strong>{data.name}</strong><span>Issue {date(data.nominal)} · {data.members.length} members · {data.sampling}</span></div>
+  {!era&&<p className="seasonal-pending" role="status">
+   <strong>ERA5 reference pending.</strong>{' '}
+   {eraProgress?<>{eraProgress.completedYears.length}/24 years prepared for 1993–2016.{eraProgress.nextYear!==null&&<> Next unfinished year: {eraProgress.nextYear}.</>}{' '}
+    {now-Date.parse(eraProgress.checkedAt)>5400000?'Progress check overdue.':eraProgress.status==='updating'?'Import running.':eraProgress.status==='behind'?'Import awaiting restart.':eraProgress.status==='complete'?'Reference published; retrying download.':'Import status could not be checked.'}{' '}
+    Last checked {date(eraProgress.checkedAt)} {eraProgress.checkedAt.slice(11,16)} UTC.{' '}</>:'The complete 1993–2016 reference is not available yet. '}
+   {referenceError&&<>Reference download failed; retrying. </>}
+   The ERA5 line will appear automatically when the complete reference loads.{' '}
+   <a href="https://github.com/matthewhugo81-arch/stratoscope/actions/workflows/prepare-era5.yml" target="_blank" rel="noreferrer">Import progress ↗</a>
+  </p>}
   <div className="seasonal-legend"><span className="forecast-key">Forecast mean</span><span className="member-key">Members</span>{climate&&<><span className="climate-key">Model climate mean</span><span className="band-key">Historical 25–75%, 10–90% & full range</span></>}{era&&<span className="era-key">ERA5 daily climate mean</span>}</div>
   <div className="seasonal-plot"><svg viewBox="0 0 960 350" role="img" aria-label={`${data.name} 60N 10hPa zonal wind ensemble${climate?' with 1993–2016 model climatology':''}${era?' and ERA5 climate mean':''}`} onPointerMove={inspect}>
    <text x={12} y={16} fill="#a4bfcc" fontSize={11}>m/s</text>
@@ -33,7 +44,6 @@ export function SeasonalChart({data,climate,era,referenceError}:{data:WindPlot;c
   <div className="seasonal-chart-options"><label><input type="checkbox" checked={members} onChange={e=>setMembers(e.target.checked)}/> Members</label>{climate&&<label><input type="checkbox" checked={history} onChange={e=>setHistory(e.target.checked)}/> Model climate</label>}{era&&<label><input type="checkbox" checked={reference} onChange={e=>setReference(e.target.checked)}/> ERA5 mean</label>}</div>
   <input className="glosea-slider" type="range" min={0} max={n-1} step={1} value={active} onChange={e=>setDay(Number(e.target.value))} aria-label="Seasonal wind valid date" aria-valuetext={`${date(data.dates[active])} ${data.dates[active].slice(11,16)} UTC`}/>
   <div className="seasonal-values" aria-live="polite"><strong>{date(data.dates[active])} · {data.dates[active].slice(11,16)} UTC</strong><span>Forecast mean <b>{signed(data.mean[active])} m/s</b></span>{climate&&<span>Model climate <b>{signed(climate.mean[indices[active]])} m/s</b></span>}{eraValues&&<span>ERA5 mean <b>{signed(eraValues[active])} m/s</b></span>}<span>{Math.round(data.easterlyFraction[active]*data.members.length)}/{data.members.length} members easterly</span></div>
-  {!era&&<p className="seasonal-pending">ERA5 daily climatology is being prepared.</p>}
   <p>Positive wind is westerly; negative is easterly. Raw seasonal model scenarios, without bias correction. The easterly member fraction is not a calibrated SSW probability. ERA5 daily climatology uses 1993–2016.</p>
   <details><summary>Sources & calculation</summary><p>{data.attribution}</p>{climate&&<p>{climate.method} {climate.sampleCount} historical member trajectories.</p>}{era&&<p>{era.method}</p>}<p>Each field is averaged around the full longitude circle; latitude rows are interpolated to 60°N when needed. Models retain their own ensemble sizes and issue dates. ERA5 uses calendar-day means from all 24 hours, averaged over 1993–2016.</p><a href="https://cds.climate.copernicus.eu/datasets/seasonal-original-pressure-levels" target="_blank" rel="noreferrer">C3S seasonal source data</a> · <a href="https://cds.climate.copernicus.eu/datasets/reanalysis-era5-pressure-levels" target="_blank" rel="noreferrer">ERA5 reference data</a></details>
  </div>;

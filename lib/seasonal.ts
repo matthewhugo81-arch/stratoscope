@@ -14,6 +14,7 @@ const ERA_SOURCE='https://cds.climate.copernicus.eu/datasets/reanalysis-era5-pre
 export type SeasonalForecast={version:2;complete:true;model:SeasonalId;name:string;system:string;nominal:string;preparedAt:string;latitude:60;level:10;units:'m/s';sampling:string;dates:string[];members:{id:string;start:string;values:number[]}[];memberCount:number;mean:number[];easterlyFraction:number[];source:string;climateKey:string;attribution:string};
 export type SeasonalClimate={version:2;complete:true;model:SeasonalId;system:string;month:number;period:[number,number];years:number[];sampleCount:number;steps:number;sampling:string;mean:number[];min:number[];p10:number[];p25:number[];p75:number[];p90:number[];max:number[];source:string;method:string};
 export type EraClimate={version:2;complete:true;period:[number,number];latitude:60;level:10;units:'m/s';source:string;method:string;daily:Record<string,number>;counts:Record<string,number>};
+export type EraProgress={checkedAt:string;completedYears:number[];nextYear:number|null;status:'updating'|'behind'|'complete'|'error'};
 function check(v:unknown):asserts v{if(!v)throw Error('Seasonal data failed validation.');}
 const stamp=(s:unknown):s is string=>typeof s==='string'&&/^\d{4}-\d{2}-\d{2}T(00|12):00:00\.000Z$/.test(s)&&Number.isFinite(Date.parse(s));
 const finite=(a:unknown,n=360):a is number[]=>Array.isArray(a)&&a.length===n&&a.every(v=>typeof v==='number'&&Number.isFinite(v)&&Math.abs(v)<200);
@@ -50,3 +51,18 @@ async function json(path:string,signal:AbortSignal):Promise<unknown|null>{
 export async function fetchSeasonal(id:SeasonalId,signal:AbortSignal){const d=await json(`forecast/${id}.json`,signal);return d===null?null:validateForecast(d,id);}
 export async function fetchClimate(id:SeasonalId,nominal:string,signal:AbortSignal){const cfg=SEASONAL_MODELS.find(m=>m.id===id)!,m=Number(nominal.slice(5,7));const d=await json(`climate/${id}-${cfg.system}-${String(m).padStart(2,'0')}.json`,signal);return d===null?null:validateClimate(d,id,m);}
 export async function fetchEra(signal:AbortSignal){const d=await json('climate/era5-1993-2016.json',signal);return d===null?null:validateEra(d);}
+export function validateEraProgress(input:unknown):EraProgress|null{
+ const report=input as {version:number;checkedAt:string;era5?:{period:number[];totalYears:number;completedYears:number[];nextYear?:number|null;status:EraProgress['status']}};
+ check(report&&report.version===1&&Number.isFinite(Date.parse(report.checkedAt)));
+ const d=report.era5;if(!d)return null;
+ check(d.period?.join(',')==='1993,2016'&&d.totalYears===24&&['updating','behind','complete','error'].includes(d.status));
+ if(!d.completedYears&&d.status==='error')return null;
+ check(Array.isArray(d.completedYears)&&d.completedYears.length<=24&&d.completedYears.every((y,i)=>Number.isInteger(y)&&y>=1993&&y<=2016&&(i===0||y>d.completedYears[i-1])));
+ const nextYear=Array.from({length:24},(_,i)=>1993+i).find(y=>!d.completedYears.includes(y))??null;
+ if(d.status!=='complete'&&d.status!=='error')check(d.nextYear===nextYear);
+ return {checkedAt:report.checkedAt,completedYears:d.completedYears,nextYear,status:d.status};
+}
+export async function fetchEraProgress(signal:AbortSignal){
+ const r=await fetch('https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/forecast-status/latest.json',{signal,cache:'no-cache'});
+ if(!r.ok)throw Error('ERA5 progress could not be checked.');return validateEraProgress(await r.json());
+}

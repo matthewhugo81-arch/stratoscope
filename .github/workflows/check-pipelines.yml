@@ -4,7 +4,7 @@ on:
   schedule:
     - cron: '11,31,51 * * * *'
   workflow_run:
-    workflows: [Prepare public ensemble maps, Prepare GEFS model maps, Prepare public DWD ICON maps, Prepare GEFS vortex geometry]
+    workflows: [Prepare public ensemble maps, Prepare GEFS model maps, Prepare public DWD ICON maps, Prepare GEFS vortex geometry, Prepare ERA5 daily wind climatology]
     types: [completed]
 permissions:
   contents: write
