@@ -173,7 +173,10 @@ def derived(results):
         v=public('forecast-data-vortex');expected=next(d['publishedRun'] for d in results if d['model']=='gefs')
         context_hours=v.get('contextHours',[])
         context_complete=v.get('contextComplete') is True and len(context_hours)==33 and set(context_hours)==set(range(0,385,12))
-        current=v['run']==expected and v['timelineComplete'] and v['count']==31 and len(v['files'])==33 and context_complete
+        heat=v.get('heatFlux',{})
+        key=v['run'][:10].replace('-','')+v['run'][11:13]
+        heat_complete=bool(re.fullmatch(r'[a-f0-9]{64}',heat.get('sha256',''))) and heat.get('path')==f"{key}/gefs/heat-flux-{heat.get('sha256')}.json" and 0<heat.get('bytes',0)<100000
+        current=v['run']==expected and v['timelineComplete'] and v['count']==31 and len(v['files'])==33 and context_complete and heat_complete
         out.append(dict(model='vortex',status='current' if current else 'behind',publishedRun=v['run'],availableRun=expected,frames=len(v['files']),anomalyFrames=len(context_hours)))
     except Exception:out.append(dict(model='vortex',status='error'))
     return out

@@ -9,6 +9,7 @@ from datetime import datetime, timezone, timedelta
 from email.utils import parsedate_to_datetime
 import gzip
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 import struct
@@ -19,6 +20,9 @@ import urllib.error
 
 import eccodes as ec
 import numpy as np
+heat_spec=importlib.util.spec_from_file_location('heat_flux',Path(__file__).with_name('heat_flux.py'))
+heat_module=importlib.util.module_from_spec(heat_spec);heat_spec.loader.exec_module(heat_module)
+member_heat_flux,heat_flux_point=heat_module.member_heat_flux,heat_module.point
 
 CONFIG = {
     'gefs': {'count': 31, 'levels': [10, 20, 30, 50, 70, 100], 'maxHour': 384},
@@ -179,7 +183,7 @@ def decode_field(message, model, run, hour, member, level, key):
         ec.codes_release(handle)
 
 
-def calculate(model, run, hour, levels, workers, panel_writer=None):
+def calculate(model, run, hour, levels, workers, panel_writer=None, heat_writer=None):
     entries = noaa_entries(run, hour, levels, workers) if model == 'gefs' else ec_entries(model, run, hour, levels)
     expected = {(m, level, key) for m in range(CONFIG[model]['count']) for level in levels for key in KEYS}
     identities = [tuple(item[3:]) for item in entries]
@@ -200,6 +204,8 @@ def calculate(model, run, hour, levels, workers, panel_writer=None):
     results = {}
     for level in levels:
         values = {key: np.stack([downloaded[m, level, key][0] for m in range(CONFIG[model]['count'])]) for key in KEYS}
+        if model == 'gefs' and level == 100 and heat_writer:
+            heat_writer(member_heat_flux(values['v'], values['temperature']))
         wind = np.hypot(values['u'], values['v'])
         planes = [values[key].mean(axis=0) for key in KEYS] + [wind.mean(axis=0), values['temperature'].std(axis=0, ddof=0), wind.std(axis=0, ddof=0)]
         zonal = None
@@ -295,16 +301,23 @@ def _prepare_hour(task):
     started = time.monotonic()
     run_key = run.strftime('%Y%m%d%H')
     panels = {}
+    heat = {}
+    def heat_writer(members):
+        filename = f'{run_key}/100/{hour}.heat-flux.json'
+        stamp = run.isoformat(timespec='milliseconds').replace('+00:00','Z')
+        packed = json.dumps(heat_flux_point(stamp,hour,members),separators=(',',':'),allow_nan=False).encode()
+        target=output/filename;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(packed)
+        heat[str(hour)] = dict(path=filename,bytes=len(packed),sha256=hashlib.sha256(packed).hexdigest())
     def panel_writer(values, diagnostics):
         filename = f'{run_key}/10/{hour}.members.bin.gz'
         panels[str(hour)] = {'path': filename, **save_panels(output/filename, model, run, hour, values, diagnostics)}
-    result = calculate(model, run, hour, levels, workers, panel_writer)
+    result = calculate(model, run, hour, levels, workers, panel_writer, heat_writer)
     files = {}
     for level, (planes, zonal) in result.items():
         filename = f'{run_key}/{level}/{hour}.bin.gz'
         files[f'{level}/{hour}'] = {'path': filename, **save_frame(output/filename, model, run, hour, level, planes, zonal)}
     print(json.dumps({'model': model, 'hour': hour, 'seconds': round(time.monotonic()-started, 2)}), flush=True)
-    return files, panels
+    return files, panels, heat
 
 def main():
     parser = argparse.ArgumentParser()
@@ -329,10 +342,13 @@ def main():
     tasks = [(args.model, run, hour, levels, args.workers, args.output) for hour in hours]
     # Only the parent creates the public catalogue after every hour succeeds.
     with ProcessPoolExecutor(max_workers=args.hour_workers) as pool:
-        for files, panels in pool.map(prepare_hour, tasks):
+        for files, panels, heat in pool.map(prepare_hour, tasks):
             manifest['files'].update(files)
             manifest.setdefault('panels', {}).update(panels)
+            if heat: manifest.setdefault('heatFlux', {}).update(heat)
     manifest['preparedAt'] = datetime.now(timezone.utc).isoformat()
+    if args.model=='gefs' and manifest['complete']:
+        assert set(manifest.get('heatFlux',{}))=={str(h) for h in hours}, 'Incomplete heat-flux member diagnostics'
     (args.output/'latest.json').write_text(json.dumps(manifest, separators=(',', ':')), encoding='utf-8')
     print('COMPLETE', args.model, len(manifest['files']), sum(v['bytes'] for v in manifest['files'].values()), flush=True)
 

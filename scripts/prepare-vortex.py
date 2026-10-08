@@ -135,6 +135,16 @@ def main():
                 b=prep.request(ROOT+'forecast-data-vortex/'+e['path']);assert len(b)==e['bytes'] and hashlib.sha256(b).hexdigest()==e['sha256']
                 f=output/e['path'];f.parent.mkdir(parents=True,exist_ok=True);f.write_bytes(b)
             catalogue['files']=previous['files']
+            if previous.get('heatFlux'):
+                e=previous['heatFlux'];assert len(e['sha256'])==64 and all(c in '0123456789abcdef' for c in e['sha256'])
+                assert e['path']==f"{key}/gefs/heat-flux-{e['sha256']}.json" and 0<e['bytes']<100000
+                b=prep.request(ROOT+'forecast-data-vortex/'+e['path']);assert len(b)==e['bytes'] and hashlib.sha256(b).hexdigest()==e['sha256']
+                series=json.loads(b)
+                assert series['run']==run and series['complete'] is True and len(series['points'])==33
+                assert [p['hour'] for p in series['points']]==list(range(0,385,12))
+                for p in series['points']:prep.heat_module.validate_point({**series,**p},run,p['hour'])
+                f=output/e['path'];f.parent.mkdir(parents=True,exist_ok=True);f.write_bytes(b)
+                catalogue['heatFlux']=e
     except urllib.error.HTTPError as e:
         if e.code!=404:raise
     wanted=args.hours if args.hours is not None else list(range(0,385,12))
@@ -167,6 +177,14 @@ def main():
         (output/'latest.json').write_text(json.dumps(catalogue,separators=(',',':')))
         print('COMPLETE FORECAST GEOMETRY',run,hour,len(frame['layers']),len(catalogue['files']),flush=True)
         if args.publish and (hour==0 or hour%48==0 or hour==wanted[-1]):publish(output,hour)
+    if not args.context_only and not args.hours and not catalogue.get('heatFlux'):
+        catalogue['heatFlux']=prep.heat_module.prepare_series(prep,m,output)
+        catalogue['timelineComplete']=all(str(h) in catalogue['files'] for h in range(0,385,12))
+        catalogue['contextHours']=[int(h) for h,e in catalogue['files'].items() if json.loads((output/e['path']).read_text()).get('baseMap',{}).get('referenceSha256')==reference_meta['sha256']]
+        catalogue['contextComplete']=len(catalogue['contextHours'])==33
+        catalogue['preparedAt']=datetime.now(timezone.utc).isoformat()
+        (output/'latest.json').write_text(json.dumps(catalogue,separators=(',',':')))
+        if args.publish:publish(output,'heat-flux')
     print('GEOMETRY READY',run,len(catalogue['files']),flush=True)
 
 if __name__=='__main__':main()

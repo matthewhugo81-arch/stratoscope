@@ -2,7 +2,7 @@ import type {EnsembleModel} from './models';
 import {validateVortexBaseMap,type VortexBaseMap} from './vortex-context';
 export type VortexLayer={theta?:number;pressure?:number;pv?:number;segments:number[][]};
 export type VortexGeometry={version:1;model:EnsembleModel;run:string;hour:number;count:number;method:string;source?:string;pressureLevels?:number[];gridDegrees?:number;layers:VortexLayer[];baseMap?:VortexBaseMap};
-export type VortexCatalogue={version:1;model:'vortex';run:string;count:31;complete:true;timelineComplete:boolean;contextComplete?:boolean;contextHours?:number[];targetHour:384;step:12;method:string;files:Record<string,{path:string;bytes:number;sha256:string}>};
+export type VortexCatalogue={version:1;model:'vortex';run:string;count:31;complete:true;timelineComplete:boolean;contextComplete?:boolean;contextHours?:number[];heatFlux?:{path:string;bytes:number;sha256:string};targetHour:384;step:12;method:string;files:Record<string,{path:string;bytes:number;sha256:string}>};
 const root='https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/forecast-data-vortex/';
 const cache=new Map<string,VortexGeometry>();
 export function validateVortex(d:VortexGeometry,run:string,hour:number){
@@ -27,6 +27,7 @@ export async function vortexCatalogue(signal:AbortSignal){
  if(d.timelineComplete&&Array.from({length:33},(_,i)=>i*12).some(h=>!d.files[String(h)]))throw Error('Incomplete vortex timeline');
  if(d.contextHours!==undefined&&(!Array.isArray(d.contextHours)||new Set(d.contextHours).size!==d.contextHours.length||d.contextHours.some(h=>!Number.isInteger(h)||!d.files[String(h)])))throw Error('Invalid anomaly timeline');
  if(d.contextComplete===true&&(!d.timelineComplete||d.contextHours?.length!==33))throw Error('Incomplete anomaly timeline');
+ if(d.heatFlux&&(d.heatFlux.path!==`${key}/gefs/heat-flux-${d.heatFlux.sha256}.json`||!/^[a-f0-9]{64}$/.test(d.heatFlux.sha256)||!Number.isInteger(d.heatFlux.bytes)||d.heatFlux.bytes<=0||d.heatFlux.bytes>100000))throw Error('Invalid heat-flux series entry');
  return d;
 }
 export async function loadVortex(c:VortexCatalogue,hour:number,signal:AbortSignal){

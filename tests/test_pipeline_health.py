@@ -15,6 +15,8 @@ class HealthTests(unittest.TestCase):
         with patch.object(h,'public',return_value=data):
             self.assertEqual(h.derived([dict(model='gefs',publishedRun=run)])[-1]['status'],'behind')
             data.update(contextComplete=True,contextHours=list(range(0,385,12)))
+            self.assertEqual(h.derived([dict(model='gefs',publishedRun=run)])[-1]['status'],'behind')
+            data['heatFlux']=dict(path='2026100806/gefs/heat-flux-'+('a'*64)+'.json',sha256='a'*64,bytes=25000)
             self.assertEqual(h.derived([dict(model='gefs',publishedRun=run)])[-1]['status'],'current')
             data['contextHours'][-1]=0
             self.assertEqual(h.derived([dict(model='gefs',publishedRun=run)])[-1]['status'],'behind')

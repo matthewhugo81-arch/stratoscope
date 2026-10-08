@@ -22,6 +22,20 @@ RUN = datetime(2026, 10, 7, tzinfo=timezone.utc)
 
 
 class PreparationTests(unittest.TestCase):
+    def test_gefs_ingest_saves_member_heat_flux_without_additional_downloads(self):
+        entries=[('https://test.invalid/data',(m*4+k)*20,20,m,100,key) for m in range(31) for k,key in enumerate(p.KEYS)]
+        wave=np.sin(np.arange(360)*np.pi/180)
+        def field(message,model,run,hour,member,level,key):
+            sign=1 if member%2 else -1
+            value={'temperature':-60+sign*6*wave,'v':sign*4*wave,'u':np.zeros(360),'height':np.full(360,16000.)}[key]
+            return np.broadcast_to(value,(91,360)).copy(),None
+        with tempfile.TemporaryDirectory() as directory, patch.object(p,'noaa_entries',return_value=entries) as inventory, patch.object(p,'request',side_effect=lambda url,start,length:bytes(length)),patch.object(p,'decode',side_effect=field):
+            files,panels,heat=p._prepare_hour(('gefs',RUN,0,[100],2,Path(directory)))
+            data=json.loads((Path(directory)/heat['0']['path']).read_text())
+            np.testing.assert_allclose(data['members'],12,atol=1e-6)
+            self.assertEqual(data['count'],31);self.assertEqual(len(files),1);self.assertFalse(panels)
+            inventory.assert_called_once()
+
     def test_rate_limit_retry_waits_for_provider_before_retrying(self):
         error=urllib.error.HTTPError('https://test.invalid/data',429,'Too Many Requests',{'Retry-After':'180'},None)
         response=MagicMock();response.__enter__.return_value.read.return_value=b'valid'
