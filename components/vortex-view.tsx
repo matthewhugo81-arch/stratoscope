@@ -9,14 +9,14 @@ function VortexCanvas({data}:{data:VortexGeometry}){
  const request=()=>{cancelAnimationFrame(raf.current);raf.current=requestAnimationFrame(()=>paint.current())};
  paint.current=()=>{
   const c=canvas.current,ctx=c?.getContext('2d');if(!ctx||!c)return;const dpr=Math.min(devicePixelRatio||1,2);ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,size.w,size.h);
-  const {yaw,tilt,zoom}=view.current,scale=Math.min(size.w*.34,size.h*.43)*zoom;
-  const project=(lon:number,lat:number,z:number)=>{const a=lon*Math.PI/180,r=(90-lat)/60,xx=r*Math.sin(a),yy=-r*Math.cos(a),x=xx*Math.cos(yaw)+yy*Math.sin(yaw),y=-xx*Math.sin(yaw)+yy*Math.cos(yaw);return{x:size.w/2+x*scale,y:size.h*.57+(y*Math.sin(tilt)-(z-.65)*Math.cos(tilt))*scale};};
+  const {yaw,tilt,zoom}=view.current,scale=Math.min(size.w*.34,size.h*.35)*zoom;
+  const project=(lon:number,lat:number,z:number)=>{const a=lon*Math.PI/180,r=(90-lat)/60,xx=r*Math.sin(a),yy=-r*Math.cos(a),x=xx*Math.cos(yaw)+yy*Math.sin(yaw),y=-xx*Math.sin(yaw)+yy*Math.cos(yaw);return{x:size.w/2+x*scale,y:size.h*.52+(y*Math.sin(tilt)-(z-.65)*Math.cos(tilt))*scale};};
   const line=(a:{x:number;y:number},b:{x:number;y:number})=>{ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y)};
   ctx.strokeStyle='#789ca448';ctx.lineWidth=.8;ctx.beginPath();
   for(const lat of [30,60,70,80])for(let lon=0;lon<360;lon+=3)line(project(lon,lat,0),project(lon+3,lat,0));
   for(let lon=0;lon<360;lon+=30)line(project(lon,90,0),project(lon,30,0));ctx.stroke();
   ctx.strokeStyle='#a1bac875';ctx.beginPath();for(const points of coast.current)for(let i=1;i<points.length;i++){const a=points[i-1],b=points[i];if(a[1]>=30&&b[1]>=30)line(project(a[0],a[1],0),project(b[0],b[1],0));}ctx.stroke();
-  const axisLon=230;ctx.strokeStyle='#93b2c5';ctx.beginPath();line(project(axisLon,30,0),project(axisLon,30,1.4));ctx.stroke();ctx.font='12px monospace';ctx.fillStyle='#bad0dc';
+  const axisLon=135;ctx.strokeStyle='#93b2c5';ctx.beginPath();line(project(axisLon,30,0),project(axisLon,30,1.4));ctx.stroke();ctx.font='12px monospace';ctx.fillStyle='#bad0dc';
   const ticks=data.model==='gefs'?[400,600,800,1000,1200]:[100,50,10];
   for(const n of ticks){const z=data.model==='gefs'?(n-400)/800*1.4:Math.log(100/n)/Math.log(10)*1.4,p=project(axisLon,30,z);ctx.fillText(String(n)+(data.model==='gefs'?' K':' hPa'),p.x+7,p.y+4);}
   for(const l of data.layers){const z=l.theta!==undefined?(l.theta-400)/800*1.4:Math.log(100/l.pressure!)/Math.log(10)*1.4,f=z/1.4;ctx.strokeStyle=`hsl(${185-f*150} 80% ${58+f*8}%)`;ctx.globalAlpha=l.theta!==undefined&&l.theta%100!==0?.58:.95;ctx.lineWidth=l.theta!==undefined?(l.theta%100===0?1.5:.85):2.3;ctx.beginPath();for(const s of l.segments)line(project(s[0],s[1],z),project(s[2],s[3],z));ctx.stroke();}
