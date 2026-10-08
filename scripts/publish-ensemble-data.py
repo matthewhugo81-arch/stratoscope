@@ -13,7 +13,7 @@ import subprocess
 import tarfile
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model', choices=['gefs', 'ifs_ens', 'aifs_ens', 'icon'], required=True)
+parser.add_argument('--model', choices=['gefs', 'ifs_ens', 'aifs_ens', 'icon', 'vortex'], required=True)
 parser.add_argument('--output', type=Path, required=True)
 args = parser.parse_args()
 repository = os.environ['GITHUB_REPOSITORY']

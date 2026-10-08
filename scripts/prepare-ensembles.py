@@ -92,7 +92,7 @@ def noaa_entries(run, hour, levels, workers):
             start, end = int(item[1]), int(entries[i+1][1])
             result.append((base, start, end-start, member, int(item[4].split()[0]), keys[item[3]]))
         return result
-    parts = set('b' if level in [20, 30, 70] else 'a' for level in levels)
+    parts = set('b' if level in [1, 2, 3, 5, 7, 20, 30, 70, 150] else 'a' for level in levels)
     with ThreadPoolExecutor(max_workers=workers) as pool:
         return [entry for entries in pool.map(inventory, [(m, p) for m in range(31) for p in parts]) for entry in entries]
 
