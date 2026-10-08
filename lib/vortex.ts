@@ -14,10 +14,9 @@ export function validateVortex(d:VortexGeometry,run:string,hour:number){
 export async function vortexCatalogue(signal:AbortSignal){
  const r=await fetch(root+'latest.json?check='+Date.now(),{signal,cache:'no-cache'});if(!r.ok)throw Error('GEFS 3D geometry is being prepared. Complete forecast times appear here as they are published.');
  let d=await r.json() as VortexCatalogue;
- // During migration, an edge can retain the pre-context catalogue while
- // already serving enriched frames. Resolve an immutable snapshot once;
- // normal current catalogues need no GitHub API request.
- if(d.contextHours===undefined){try{
+ // During enrichment, an edge can retain the older completed catalogue.
+ // Resolve an immutable snapshot; normal complete catalogues need no API call.
+ if(d.contextHours===undefined||(d.timelineComplete&&d.contextComplete&&!d.heatFlux)){try{
   const ref=await fetch('https://api.github.com/repos/matthewhugo81-arch/stratoscope/git/ref/heads/forecast-data-vortex',{signal,cache:'no-cache'});
   if(ref.ok){const head=await ref.json() as {object?:{sha?:string}};const sha=head?.object?.sha;if(typeof sha==='string'&&/^[a-f0-9]{40}$/.test(sha)){const snapshot=await fetch(`https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/${sha}/latest.json`,{signal,cache:'force-cache'});if(snapshot.ok)d=await snapshot.json() as VortexCatalogue;}}
  }catch(e){if(signal.aborted)throw e;}}
