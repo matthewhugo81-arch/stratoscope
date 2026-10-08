@@ -214,3 +214,24 @@ Compact, hash-checked GEFS geometry is stored on `forecast-data-vortex`. Offline
 ### Wind direction arrows
 
 Wind maps include an optional, default-enabled arrow overlay. Screen-spaced arrows use bilinearly sampled eastward u and northward v components and a short great-circle step projected into the current globe orientation. Arrows point along flow (towards its destination), with bounded length increasing with vector speed; shading retains its existing speed scale. Ensemble mean arrows represent the mean vector, while shading represents the mean member speed, which can differ. Spread maps never display direction arrows. No extra downloads are required.
+
+
+### Forecast delivery reliability
+
+ECMWF ENS and AIFS preparation now has a separate concurrency lock per model,
+checks twice an hour, and processes two forecast hours in separate native-decoder
+processes on the public runner. Only a fully validated run is published. IFS ENS
+uses complete 15-day 00/12 UTC cycles; the shorter 06/18 UTC IFS cycles are not
+substituted into the 15-day timeline. AIFS and GEFS accept all four cycles when
+their complete advertised horizon is available.
+
+`check-pipelines.yml` audits terminal provider inventories, complete public
+catalogues, all member-panel entries, diagnostics and the GEFS 3D timeline every
+20 minutes and after preparation. It recovers idle stale jobs with a 15-minute
+retry cooldown, never dispatching duplicate active model jobs. A small public
+`forecast-status/latest.json` drives the site's source freshness notice. The
+notice offers a new published run without unexpectedly changing the user's
+current analysis or deleting cached frames. Status older than 90 minutes is
+labelled overdue. The desktop ingest monitor also checks for missed GitHub
+schedules; GitHub scheduled events can be delayed or dropped, so this is a
+recovery mechanism rather than a guaranteed publication deadline.

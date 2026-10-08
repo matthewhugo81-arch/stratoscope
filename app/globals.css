@@ -232,3 +232,5 @@ footer{font-size:11px;line-height:1.5}
 .vortex-load-status{height:24px;line-height:24px;font:11px/24px monospace;color:#abc5d0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .vortex-outlook .vortex-timeline{margin:0 0 8px;gap:8px}.vortex-method summary{cursor:pointer;color:#b5efdd}.vortex-method p{margin:8px 0}
 @media(max-width:580px){.vortex-outlook{padding:10px}.vortex-heading{gap:4px}.vortex-heading .vortex-stamp{font-size:10px}.vortex-view-controls span{display:none}.vortex-stage .vortex-view-controls{left:8px;top:8px}}
+
+.pipeline-note{display:block;font-size:11px;line-height:1.5;color:#efc281;margin-top:8px}.pipeline-current{display:block;font-size:10px;line-height:1.5;color:#8bbab0;margin-top:8px}

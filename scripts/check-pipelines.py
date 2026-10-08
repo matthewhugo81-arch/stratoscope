@@ -1,0 +1,168 @@
+"""Small independent freshness audit. No raw fields, CDS requests or paid services.
+
+Compare terminal provider inventories with complete published catalogues. Recovery
+dispatches only idle workflows; partial data never becomes the public latest run.
+"""
+import argparse
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone, timedelta
+import importlib.util
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import urllib.error
+import urllib.request
+
+REPO = 'matthewhugo81-arch/stratoscope'
+RAW = f'https://raw.githubusercontent.com/{REPO}/'
+MODELS = ['gfs', 'ecmwf_direct', 'gefs', 'ifs_ens', 'aifs_ens', 'icon']
+WORKFLOWS = {'gefs':'prepare-gefs.yml', 'ifs_ens':'prepare-ensembles.yml',
+             'aifs_ens':'prepare-ensembles.yml', 'icon':'prepare-icon.yml',
+             'diagnostics':'prepare-diagnostics.yml', 'vortex':'prepare-vortex.yml'}
+ACTIVE = {'queued', 'in_progress', 'waiting', 'pending', 'requested'}
+
+def stamp(d):
+    return d.isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+
+def fetch(url):
+    with urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent':'Stratoscope-pipeline-health'}), timeout=25) as r:
+        return r.read()
+
+def public(branch, file='latest.json'):
+    return json.loads(fetch(RAW+branch+'/'+file))
+
+def github(endpoint, payload=None):
+    token = os.environ['GH_TOKEN']
+    req = urllib.request.Request('https://api.github.com/repos/'+REPO+endpoint,
+        data=json.dumps(payload).encode() if payload is not None else None,
+        headers={'Authorization':'Bearer '+token,'Accept':'application/vnd.github+json','User-Agent':'Stratoscope-pipeline-health'})
+    with urllib.request.urlopen(req,timeout=30) as r:
+        b=r.read()
+        return json.loads(b) if b else None
+
+def preparation():
+    spec=importlib.util.spec_from_file_location('ensemble_preparation',Path(__file__).with_name('prepare-ensembles.py'))
+    mod=importlib.util.module_from_spec(spec);spec.loader.exec_module(mod)
+    return mod
+
+def direct_latest(model, now):
+    interval=6 if model=='gfs' else 12
+    start=datetime.fromtimestamp(int(now.timestamp())//(interval*3600)*(interval*3600),timezone.utc)
+    for back in range(5):
+        run=start-timedelta(hours=interval*back);day=run.strftime('%Y%m%d');cycle=run.strftime('%H')
+        try:
+            if model=='gfs':
+                base=f'https://noaa-gfs-bdp-pds.s3.amazonaws.com/gfs.{day}/{cycle}/atmos/gfs.t{cycle}z.pgrb2.1p00.f240.idx'
+                entries=[line.split(':') for line in fetch(base).decode().splitlines()]
+                assert all(any(p[3]==field and p[4]==f'{level} mb' for p in entries) for level in [10,20,30,50,70,100] for field in ['TMP','HGT','UGRD','VGRD'])
+            elif model=='ecmwf_direct':
+                base=f'https://data.ecmwf.int/forecasts/{day}/{cycle}z/ifs/0p25/oper/{day}{cycle}0000-240h-oper-fc.index'
+                entries=[json.loads(line) for line in fetch(base).decode().splitlines()]
+                assert all(any(p.get('levtype')=='pl' and str(p.get('levelist'))==str(level) and p['param']==field and p['date']==day and int(p['step'])==240 for p in entries) for level in [10,50,100] for field in ['t','gh','u','v'])
+            else:
+                for field in ['t','fi','u','v']:
+                    listing=fetch(f'https://opendata.dwd.de/weather/nwp/icon/grib/{cycle}/{field}/').decode()
+                    names=set(re.findall(r'href="([^"]+)"',listing))
+                    assert all(f'icon_global_icosahedral_pressure-level_{day}{cycle}_{h:03}_{level}_{field.upper()}.grib2.bz2' in names for h in range(0,181,6) for level in [30,50,70,100])
+            return stamp(run)
+        except (urllib.error.HTTPError, AssertionError):
+            continue
+    raise ValueError('No complete provider inventory available')
+
+def validate_catalogue(model, m):
+    count,last,levels=(31,384,[10,20,30,50,70,100]) if model=='gefs' else (51,360,[10,50,100])
+    if model=='icon':count,last,levels=None,180,[30,50,70,100]
+    assert m['model']==model and m['complete'] is True and m['maxHour']==last and m['step']==6 and m['levels']==levels
+    if count:assert m['count']==count
+    key=datetime.fromisoformat(m['run'].replace('Z','+00:00')).strftime('%Y%m%d%H')
+    assert len(m['files'])==len(levels)*(last//6+1)
+    for level in levels:
+        for hour in range(0,last+1,6):
+            e=m['files'][f'{level}/{hour}']
+            assert e['path'].startswith(f'{key}/{level}/{hour}.') and e['bytes']>0 and re.fullmatch('[a-f0-9]{64}',e['sha256'])
+    if count:
+        assert len(m['panels'])==last//6+1
+        for hour in range(0,last+1,6):
+            e=m['panels'][str(hour)]
+            assert e['path']==f'{key}/10/{hour}.members.bin.gz' and e['bytes']>0 and re.fullmatch('[a-f0-9]{64}',e['sha256'])
+
+def audit(model, now, prep):
+    try:
+        available=stamp(prep.discover(model,now)) if model in prep.CONFIG else direct_latest(model,now)
+        if model in ['gfs','ecmwf_direct']:
+            return dict(model=model,availableRun=available,status='direct',message='Browser reads the newest complete provider run')
+        m=public('forecast-data-'+model.replace('_','-'));validate_catalogue(model,m)
+        return dict(model=model,availableRun=available,publishedRun=m['run'],preparedAt=m['preparedAt'],status='current' if m['run']>=available else 'behind',frames=len(m['files']))
+    except Exception as e:
+        return dict(model=model,status='error',message=type(e).__name__+': provider or catalogue validation failed')
+
+def matching_jobs(model, run):
+    if model not in ['ifs_ens','aifs_ens']:return run['status'] in ACTIVE
+    jobs=github(f"/actions/runs/{run['id']}/jobs")['jobs']
+    if not jobs:return run['status'] in ACTIVE  # A dispatch has not expanded its matrix yet.
+    return any(job['name'].endswith(f'({model})') and job['status'] in ACTIVE for job in jobs)
+
+def recovery(model, recover, now):
+    workflow=WORKFLOWS[model]
+    runs=github('/actions/workflows/'+workflow+'/runs?per_page=12')['workflow_runs']
+    for run in runs:
+        if run['status'] in ACTIVE and matching_jobs(model,run):
+            return 'updating',run['html_url']
+    # A failed/new dispatch is allowed time to register or settle before retrying.
+    recent=next((r for r in runs if (now-datetime.fromisoformat(r['created_at'].replace('Z','+00:00'))).total_seconds()<900),None)
+    if recent:return 'behind',recent['html_url']
+    if recover:
+        payload={'ref':'main'}
+        if model in ['ifs_ens','aifs_ens']:payload['inputs']={'model':model}
+        github('/actions/workflows/'+workflow+'/dispatches',payload)
+        return 'updating',f'https://github.com/{REPO}/actions/workflows/{workflow}'
+    return 'behind',f'https://github.com/{REPO}/actions/workflows/{workflow}'
+
+def derived(results):
+    out=[]
+    for model in ['gefs','ifs_ens','aifs_ens']:
+        expected=next((d.get('publishedRun') for d in results if d['model']==model),None)
+        if not expected:continue
+        try:
+            d=public('forecast-data-diagnostics',model+'.json')
+            current=d.get('complete') is True and d['run']==expected
+            out.append(dict(model='diagnostics',sourceModel=model,status='current' if current else 'behind',publishedRun=d.get('run'),availableRun=expected))
+        except Exception:out.append(dict(model='diagnostics',sourceModel=model,status='behind',availableRun=expected))
+    try:
+        v=public('forecast-data-vortex');expected=next(d['publishedRun'] for d in results if d['model']=='gefs')
+        current=v['run']==expected and v['timelineComplete'] and v['count']==31 and len(v['files'])==33
+        out.append(dict(model='vortex',status='current' if current else 'behind',publishedRun=v['run'],availableRun=expected,frames=len(v['files'])))
+    except Exception:out.append(dict(model='vortex',status='error'))
+    return out
+
+def publish(data):
+    root=Path('work/pipeline-status');root.mkdir(parents=True,exist_ok=True)
+    def git(*args):return subprocess.check_output(['git',*args],cwd=root,text=True).strip()
+    git('init','-b','forecast-status');git('remote','add','origin',f'https://github.com/{REPO}.git')
+    old=git('ls-remote','origin','refs/heads/forecast-status');sha=old.split()[0] if old else ''
+    (root/'latest.json').write_text(json.dumps(data,separators=(',',':')),encoding='utf8')
+    git('config','user.name','github-actions[bot]');git('config','user.email','41898282+github-actions[bot]@users.noreply.github.com')
+    git('add','latest.json');git('commit','-m','Forecast pipeline health check')
+    git('push',f'--force-with-lease=refs/heads/forecast-status:{sha}','origin','HEAD:refs/heads/forecast-status')
+
+def main():
+    parser=argparse.ArgumentParser();parser.add_argument('--recover',action='store_true');parser.add_argument('--publish',action='store_true');args=parser.parse_args()
+    assert os.environ.get('GITHUB_REPOSITORY',REPO)==REPO
+    now=datetime.now(timezone.utc);prep=preparation()
+    with ThreadPoolExecutor(max_workers=6) as pool:results=list(pool.map(lambda m:audit(m,now,prep),MODELS))
+    results+=derived(results)
+    recovered={}
+    if os.environ.get('GH_TOKEN'):
+        for result in results:
+            if result['status']=='behind':
+                model=result['model']
+                if model not in recovered:recovered[model]=recovery(model,args.recover,now)
+                result['status'],result['workflowUrl']=recovered[model]
+    data=dict(version=1,checkedAt=stamp(now),models=results)
+    print(json.dumps(data,indent=2),flush=True)
+    if args.publish:publish(data)
+    if any(d['status']=='error' for d in results):raise SystemExit(1)
+
+if __name__=='__main__':main()
