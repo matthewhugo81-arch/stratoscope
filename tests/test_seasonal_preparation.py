@@ -89,6 +89,13 @@ class SeasonalTests(unittest.TestCase):
   self.assertEqual(len(result),55);self.assertEqual(len(result[0]['values']),180)
   with self.assertRaises(ValueError):s.ensemble(records[:-1],'ammc',N)
   with self.assertRaises(ValueError):s.ensemble(records+[records[0]],'ammc',N)
+ def test_bom_reuses_exact_accepted_12h_request(self):
+  requests=requests_for('ammc',N)
+  legacy=[{**r,'leadtime_hour':[str(h) for h in range(12,int(r['leadtime_hour'][-1])+1,12)]} for r in requests]
+  with patch.object(s,'load',side_effect=[{'request':r} for r in legacy]),patch.object(s,'retrieve',return_value=Mock()) as retrieve,patch.object(s,'read_grib',return_value=[]),patch.object(s,'ensemble',return_value=[]) as ensemble:
+   s.prepare_ensemble(Mock(),'ammc',N)
+   self.assertEqual([c.args[2] for c in retrieve.call_args_list],legacy)
+   ensemble.assert_called_once()
  def test_request_has_12h_resolution_and_native_system(self):
   for model,cfg in MODELS.items():
    req=requests_for(model,N)
