@@ -1,0 +1,40 @@
+name: Prepare northern diagnostic charts
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: [Prepare public ensemble maps]
+    types: [completed]
+  schedule:
+    - cron: '43 * * * *'
+permissions:
+  contents: write
+concurrency:
+  group: northern-diagnostic-series
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.repository == 'matthewhugo81-arch/stratoscope' && github.event.repository.private == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - run: python -u scripts/prepare-diagnostics.py --output work/diagnostics
+      - name: Publish compact diagnostic series
+        if: hashFiles('work/diagnostics/*.json') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh auth setup-git --hostname github.com
+          git clone --single-branch --branch forecast-data-diagnostics --depth 1 https://github.com/matthewhugo81-arch/stratoscope.git work/diagnostics-publish
+          cp work/diagnostics/*.json work/diagnostics-publish/
+          cd work/diagnostics-publish
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add '*.json'
+          if ! git diff --cached --quiet; then
+            git commit -m 'Update complete northern diagnostic series'
+            git push origin HEAD:forecast-data-diagnostics
+          fi

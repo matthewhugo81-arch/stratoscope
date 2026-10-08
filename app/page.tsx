@@ -11,6 +11,7 @@ import {ZonalWindCard} from '@/components/zonal-wind-card';
 import {ForecastStamps} from '@/components/forecast-stamps';
 import {GloSeaOutlook} from '@/components/glosea-outlook';
 import {MemberPanels} from '@/components/member-panels';
+import {NorthernComparison} from '@/components/northern-diagnostics';
 import {MODELS,isModel,isCycle,isEnsemble,memberCount,supports,type ModelId,type ForecastMeta,type EnsembleView} from '@/lib/models';
 import {loadForecast,peekForecast,clearForecastCache,activateForecastSequence} from '@/lib/forecast-client';
 import {forecastMeta} from '@/lib/forecast-transport';
@@ -131,6 +132,7 @@ export default function Home(){
    </div>
   </section>
   {showStamps&&<ForecastStamps times={times} hour={hour} run={run} field={field} onSelect={chooseHour}/>}
+  <NorthernComparison/>
   <GloSeaOutlook/>
   {ensemble&&showMembers&&run&&<MemberPanels model={model} run={run} hour={hour} field={field} onClose={()=>setShowMembers(false)} onInspect={(m,h,f)=>{setField(f);setShowMembers(false);setLevel(10);setView('member');setMember(m);chooseHour(h)}}/>}
 

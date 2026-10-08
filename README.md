@@ -196,3 +196,9 @@ member count, source and field bounds before display.
 ## EC46 daily wind chart
 The wind-outlook selector includes ECMWF EC46, loaded directly from the official anonymous OpenCharts graphical-product API. Omitting base_time selects the latest available run on opening or Refresh outlook. The issued chart retains its 101 members, mean, model-climate lines, date and attribution. This is an official image, not raw member data. No paid delivery service, API secret or scheduled ingest is used.
 
+
+### Northern forecast diagnostics
+
+The expandable northern diagnostics compare complete GEFS, IFS ENS and AIFS ENS 10 hPa forecasts in two native charts: signed zonal-mean u wind at 60°N and area-weighted temperature over 60–90°N. Wind retains the native longitude-circle diagnostic; temperature uses spherical latitude-band weights on the stored 2° member overview grid (including clipped boundary cells). It is explicitly a forecast-only view with labelled initialization times, not a historical analysis. Individual member curves and a zero-wind reference are available.
+
+`scripts/prepare-diagnostics.py` verifies and reuses already published member panels; it submits no model-member or CDS requests. Complete compact series are saved on `forecast-data-diagnostics`, one small JSON per model. The public standard-runner workflow checks hourly and after ensemble preparation, skips unchanged inputs and refuses partial ensembles/timelines. It uses no paid API or Actions artifact storage.
