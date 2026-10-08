@@ -5,7 +5,7 @@ MODELS={
  'ecmf':dict(name='ECMWF',centre='ecmwf',system='51',forecast=51,hindcast=25,per_start=51,hc_per_start=25),
  'lfpw':dict(name='Météo-France',centre='meteo_france',system='9',forecast=51,hindcast=31,per_start=51,hc_per_start=31),
  'edzw':dict(name='DWD',centre='dwd',system='22',forecast=50,hindcast=30,per_start=50,hc_per_start=30),
- 'cmcc':dict(name='CMCC',centre='cmcc',system='4',forecast=50,hindcast=30,per_start=50,hc_per_start=30),
+ 'cmcc':dict(name='CMCC',grib_centre='cnmc',centre='cmcc',system='4',forecast=50,hindcast=30,per_start=50,hc_per_start=30),
  'rjtd':dict(name='JMA',centre='jma',system='4',forecast=55,hindcast=10,per_start=5,hc_per_start=5),
  'ammc':dict(name='BOM',centre='bom',system='2',forecast=55,hindcast=27,per_start=11,hc_per_start=3),
 }

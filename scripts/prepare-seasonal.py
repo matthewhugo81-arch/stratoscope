@@ -57,7 +57,7 @@ def read_grib(file,model=None):
    try:
     get=lambda k:ec.codes_get(g,k)
     if not(get('shortName')=='u' and get('level')==10 and get('typeOfLevel')=='isobaricInhPa' and get('units')=='m s**-1' and get('gridType')=='regular_ll' and get('bitmapPresent')==0 and get('stepType')=='instant'):raise ValueError('Unexpected GRIB field, units or grid')
-    if model and (get('centre')!=model or str(get('systemNumber'))!=MODELS[model]['system']):raise ValueError('Unexpected model or system')
+    if model and (get('centre')!=MODELS[model].get('grib_centre',model) or get('origin')!=model or str(get('systemNumber'))!=MODELS[model]['system']):raise ValueError('Unexpected model or system')
     if not model and get('centre')!='ecmf':raise ValueError('Unexpected ERA5 centre')
     stamp=lambda a,b:datetime.strptime(f'{get(a):08}{get(b):04}','%Y%m%d%H%M').replace(tzinfo=timezone.utc)
     start=stamp('dataDate','dataTime');valid=stamp('validityDate','validityTime')
@@ -147,7 +147,7 @@ def main():
  if args.phase=='era5':era5(client,args.era5_year,args.aggregate_only)
  elif args.phase in ['forecast','update']:
   forecast(client,args.model,nominal)
-  if args.phase=='update':climate(client,args.model,nominal)
+
  else:climate(client,args.model,nominal)
 if __name__=='__main__':
  try:main()

@@ -24,7 +24,7 @@ jobs:
       fail-fast: false
       max-parallel: 2
       matrix:
-        model: ${{ fromJSON(inputs.phase == 'era5' && '["era5"]' || inputs.model != '' && inputs.model != 'all' && format('["{0}"]', inputs.model) || github.event_name == 'schedule' && '["egrr","ecmf","lfpw","edzw","cmcc","rjtd","ammc","era5"]' || '["egrr","ecmf","lfpw","edzw","cmcc","rjtd","ammc"]') }}
+        model: ${{ fromJSON(inputs.phase == 'era5' && '["era5"]' || inputs.model != '' && inputs.model != 'all' && format('["{0}"]', inputs.model) || github.event_name == 'schedule' && '["egrr","ecmf","lfpw","edzw","cmcc","rjtd","ammc"]' || '["egrr","ecmf","lfpw","edzw","cmcc","rjtd","ammc"]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 350
     steps:
