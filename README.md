@@ -210,3 +210,7 @@ GEFS uses all 31 members' mean temperature and horizontal winds at 13 pressure l
 The 3D viewer is GEFS-only. Its north-pole base map and PV contours share an outward-looking projection: east longitudes run counterclockwise, without mirroring coastlines.
 
 Compact, hash-checked GEFS geometry is stored on `forecast-data-vortex`. Offline preparation reuses the six existing mean levels and retrieves seven extra levels directly from NOAA. Each published time requires the complete ensemble; the catalogue explicitly reports whether all 33 twelve-hourly forecast times are ready. Checkpoints let subsequent jobs resume already published times. The original public repository uses free standard GitHub runners and keeps current/preceding generated runs. This preparation is independent of the main GEFS maps, whose own hourly workflow prevents slow ECMWF jobs from blocking new NOAA cycles. Browser drag, wheel, pinch, keyboard rotation and cached playback operate on prepared geometry.
+
+### Wind direction arrows
+
+Wind maps include an optional, default-enabled arrow overlay. Screen-spaced arrows use bilinearly sampled eastward u and northward v components and a short great-circle step projected into the current globe orientation. Arrows point along flow (towards its destination), with bounded length increasing with vector speed; shading retains its existing speed scale. Ensemble mean arrows represent the mean vector, while shading represents the mean member speed, which can differ. Spread maps never display direction arrows. No extra downloads are required.

@@ -2,8 +2,9 @@
 import {useEffect,useRef,useState} from 'react';
 import {Plus,Minus,Compass,RotateCcw} from 'lucide-react';
 import type {Frame} from '@/lib/grib';
+import {windArrowTarget} from '@/lib/wind-arrows';
 import {createRenderer,SIZE,CENTER,RADIUS,viewBasis,rotateBasis,projectGlobe,inverseGlobe,sample,sampleWind,color,defaultViewport} from '@/lib/globe';
-export function PolarMap({frame,field,contours,graticule}:{frame:Frame|null;field:string;contours:boolean;graticule:boolean}){
+export function PolarMap({frame,field,contours,graticule,windArrows}:{frame:Frame|null;field:string;contours:boolean;graticule:boolean;windArrows:boolean}){
  const viewport=useRef({...defaultViewport}),stage=useRef<HTMLDivElement>(null);
  const base=useRef<HTMLCanvasElement>(null),overlay=useRef<HTMLCanvasElement>(null),renderer=useRef<ReturnType<typeof createRenderer>>(null),coast=useRef<number[][][]>([]),view=useRef({basis:viewBasis(),zoom:1}),raf=useRef(0),paint=useRef(()=>{}),pointers=useRef(new Map<number,{x:number;y:number}>()),pinch=useRef(0);
  const [probe,setProbe]=useState<{lat:number;lon:number}|null>(null),[position,setPosition]=useState('65°N · 0°E'),[dragging,setDragging]=useState(false),[software,setSoftware]=useState(false);
@@ -21,13 +22,26 @@ export function PolarMap({frame,field,contours,graticule}:{frame:Frame|null;fiel
   const line=(points:number[][])=>{ctx.beginPath();let started=false;for(const [lon,lat] of points){const p=projectGlobe(lon,lat,b,z,vp);if(p.depth<=.005){started=false;continue}if(started)ctx.lineTo(p.x,p.y);else{ctx.moveTo(p.x,p.y);started=true}}ctx.stroke()};
   if(graticule){ctx.lineWidth=.7;ctx.strokeStyle='#daf4ff38';ctx.setLineDash([3,5]);for(const lat of [-60,-30,0,30,60,80])line(Array.from({length:181},(_,i)=>[i*2-180,lat]));for(let lon=-180;lon<180;lon+=30)line(Array.from({length:91},(_,i)=>[lon,i*2-90]));ctx.setLineDash([]);}
   ctx.strokeStyle='#e5f7ff83';ctx.lineWidth=.85;coast.current.forEach(line);
+  if(frame&&wind&&windArrows&&frame.ensemble?.view!=='spread'){
+   const arrows=new Path2D(),spacing=54;
+   for(let y=spacing/2;y<vp.height;y+=spacing)for(let x=spacing/2;x<vp.width;x+=spacing){
+    const p=inverseGlobe(x,y,b,z,vp);if(!p||p.lat<5||p.lat>87||p.z<.3)continue;
+    const target=windArrowTarget(p.lat,p.lon,sample(frame,frame.u,p.lat,p.lon),sample(frame,frame.v,p.lat,p.lon));if(!target)continue;
+    const q=projectGlobe(target.lon,target.lat,b,z,vp),dx=q.x-x,dy=q.y-y,d=Math.hypot(dx,dy);if(q.depth<.25||d<.01)continue;
+    const ux=dx/d,uy=dy/d,half=target.length/2,head=4;
+    const sx=x-ux*half,sy=y-uy*half,ex=x+ux*half,ey=y+uy*half;
+    if(Math.min(sx,ex)<5||Math.max(sx,ex)>vp.width-5||Math.min(sy,ey)<5||Math.max(sy,ey)>vp.height-5)continue;
+    arrows.moveTo(sx,sy);arrows.lineTo(ex,ey);arrows.moveTo(ex-ux*head-uy*head*.65,ey-uy*head+ux*head*.65);arrows.lineTo(ex,ey);arrows.lineTo(ex-ux*head+uy*head*.65,ey-uy*head-ux*head*.65);
+   }
+   ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#06131ee0';ctx.lineWidth=3.7;ctx.stroke(arrows);ctx.strokeStyle='#fff4dc';ctx.lineWidth=1.35;ctx.stroke(arrows);ctx.lineCap='butt';
+  }
   ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='12px Arial';
   if(frame&&contours){const labels:{x:number;y:number}[]=[];for(let lat=15;lat<=85;lat+=10)for(let lon=-180;lon<180;lon+=5){const a=sample(frame,frame.height,lat,lon),c=sample(frame,frame.height,lat,lon+5),h=Math.ceil(Math.min(a,c)/400)*400;if(h>=Math.max(a,c)||a===c)continue;const p=projectGlobe(lon+5*(h-a)/(c-a),lat,b,z,vp);if(p.depth<.25||p.x<35||p.x>vp.width-35||p.y<35||p.y>vp.height-35||labels.some(q=>Math.hypot(p.x-q.x,p.y-q.y)<125))continue;labels.push(p);ctx.fillStyle='#132731df';ctx.fillRect(p.x-18,p.y-8,36,16);ctx.fillStyle='#fff3d9';ctx.fillText(String(h/10),p.x,p.y);}}
   for(const [lon,lat,text] of [[0,90,'N'],[0,0,'0°'],[90,60,'60°N'],[-90,30,'30°N']] as [number,number,string][]){const p=projectGlobe(lon,lat,b,z,vp);if(p.depth>.2){ctx.fillStyle='#e1f5ff';ctx.fillText(text,p.x,p.y-9);}}
   const lat=Math.asin(Math.max(-1,Math.min(1,b.front[1])))*180/Math.PI,lon=Math.atan2(b.front[0],b.front[2])*180/Math.PI;setPosition(`${Math.abs(lat).toFixed(0)}°${lat<0?'S':'N'} · ${Math.abs(lon).toFixed(0)}°${lon<0?'W':'E'} · ${z.toFixed(1)}×`);
  };
  useEffect(()=>{try{renderer.current=createRenderer(base.current!);setSoftware(!renderer.current)}catch{renderer.current=null;setSoftware(true)}fetch(new URL('coastline.json',document.baseURI)).then(r=>r.json() as Promise<{features:{geometry:{type:string;coordinates:number[][]|number[][][]}}[]}>).then(j=>{coast.current=j.features.flatMap(f=>f.geometry.type==='LineString'?[f.geometry.coordinates as number[][]]:f.geometry.coordinates as number[][][]);request()}).catch(()=>{});request();const c=overlay.current!;const wheel=(e:WheelEvent)=>{e.preventDefault();setProbe(null);const delta=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?viewport.current.height:1);zoom(Math.exp(-Math.max(-150,Math.min(150,delta))*.0015))};c.addEventListener('wheel',wheel,{passive:false});const resize=new ResizeObserver(([entry])=>{const {width,height}=entry.contentRect;if(!width||!height)return;const dpr=Math.min(window.devicePixelRatio||1,2);viewport.current={width,height,dpr};for(const canvas of [base.current!,c]){canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);}request();});resize.observe(stage.current!);return()=>{resize.disconnect();cancelAnimationFrame(raf.current);renderer.current?.dispose();c.removeEventListener('wheel',wheel)}},[]);
- useEffect(request,[frame,field,contours,graticule]);
+ useEffect(request,[frame,field,contours,graticule,windArrows]);
  const release=(id:number)=>{pointers.current.delete(id);pinch.current=0;if(!pointers.current.size)setDragging(false)};
  return <div className="globe-wrap"><div className="globe-tools"><div><button aria-label="Zoom in" onClick={()=>zoom(1.15)}><Plus size={17}/></button><button aria-label="Zoom out" onClick={()=>zoom(1/1.15)}><Minus size={17}/></button></div><div><button aria-label="Reset to north pole" title="North-pole view" onClick={()=>reset(true)}><Compass size={17}/><span>North pole</span></button><button aria-label="Fit whole globe" title="Fit the whole globe in the available space" onClick={()=>{view.current.zoom=1;setProbe(null);request()}}><RotateCcw size={16}/><span className="fit-label">Fit globe</span></button></div></div><div ref={stage} className={`polar-map globe ${dragging?'dragging':''}`}><canvas ref={base} width={SIZE} height={SIZE} aria-hidden="true"/><canvas ref={overlay} width={SIZE} height={SIZE} className="globe-overlay" tabIndex={0} role="img" aria-label={`${frame?frame.level+' hPa '+field+' '+(frame.ensemble?.view??'')+' globe, valid '+frame.valid:'Globe loading'}. Drag to rotate and tilt. Scroll to zoom. Left and right arrows step forecast time. Shift plus arrows rotate; plus and minus zoom; Home resets north.`}
  onPointerDown={e=>{e.currentTarget.focus({preventScroll:true});e.currentTarget.setPointerCapture(e.pointerId);pointers.current.set(e.pointerId,{x:e.clientX,y:e.clientY});setDragging(true);setProbe(null);pinch.current=0}}
