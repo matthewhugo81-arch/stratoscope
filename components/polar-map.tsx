@@ -26,14 +26,14 @@ export function PolarMap({frame,field,contours,graticule,windArrows}:{frame:Fram
    const arrows=new Path2D(),spacing=54;
    for(let y=spacing/2;y<vp.height;y+=spacing)for(let x=spacing/2;x<vp.width;x+=spacing){
     const p=inverseGlobe(x,y,b,z,vp);if(!p||p.lat<5||p.lat>87||p.z<.3)continue;
-    const target=windArrowTarget(p.lat,p.lon,sample(frame,frame.u,p.lat,p.lon),sample(frame,frame.v,p.lat,p.lon));if(!target)continue;
+    const target=windArrowTarget(p.lat,p.lon,sample(frame,frame.u,p.lat,p.lon),sample(frame,frame.v,p.lat,p.lon),sampleWind(frame,p.lat,p.lon));if(!target)continue;
     const q=projectGlobe(target.lon,target.lat,b,z,vp),dx=q.x-x,dy=q.y-y,d=Math.hypot(dx,dy);if(q.depth<.25||d<.01)continue;
-    const ux=dx/d,uy=dy/d,half=target.length/2,head=4;
+    const ux=dx/d,uy=dy/d,half=target.length/2,head=target.head;
     const sx=x-ux*half,sy=y-uy*half,ex=x+ux*half,ey=y+uy*half;
     if(Math.min(sx,ex)<5||Math.max(sx,ex)>vp.width-5||Math.min(sy,ey)<5||Math.max(sy,ey)>vp.height-5)continue;
     arrows.moveTo(sx,sy);arrows.lineTo(ex,ey);arrows.moveTo(ex-ux*head-uy*head*.65,ey-uy*head+ux*head*.65);arrows.lineTo(ex,ey);arrows.lineTo(ex-ux*head+uy*head*.65,ey-uy*head-ux*head*.65);
    }
-   ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#06131ee0';ctx.lineWidth=3.7;ctx.stroke(arrows);ctx.strokeStyle='#fff4dc';ctx.lineWidth=1.35;ctx.stroke(arrows);ctx.lineCap='butt';
+   ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#06131ee0';ctx.lineWidth=2.8;ctx.stroke(arrows);ctx.strokeStyle='#fff4dc';ctx.lineWidth=1.1;ctx.stroke(arrows);ctx.lineCap='butt';
   }
   ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='12px Arial';
   if(frame&&contours){const labels:{x:number;y:number}[]=[];for(let lat=15;lat<=85;lat+=10)for(let lon=-180;lon<180;lon+=5){const a=sample(frame,frame.height,lat,lon),c=sample(frame,frame.height,lat,lon+5),h=Math.ceil(Math.min(a,c)/400)*400;if(h>=Math.max(a,c)||a===c)continue;const p=projectGlobe(lon+5*(h-a)/(c-a),lat,b,z,vp);if(p.depth<.25||p.x<35||p.x>vp.width-35||p.y<35||p.y>vp.height-35||labels.some(q=>Math.hypot(p.x-q.x,p.y-q.y)<125))continue;labels.push(p);ctx.fillStyle='#132731df';ctx.fillRect(p.x-18,p.y-8,36,16);ctx.fillStyle='#fff3d9';ctx.fillText(String(h/10),p.x,p.y);}}
