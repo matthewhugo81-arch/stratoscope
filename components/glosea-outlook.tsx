@@ -25,15 +25,16 @@ export function GloSeaOutlook(){
  },[open,refresh]);
  useEffect(()=>{
   if(!open||model==='ec46')return;
-  const c=new AbortController(),signal=AbortSignal.any([c.signal,AbortSignal.timeout(25000)]);
+  const c=new AbortController();let timer:ReturnType<typeof setTimeout>|undefined;
   setForecast(null);setError('');setReferenceError(false);setLoading(true);
-  void (async()=>{
-   let f:SeasonalForecast|null=null;
+  const check=async()=>{
+   const signal=AbortSignal.any([c.signal,AbortSignal.timeout(25000)]);let f:SeasonalForecast|null=null;
    try{f=await fetchSeasonal(model,signal);if(!c.signal.aborted)setForecast(f)}catch{if(!c.signal.aborted)setError('The selected forecast could not be loaded. Please retry.')}
    finally{if(!c.signal.aborted)setLoading(false)}
 
-  })();
-  return()=>c.abort();
+   if(!c.signal.aborted&&!f)timer=setTimeout(check,60000);
+  };
+  void check();return()=>{c.abort();clearTimeout(timer)};
  },[open,model,refresh,data?.nominal]);
  const selected=model==='ec46'?{name:'ECMWF EC46'}:SEASONAL_MODELS.find(m=>m.id===model)!;
  const source=model==='ec46'?'https://charts.ecmwf.int/products/extended-zonal-mean-zonal-wind?area=nh':'https://climate.copernicus.eu/charts/packages/c3s_seasonal/products/c3s_seasonal_stratots_'+model+'?area=60N&type=plumemembers';
