@@ -145,11 +145,29 @@ def climate(client,model,nominal):
  payload=dict(version=2,complete=True,model=model,system=cfg['system'],month=nominal.month,period=[1993,2016],years=YEARS,sampleCount=len(pooled),steps=STEPS,sampling='12-hourly instantaneous',mean=np.round(array.mean(axis=0),4).tolist(),source=SOURCE,method='Equal-weight qualified hindcast members across 1993–2016, aligned by 12-hour lead from each nominal first-of-month. Linear sample quantiles; no bias correction. Leap years retain their native lead-time calendar.')
  for name,values in zip(['min','p10','p25','p75','p90','max'],quantiles):payload[name]=np.round(values,4).tolist()
  publish(final,payload)
+def era5_year_order(client):
+ # Harvest already completed CDS jobs before waiting behind an older queued year.
+ # Only inspect saved request IDs here; retrieve() validates them before download.
+ seeds=json.loads(Path('scripts/era5-resume.json').read_text());ready=[]
+ for year in YEARS:
+  if load(f'checkpoints/era5/{year}.json') is not None:continue
+  saved=load(f'requests/era5-{year}.json');request_id=saved['id'] if saved else seeds.get(str(year))
+  if not request_id:continue
+  try:
+   remote=client.client.get_remote(request_id)
+   if remote.status=='successful':ready.append(year)
+  except Exception:
+   # A progress probe must not discard progress or prevent the normal retry path.
+   print('ERA5 status probe unavailable for',year,'; retaining normal retrieval',flush=True)
+ if ready:print('Collecting already completed ERA5 requests first:',ready,flush=True)
+ return ready+[year for year in YEARS if year not in ready]
+
 def era5(client,selected_year=None,aggregate_only=False):
  final='climate/era5-1993-2016.json'
  if load(final):print('ERA5 reference already prepared');return
  sums={};counts={}
- for year in ([selected_year] if selected_year else YEARS):
+ order=[selected_year] if selected_year else YEARS if aggregate_only else era5_year_order(client)
+ for year in order:
   name=f'checkpoints/era5/{year}.json';part=load(name)
   if part is None:
    if aggregate_only:raise ValueError('ERA5 reference still requires year '+str(year))

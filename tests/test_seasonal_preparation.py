@@ -8,6 +8,19 @@ from seasonal_config import *
 spec=importlib.util.spec_from_file_location('seasonal',Path(__file__).resolve().parents[1]/'scripts/prepare-seasonal.py');s=importlib.util.module_from_spec(spec);spec.loader.exec_module(s)
 N=datetime(2026,9,1,tzinfo=timezone.utc)
 class SeasonalTests(unittest.TestCase):
+ def test_ready_era5_years_are_collected_before_queued_earlier_year(self):
+  client=Mock()
+  client.client.get_remote.side_effect=lambda request_id:Mock(status='accepted' if request_id=='queued' else 'successful')
+  def saved(name):
+   if name=='checkpoints/era5/1993.json':return {'year':1993}
+   if name=='requests/era5-1994.json':return {'id':'queued'}
+   if name=='requests/era5-1995.json':return {'id':'ready'}
+   return None
+  with patch.object(s,'YEARS',[1993,1994,1995]),patch.object(s,'load',side_effect=saved):
+   self.assertEqual(s.era5_year_order(client),[1995,1993,1994])
+  self.assertEqual([c.args[0] for c in client.client.get_remote.call_args_list],['queued','ready'])
+  client.client.submit.assert_not_called()
+
  def test_resume_uses_existing_job_without_submitting(self):
   request={'year':['2002']};remote=Mock(collection_id='test',request=request,status='successful')
   remote.download.side_effect=lambda target:Path(target).write_bytes(b'data')

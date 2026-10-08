@@ -54,6 +54,8 @@ import (with a 15-minute dispatch cooldown). Completed years and accepted CDS
 request IDs are reused; the audit itself never submits CDS requests. Both ERA5
 entry points share a concurrency group. Completion requires all 366 valid daily
 values and the correct 24-year / six-leap-year sample counts.
+On resumption the importer collects already successful saved CDS requests before
+waiting for an earlier queued year, so ready results cannot be stranded behind it.
 The read-only `Diagnose seasonal imports` workflow can inspect all outstanding
 ERA5 request states without submitting, replacing or cancelling any request.
 Models awaiting their first native file retain an explicitly labelled official
