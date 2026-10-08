@@ -1,5 +1,3 @@
-import {preparedMeta} from './prepared-ensembles';
-import {loadForecast} from './forecast-client';
 import type {EnsembleModel} from './models';
 export type VortexLayer={theta?:number;pressure?:number;pv?:number;segments:number[][]};
 export type VortexGeometry={version:1;model:EnsembleModel;run:string;hour:number;count:number;method:string;source?:string;pressureLevels?:number[];gridDegrees?:number;layers:VortexLayer[]};
@@ -28,26 +26,3 @@ export async function loadVortex(c:VortexCatalogue,hour:number,signal:AbortSigna
  const sha=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',b)),v=>v.toString(16).padStart(2,'0')).join('');if(sha!==e.sha256)throw Error('Vortex geometry integrity check failed');
  const d=validateVortex(JSON.parse(new TextDecoder().decode(b)),c.run,hour);cache.set(key,d);if(cache.size>70)cache.delete(cache.keys().next().value!);return d;
 }
-// ECMWF's three available levels are shown as real independent height contours.
-// Do not manufacture a continuous PV surface across the large vertical gaps.
-export function heightContours(values:number[]){
- const weights:number[]=[],rank:{v:number;w:number}[]=[];
- for(let y=0;y<=60;y++){const lat=90-y,w=(Math.sin(Math.min(90,lat+.5)*Math.PI/180)-Math.sin(Math.max(30,lat-.5)*Math.PI/180))/360;weights.push(w);for(let x=0;x<360;x++)rank.push({v:values[y*360+x],w});}
- rank.sort((a,b)=>a.v-b.v);let area=0,threshold=rank[0].v;
- for(const p of rank){area+=p.w;threshold=p.v;if(area>=1-Math.sin(70*Math.PI/180))break;}
- const segments:number[][]=[];
- for(let y=0;y<60;y++)for(let x=0;x<360;x++){
-  const a=[[x,90-y,values[y*360+x]],[x+1,90-y,values[y*360+(x+1)%360]],[x+1,89-y,values[(y+1)*360+(x+1)%360]],[x,89-y,values[(y+1)*360+x]]],points:number[][]=[];
-  for(let k=0;k<4;k++){const p=a[k],q=a[(k+1)%4];if((p[2]>=threshold)!==(q[2]>=threshold)){const f=(threshold-p[2])/(q[2]-p[2]);points.push([p[0]+f*(q[0]-p[0]),p[1]+f*(q[1]-p[1])]);}}
-  if(points.length===4&&(a.reduce((s,p)=>s+p[2],0)/4>=threshold)!==(a[0][2]>=threshold))points.push(points.shift()!);
-  for(let i=0;i<points.length-1;i+=2)segments.push([...points[i],...points[i+1]]);
- }
- return segments;
-}
-export async function ecmwfLayers(model:'ifs_ens'|'aifs_ens',run:string,hour:number,signal:AbortSignal):Promise<VortexGeometry>{
- const key=`${model}/${run}/${hour}`;if(cache.has(key))return cache.get(key)!;
- const layers:VortexLayer[]=[];
- for(const pressure of [100,50,10]){const {frame}=await loadForecast(model,run,hour,pressure,-1,signal,()=>{});if(frame.run!==run||frame.level!==pressure||frame.hour!==hour||frame.ensemble?.count!==51)throw Error('Mismatched ECMWF layer');layers.push({pressure,segments:heightContours(frame.height)});}
- const data:VortexGeometry={version:1,model,run,hour,count:51,method:'three-independent-geopotential-layers',layers};cache.set(key,data);return data;
-}
-export const layerMeta=(model:'ifs_ens'|'aifs_ens',signal:AbortSignal)=>preparedMeta(model,signal);
