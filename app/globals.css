@@ -221,3 +221,14 @@ footer{font-size:11px;line-height:1.5}
 
 .nh-diagnostic-time input[type=checkbox]{flex:0 0 auto;min-width:0}.nh-diagnostic-chart>small{display:block;margin:2px 0 8px;font-size:11px}
 .vortex-stage{min-height:460px}.vortex-canvas{display:block;width:100%;height:clamp(380px,60vh,640px);touch-action:none;cursor:grab;border:1px solid #294550;border-radius:7px;background:radial-gradient(ellipse at center,#152e38,#0c1a24 75%)}.vortex-canvas:active{cursor:grabbing}.vortex-view-controls,.vortex-timeline{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:12px 0}.vortex-view-controls span,.vortex-stamp{font:11px monospace;color:#abc5d0}.vortex-pending{min-height:460px;display:flex;align-items:center;justify-content:center;color:#adc9d6;padding:25px;text-align:center}.vortex-timeline label{font-size:12px}.vortex-timeline select{margin-left:8px;background:#18303a;color:#c9e0e9;border:1px solid #426271;padding:8px;border-radius:4px}
+
+/* Keep forecast stepping stationary and give the vertical view more space. */
+.vortex-outlook{padding:12px 16px;overflow-anchor:none}
+.vortex-heading{display:flex;align-items:center;justify-content:space-between;gap:8px 20px;flex-wrap:wrap;margin-bottom:8px}
+.vortex-heading h2{font-size:19px;margin:0}.vortex-heading .vortex-stamp{margin:0}
+.vortex-stage{position:relative;min-height:0}.vortex-stage .vortex-canvas,.vortex-stage .vortex-pending{height:clamp(440px,72vh,840px);min-height:0}
+.vortex-stage .vortex-view-controls{position:absolute;top:10px;left:12px;right:12px;z-index:1;margin:0;pointer-events:none;gap:7px}
+.vortex-view-controls button{pointer-events:auto;background:#102733ed}.vortex-view-controls span{background:#0c1a24d9;padding:5px 8px;border-radius:4px}
+.vortex-load-status{height:24px;line-height:24px;font:11px/24px monospace;color:#abc5d0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vortex-outlook .vortex-timeline{margin:0 0 8px;gap:8px}.vortex-method summary{cursor:pointer;color:#b5efdd}.vortex-method p{margin:8px 0}
+@media(max-width:580px){.vortex-outlook{padding:10px}.vortex-heading{gap:4px}.vortex-heading .vortex-stamp{font-size:10px}.vortex-view-controls span{display:none}.vortex-stage .vortex-view-controls{left:8px;top:8px}}
