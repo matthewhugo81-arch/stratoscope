@@ -2,12 +2,30 @@ import importlib.util,sys,unittest
 from pathlib import Path
 from datetime import datetime,timedelta,timezone
 import numpy as np
-from unittest.mock import patch
+from unittest.mock import patch,Mock
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
 from seasonal_config import *
 spec=importlib.util.spec_from_file_location('seasonal',Path(__file__).resolve().parents[1]/'scripts/prepare-seasonal.py');s=importlib.util.module_from_spec(spec);spec.loader.exec_module(s)
 N=datetime(2026,9,1,tzinfo=timezone.utc)
 class SeasonalTests(unittest.TestCase):
+ def test_resume_uses_existing_job_without_submitting(self):
+  request={'year':['2002']};remote=Mock(collection_id='test',request=request,status='successful')
+  remote.download.side_effect=lambda target:Path(target).write_bytes(b'data')
+  client=Mock();client.client.get_remote.return_value=remote
+  with patch.object(s,'load',return_value={'id':'existing','dataset':'test','request':request}),patch.object(s,'publish'):
+   file=s.retrieve(client,'test',request,'test-resume');file.unlink()
+  client.client.submit.assert_not_called()
+ def test_only_queue_rejections_retry_and_save_new_request(self):
+  request={'year':['2002']};remote=Mock(request_id='new')
+  remote.download.side_effect=lambda target:Path(target).write_bytes(b'data')
+  client=Mock();client.client.submit.side_effect=[RuntimeError('Number queued requests for this dataset is temporarily limited'),remote]
+  with patch.object(s,'load',return_value=None),patch.object(s,'publish') as publish,patch.object(s.time,'sleep') as sleep:
+   file=s.retrieve(client,'test',request,'test-retry');file.unlink()
+   sleep.assert_called_once_with(90);self.assertEqual(publish.call_args.args[1]['id'],'new')
+  client.client.submit.side_effect=ValueError('wrong data')
+  with patch.object(s,'load',return_value=None),patch.object(s.time,'sleep') as sleep:
+   with self.assertRaisesRegex(ValueError,'wrong data'):s.retrieve(client,'test',request,'test-invalid')
+   sleep.assert_not_called()
  def test_era_reference_only_publishes_after_all_years_and_handles_leap_days(self):
   def checkpoint(name):
    if not name.startswith('checkpoints/'):return None

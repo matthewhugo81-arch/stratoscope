@@ -79,7 +79,40 @@ def ensemble(records,model,nominal,hindcast=False):
  return [dict(id=f'{s:%Y%m%d}-{n}',start=iso(s),values=series[(s,n)]) for s,n in sorted(series)]
 def retrieve(client,dataset,request,label):
  folder=Path('work/seasonal-downloads');folder.mkdir(parents=True,exist_ok=True);file=folder/(label+'.grib')
- print('Retrieving',label,flush=True);client.retrieve(dataset,request,str(file));print('Downloaded',label,file.stat().st_size,'bytes',flush=True);return file
+ checkpoint='requests/'+label+'.json';saved=load(checkpoint)
+ if saved is None and label.startswith('era5-'):
+  seed=json.loads(Path('scripts/era5-resume.json').read_text()).get(label[5:])
+  if seed:saved={'id':seed,'dataset':dataset,'request':request}
+ def normalized(value):
+  if isinstance(value,dict):return {k:normalized(v) for k,v in value.items()}
+  if isinstance(value,list):return [normalized(v) for v in value]
+  if isinstance(value,(int,float)):return str(float(value))
+  return str(value)
+ for attempt in range(40):
+  try:
+   if saved:
+    if saved['dataset']!=dataset or saved['request']!=request:raise ValueError('Request checkpoint does not match requested data')
+    remote=client.client.get_remote(saved['id'])
+    if remote.collection_id!=dataset or normalized(remote.request)!=normalized(request):raise ValueError('Remote request does not match requested data')
+    status=remote.status
+    if status in ['dismissed','deleted']:
+     saved=None;continue
+    print('Resuming',label,status,flush=True)
+   else:
+    print('Submitting',label,flush=True)
+    remote=client.client.submit(collection_id=dataset,request=request)
+    saved={'id':remote.request_id,'dataset':dataset,'request':request}
+    publish(checkpoint,saved)
+   remote.download(str(file))
+   print('Downloaded',label,file.stat().st_size,'bytes',flush=True);return file
+  except Exception as e:
+   response=getattr(e,'response',None)
+   message=str(e)+(response.text if response is not None else '')
+   if 'Number queued requests' not in message or 'temporarily limited' not in message:raise
+   print('CDS queue is full; retrying this rejected request in 90 seconds',flush=True)
+   saved=None;time.sleep(90)
+ raise ValueError('CDS queue remained full; completed checkpoints are preserved')
+
 def prepare_ensemble(client,model,nominal,hindcast=False):
  records=[]
  for i,request in enumerate(requests_for(model,nominal,hindcast)):
