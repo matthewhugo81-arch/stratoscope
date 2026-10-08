@@ -171,8 +171,10 @@ def derived(results):
         except Exception:out.append(dict(model='diagnostics',sourceModel=model,status='behind',availableRun=expected))
     try:
         v=public('forecast-data-vortex');expected=next(d['publishedRun'] for d in results if d['model']=='gefs')
-        current=v['run']==expected and v['timelineComplete'] and v['count']==31 and len(v['files'])==33
-        out.append(dict(model='vortex',status='current' if current else 'behind',publishedRun=v['run'],availableRun=expected,frames=len(v['files'])))
+        context_hours=v.get('contextHours',[])
+        context_complete=v.get('contextComplete') is True and len(context_hours)==33 and set(context_hours)==set(range(0,385,12))
+        current=v['run']==expected and v['timelineComplete'] and v['count']==31 and len(v['files'])==33 and context_complete
+        out.append(dict(model='vortex',status='current' if current else 'behind',publishedRun=v['run'],availableRun=expected,frames=len(v['files']),anomalyFrames=len(context_hours)))
     except Exception:out.append(dict(model='vortex',status='error'))
     return out
 

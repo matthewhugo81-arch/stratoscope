@@ -19,6 +19,9 @@ import subprocess
 import sys
 import urllib.error
 import numpy as np
+context_spec=importlib.util.spec_from_file_location('vortex_context',Path(__file__).with_name('vortex_context.py'))
+context=importlib.util.module_from_spec(context_spec);context_spec.loader.exec_module(context)
+load_reference,prepare_context=context.load_reference,context.prepare_context
 
 spec=importlib.util.spec_from_file_location('ensemble_preparation',Path(__file__).with_name('prepare-ensembles.py'))
 prep=importlib.util.module_from_spec(spec);spec.loader.exec_module(prep)
@@ -115,10 +118,14 @@ def publish(output,hour):
     subprocess.run([sys.executable,str(Path(__file__).with_name('publish-ensemble-data.py')),'--model','vortex','--output',str(stage)],check=True)
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--hours',nargs='+',type=int);p.add_argument('--publish',action='store_true');args=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--hours',nargs='+',type=int);p.add_argument('--publish',action='store_true');p.add_argument('--context-only',action='store_true',help='Enrich the published vortex run without recalculating PV');args=p.parse_args()
     base=ROOT+'forecast-data-gefs/'
     m=json.loads(prep.request(base+'latest.json'));assert m['complete'] and m['count']==31 and m['maxHour']==384
+    if args.context_only:
+        m=json.loads(prep.request(ROOT+'forecast-data-vortex/latest.json'))
+        assert m['count']==31 and m['complete']
     run=m['run'];when=datetime.fromisoformat(run.replace('Z','+00:00'));key=when.strftime('%Y%m%d%H')
+    reference,reference_meta=load_reference()
     catalogue=dict(version=1,model='vortex',run=run,count=31,complete=True,timelineComplete=False,targetHour=384,step=12,method='mean-field-pv-equivalent-area-70N',files={})
     output=args.output;output.mkdir(parents=True,exist_ok=True)
     try:
@@ -133,19 +140,29 @@ def main():
     wanted=args.hours if args.hours is not None else list(range(0,385,12))
     assert wanted and all(h in range(0,385,12) for h in wanted)
     for hour in wanted:
-        if str(hour) in catalogue['files']:continue
-        fields={}
-        for level in [10,20,30,50,70,100]:
-            e=m['files'][f'{level}/{hour}'];b=prep.request(base+e['path'])
-            assert len(b)==e['bytes'] and hashlib.sha256(b).hexdigest()==e['sha256']
-            fields[level]=mean_frame(b,run,hour,level)
-        extra=prep.calculate('gefs',when,hour,EXTRA,6)
-        for level,(planes,_) in extra.items():fields[level]=np.stack(planes[:4])
-        frame=geometry(fields,run,hour)
+        if str(hour) in catalogue['files']:
+            frame=json.loads((output/catalogue['files'][str(hour)]['path']).read_text())
+            if frame.get('baseMap',{}).get('referenceSha256')==reference_meta['sha256']:continue
+        else:
+            if args.context_only:continue
+            fields={}
+            for level in [10,20,30,50,70,100]:
+                e=m['files'][f'{level}/{hour}'];b=prep.request(base+e['path'])
+                assert len(b)==e['bytes'] and hashlib.sha256(b).hexdigest()==e['sha256']
+                fields[level]=mean_frame(b,run,hour,level)
+            extra=prep.calculate('gefs',when,hour,EXTRA,6)
+            for level,(planes,_) in extra.items():fields[level]=np.stack(planes[:4])
+            frame=geometry(fields,run,hour)
+        frame['baseMap']=prepare_context(prep,run,hour,reference,reference_meta)
         packed=json.dumps(frame,separators=(',',':'),allow_nan=False).encode()
-        filename=f'{key}/gefs/{hour}.json';f=output/filename;f.parent.mkdir(parents=True,exist_ok=True);f.write_bytes(packed)
-        catalogue['files'][str(hour)]=dict(path=filename,bytes=len(packed),sha256=hashlib.sha256(packed).hexdigest())
+        digest=hashlib.sha256(packed).hexdigest()
+        # Immutable asset names prevent a cached catalogue from pairing with
+        # a replaced frame during incremental context backfills.
+        filename=f'{key}/gefs/{hour}-{digest}.json';f=output/filename;f.parent.mkdir(parents=True,exist_ok=True);f.write_bytes(packed)
+        catalogue['files'][str(hour)]=dict(path=filename,bytes=len(packed),sha256=digest)
         catalogue['timelineComplete']=all(str(h) in catalogue['files'] for h in range(0,385,12))
+        catalogue['contextHours']=[int(h) for h,e in catalogue['files'].items() if json.loads((output/e['path']).read_text()).get('baseMap',{}).get('referenceSha256')==reference_meta['sha256']]
+        catalogue['contextComplete']=len(catalogue['contextHours'])==33
         catalogue['preparedAt']=datetime.now(timezone.utc).isoformat()
         (output/'latest.json').write_text(json.dumps(catalogue,separators=(',',':')))
         print('COMPLETE FORECAST GEOMETRY',run,hour,len(frame['layers']),len(catalogue['files']),flush=True)

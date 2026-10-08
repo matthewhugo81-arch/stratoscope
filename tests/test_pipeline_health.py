@@ -9,6 +9,16 @@ h=importlib.util.module_from_spec(spec);spec.loader.exec_module(h)
 NOW=datetime(2026,10,8,10,tzinfo=timezone.utc)
 
 class HealthTests(unittest.TestCase):
+    def test_vortex_context_must_cover_the_complete_matched_timeline(self):
+        run='2026-10-08T06:00:00.000Z'
+        data=dict(run=run,complete=True,timelineComplete=True,count=31,files={str(h):{} for h in range(0,385,12)})
+        with patch.object(h,'public',return_value=data):
+            self.assertEqual(h.derived([dict(model='gefs',publishedRun=run)])[-1]['status'],'behind')
+            data.update(contextComplete=True,contextHours=list(range(0,385,12)))
+            self.assertEqual(h.derived([dict(model='gefs',publishedRun=run)])[-1]['status'],'current')
+            data['contextHours'][-1]=0
+            self.assertEqual(h.derived([dict(model='gefs',publishedRun=run)])[-1]['status'],'behind')
+
     def test_era5_reports_saved_years_without_duplicate_active_request(self):
         run={'id':1,'status':'in_progress','created_at':'2026-10-08T09:00:00Z','html_url':'https://github.com/run/1'}
         def api(path,payload=None):

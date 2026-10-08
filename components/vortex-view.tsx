@@ -1,9 +1,17 @@
 'use client';
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
 import {vortexCatalogue,loadVortex,type VortexGeometry,type VortexCatalogue} from '@/lib/vortex';
 import {projectVortexPoint} from '@/lib/vortex-projection';
+import {heightAnomalyColour,sampleHeightAnomaly} from '@/lib/vortex-context';
 const stamp=(v:string)=>new Date(v).toLocaleString('en-GB',{timeZone:'UTC',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false});
 function VortexCanvas({data}:{data:VortexGeometry}){
+ const [showBase,setShowBase]=useState(true),[opacity,setOpacity]=useState(.65);
+ const texture=useMemo(()=>{
+  if(!data.baseMap)return null;
+  const c=document.createElement('canvas'),n=1024,r=n/2;c.width=n;c.height=n;const ctx=c.getContext('2d')!,pixels=ctx.createImageData(n,n);
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){const east=(x+.5-r)/r,south=(y+.5-r)/r,radius=Math.hypot(east,south);if(radius>1)continue;const lon=Math.atan2(east,south)*180/Math.PI,lat=90-radius*60,colour=heightAnomalyColour(sampleHeightAnomaly(data.baseMap,lon,lat));pixels.data.set(colour,(y*n+x)*4);}
+  ctx.putImageData(pixels,0,0);return c;
+ },[data.baseMap]);
  const canvas=useRef<HTMLCanvasElement>(null),view=useRef({yaw:.6,tilt:.55,zoom:1}),paint=useRef(()=>{}),coast=useRef<number[][][]>([]),pointers=useRef(new Map<number,{x:number;y:number}>()),[size,setSize]=useState({w:1000,h:530}),raf=useRef(0);
  const request=()=>{cancelAnimationFrame(raf.current);raf.current=requestAnimationFrame(()=>paint.current())};
  paint.current=()=>{
@@ -11,10 +19,13 @@ function VortexCanvas({data}:{data:VortexGeometry}){
   const {yaw,tilt,zoom}=view.current,scale=Math.min(size.w*.34,size.h*.35)*zoom;
   const project=(lon:number,lat:number,z:number)=>{const p=projectVortexPoint(lon,lat,z,yaw,tilt);return{x:size.w/2+p.x*scale,y:size.h*.52+p.y*scale}};
   const line=(a:{x:number;y:number},b:{x:number;y:number})=>{ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y)};
+  // The geographic context plane sits below 400 K; it is not a theta level.
+  const baseZ=-.14;
+  if(showBase&&texture){const centre=project(0,90,baseZ),r=texture.width/2;ctx.save();ctx.globalAlpha=opacity;ctx.translate(centre.x,centre.y);ctx.transform(Math.cos(yaw)*scale/r,-Math.sin(yaw)*Math.sin(tilt)*scale/r,Math.sin(yaw)*scale/r,Math.cos(yaw)*Math.sin(tilt)*scale/r,0,0);ctx.drawImage(texture,-r,-r);ctx.restore();}
   ctx.strokeStyle='#789ca448';ctx.lineWidth=.8;ctx.beginPath();
-  for(const lat of [30,60,70,80])for(let lon=0;lon<360;lon+=3)line(project(lon,lat,0),project(lon+3,lat,0));
-  for(let lon=0;lon<360;lon+=30)line(project(lon,90,0),project(lon,30,0));ctx.stroke();
-  ctx.strokeStyle='#a1bac875';ctx.beginPath();for(const points of coast.current)for(let i=1;i<points.length;i++){const a=points[i-1],b=points[i];if(a[1]>=30&&b[1]>=30)line(project(a[0],a[1],0),project(b[0],b[1],0));}ctx.stroke();
+  for(const lat of [30,60,70,80])for(let lon=0;lon<360;lon+=3)line(project(lon,lat,baseZ),project(lon+3,lat,baseZ));
+  for(let lon=0;lon<360;lon+=30)line(project(lon,90,baseZ),project(lon,30,baseZ));ctx.stroke();
+  ctx.strokeStyle='#a1bac89c';ctx.beginPath();for(const points of coast.current)for(let i=1;i<points.length;i++){const a=points[i-1],b=points[i];if(a[1]>=30&&b[1]>=30)line(project(a[0],a[1],baseZ),project(b[0],b[1],baseZ));}ctx.stroke();
   const axisLon=135;ctx.strokeStyle='#93b2c5';ctx.beginPath();line(project(axisLon,30,0),project(axisLon,30,1.4));ctx.stroke();ctx.font='12px monospace';ctx.fillStyle='#bad0dc';
   const ticks=[400,600,800,1000,1200];
   for(const n of ticks){const z=(n-400)/800*1.4,p=project(axisLon,30,z);ctx.fillText(String(n)+' K',p.x+7,p.y+4);}
@@ -27,9 +38,9 @@ function VortexCanvas({data}:{data:VortexGeometry}){
   fetch(new URL('coastline.json',document.baseURI)).then(r=>r.json() as Promise<{features:{geometry:{type:string;coordinates:number[][]|number[][][]}}[]}>).then(j=>{coast.current=j.features.flatMap((f:{geometry:{type:string;coordinates:number[][]|number[][][]}})=>f.geometry.type==='LineString'?[f.geometry.coordinates as number[][]]:f.geometry.coordinates as number[][][]);request()}).catch(()=>{});
   return()=>{observer.disconnect();c.removeEventListener('wheel',wheel);cancelAnimationFrame(raf.current)};
  },[]);
- useEffect(()=>{request()},[data,size]);
+ useEffect(()=>{request()},[data,size,texture,showBase,opacity]);
  function reset(){view.current={yaw:.6,tilt:.55,zoom:1};request()}
- return <><div className="vortex-view-controls"><button className="seasonal-refresh" onClick={reset}>Fit & reset view</button><button className="seasonal-refresh" onClick={()=>{view.current.zoom=Math.min(2.5,view.current.zoom*1.15);request()}}>Zoom +</button><button className="seasonal-refresh" onClick={()=>{view.current.zoom=Math.max(.5,view.current.zoom/1.15);request()}}>Zoom −</button><span>Drag to rotate & tilt · wheel or pinch to zoom</span></div><canvas ref={canvas} className="vortex-canvas" role="img" aria-label="GEFS 3D potential-vorticity contour structure" tabIndex={0}
+ return <><div className="vortex-view-controls"><button className="seasonal-refresh" onClick={reset}>Fit & reset view</button><button className="seasonal-refresh" onClick={()=>{view.current.zoom=Math.min(2.5,view.current.zoom*1.15);request()}}>Zoom +</button><button className="seasonal-refresh" onClick={()=>{view.current.zoom=Math.max(.5,view.current.zoom/1.15);request()}}>Zoom −</button><span>Drag to rotate & tilt · wheel or pinch to zoom</span><div className="vortex-base-controls"><label><input type="checkbox" checked={showBase} onChange={e=>setShowBase(e.target.checked)}/>500 hPa anomalies</label><label>Opacity<input aria-label="500 hPa anomaly opacity" type="range" min="15" max="100" step="5" value={Math.round(opacity*100)} disabled={!showBase} onChange={e=>setOpacity(Number(e.target.value)/100)}/></label></div></div>{showBase&&<div className="vortex-base-legend" aria-label="500 hPa height anomaly legend">{data.baseMap?<><strong>500 hPa height anomaly · m</strong><div className="vortex-base-gradient"/><div className="vortex-base-ticks"><span>−300</span><span>−150</span><span>0</span><span>+150</span><span>+300</span></div><small>GEFS mean − NCEP/NCAR daily average, 1991–2020</small></>:<span>500 hPa base map preparing for this forecast time</span>}</div>}<canvas ref={canvas} className="vortex-canvas" role="img" aria-label={`GEFS 3D potential-vorticity contour structure${showBase&&data.baseMap?' with 500 hPa height anomalies':''}`} tabIndex={0}
   onKeyDown={e=>{if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','+','-','Home'].includes(e.key)){e.preventDefault();e.stopPropagation();if(e.key==='Home')reset();else if(e.key==='+'||e.key==='-')view.current.zoom=Math.max(.5,Math.min(2.5,view.current.zoom*(e.key==='+'?1.15:1/1.15)));else{view.current.yaw+=(e.key==='ArrowLeft'?-.1:e.key==='ArrowRight'?.1:0);view.current.tilt=Math.max(.1,Math.min(1.4,view.current.tilt+(e.key==='ArrowUp'?.1:e.key==='ArrowDown'?-.1:0)));}request();}}}
   onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);pointers.current.set(e.pointerId,{x:e.clientX,y:e.clientY});}}
   onPointerMove={e=>{const old=pointers.current.get(e.pointerId);if(!old)return;const other=[...pointers.current.entries()].find(([id])=>id!==e.pointerId)?.[1];if(other){const before=Math.hypot(old.x-other.x,old.y-other.y),after=Math.hypot(e.clientX-other.x,e.clientY-other.y);if(before>5)view.current.zoom=Math.max(.5,Math.min(2.5,view.current.zoom*after/before));}else{view.current.yaw+=(e.clientX-old.x)*.008;view.current.tilt=Math.max(.1,Math.min(1.4,view.current.tilt-(e.clientY-old.y)*.007));}pointers.current.set(e.pointerId,{x:e.clientX,y:e.clientY});request();}}
@@ -40,7 +51,7 @@ export function VortexView(){
  const times=catalogue?Object.keys(catalogue.files).map(Number).sort((a,b)=>a-b):[0];
  useEffect(()=>{
   if(!open)return;const c=new AbortController();let timer:ReturnType<typeof setTimeout>;setRun('');setData(null);setError('');setLoading(true);setPlaying(false);
-  const check=async()=>{try{const m=await vortexCatalogue(AbortSignal.any([c.signal,AbortSignal.timeout(30000)]));if(c.signal.aborted)return;setCatalogue(m);setRun(m.run);setHour(h=>m.files[String(h)]?h:0);if(!m.timelineComplete)timer=setTimeout(check,60000);}catch(e){if(!c.signal.aborted){setError((e as Error).message);setLoading(false);timer=setTimeout(check,60000);}}};void check();return()=>{c.abort();clearTimeout(timer)};
+  const check=async()=>{try{const m=await vortexCatalogue(AbortSignal.any([c.signal,AbortSignal.timeout(30000)]));if(c.signal.aborted)return;setCatalogue(m);setRun(m.run);setHour(h=>m.files[String(h)]?h:0);if(!m.timelineComplete||!m.contextComplete)timer=setTimeout(check,60000);}catch(e){if(!c.signal.aborted){setError((e as Error).message);setLoading(false);timer=setTimeout(check,60000);}}};void check();return()=>{c.abort();clearTimeout(timer)};
  },[open,refresh]);
  useEffect(()=>{
   if(!open||!run)return;const c=new AbortController();setLoading(true);setError('');
@@ -54,6 +65,7 @@ export function VortexView(){
   <div className="vortex-stage">{data?<VortexCanvas data={data}/>:<div className="vortex-pending" role="status">{loading?'Loading complete forecast geometry…':error}</div>}</div><div className="vortex-load-status" role="status" title={error}>{error|| (loading?`Loading forecast +${hour}h… Previous complete view remains visible.`:catalogue?`Ready · ${times.length}/33 complete forecast times prepared${catalogue.timelineComplete?'':' · preparation continues'}`:'')}</div>
   <div className="vortex-timeline"><button className="seasonal-refresh" disabled={loading||times.indexOf(hour)<=0} onClick={()=>changeHour(times[times.indexOf(hour)-1])}>← Previous</button><button className="seasonal-refresh" disabled={!data||times.length<2} onClick={()=>setPlaying(v=>!v)}>{playing?'Pause':'Loop'}</button><button className="seasonal-refresh" disabled={loading||times.indexOf(hour)>=times.length-1} onClick={()=>changeHour(times[times.indexOf(hour)+1])}>Next →</button><label>Forecast time<select aria-label="3D forecast time" value={hour} onChange={e=>changeHour(Number(e.target.value))}>{times.map(h=><option key={h} value={h}>{h===0?'Initial field':`+${h} hours`}</option>)}</select></label><button className="seasonal-refresh" onClick={()=>{setPlaying(false);setRefresh(v=>v+1)}}>Refresh 3D data</button></div>
   <details className="vortex-method"><summary>Data, method & controls</summary><p>Potential vorticity estimated from complete 31-member mean temperature and winds on 13 pressure levels (200–1 hPa), sampled at 1°. Contours at 400–1200 K enclose a high-PV area equivalent to 70°N. This is a fixed-area structure diagnostic, not a formally diagnosed vortex edge. PV of ensemble-mean fields differs from ensemble-mean PV; averaging can soften or hide member-specific splits.</p><p>{catalogue?`${times.length}/33 complete forecast times prepared${catalogue.timelineComplete?'':'; remaining times appear as preparation completes'}. Every displayed time uses all 31 members.`:''} Colours run from cyan at 400 K to orange at 1200 K. Vertical spacing represents potential temperature, not physical altitude.</p>
-  <p>3D time controls are independent of the main globe. Downloaded geometry is cached; playback waits for each complete frame. Drag to rotate and tilt, scroll or pinch to zoom. With the view focused, arrow keys rotate, +/− zoom and Home resets.</p><a href="https://registry.opendata.aws/noaa-gefs/" target="_blank" rel="noreferrer">Official data source ↗</a></details>
+  <p>The optional base map shows the complete 31-member GEFS 500 hPa mean height minus the NCEP/NCAR Reanalysis 1 calendar-day mean for 1991–2020, in metres. Orange/red indicates above-average heights; blue/purple indicates below-average heights. The fixed scale saturates at ±300 m. Each map uses the same run and valid time as the vortex. The stored 2.5° daily reference is bilinearly interpolated to the 1° forecast display grid; February 29 uses the average of February 28 and March 1. It is a daily-mean reference, without forecast-bias correction.</p><p>The base plane is geographical context, not a potential-temperature surface or a physical vertical separation. Height anomalies help locate ridges and troughs; they do not measure upward wave activity or prove a causal influence on the vortex.</p>
+  <p>3D time controls are independent of the main globe. Downloaded geometry is cached; playback waits for each complete frame. Drag to rotate and tilt, scroll or pinch to zoom. With the view focused, arrow keys rotate, +/− zoom and Home resets.</p><a href="https://registry.opendata.aws/noaa-gefs/" target="_blank" rel="noreferrer">GEFS source ↗</a>{' · '}<a href="https://psl.noaa.gov/data/gridded/data.ncep.reanalysis.html" target="_blank" rel="noreferrer">Daily climatology source ↗</a></details>
  </section>}</div>;
 }
