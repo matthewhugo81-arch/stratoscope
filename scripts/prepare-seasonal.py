@@ -75,7 +75,9 @@ def ensemble(records,model,nominal,hindcast=False):
   if values[i] is not None:raise ValueError('Duplicate member/time field')
   values[i]=round(value,4)
  expected=cfg['hindcast' if hindcast else 'forecast'];per=cfg['hc_per_start' if hindcast else 'per_start']
- if len(series)!=expected or any(sum(k[0]==start for k in series)!=per for start in starts) or any(None in v for v in series.values()):raise ValueError(f'Incomplete ensemble: expected {expected} complete members')
+ if len(series)!=expected or any(sum(k[0]==start for k in series)!=per for start in starts) or any(None in v for v in series.values()):
+  summary=[dict(start=iso(start),members=sum(k[0]==start for k in series),complete=sum(k[0]==start and None not in values for k,values in series.items()),missingDates=sorted({iso(dates[i]) for k,values in series.items() if k[0]==start for i,value in enumerate(values) if value is None})) for start in sorted(starts)]
+  raise ValueError(f'Incomplete ensemble: expected {expected} complete members; received {len(series)}. Initialization coverage: '+json.dumps(summary,separators=(',',':')))
  return [dict(id=f'{s:%Y%m%d}-{n}',start=iso(s),values=series[(s,n)]) for s,n in sorted(series)]
 def retrieve(client,dataset,request,label):
  folder=Path('work/seasonal-downloads');folder.mkdir(parents=True,exist_ok=True);file=folder/(label+'.grib')
