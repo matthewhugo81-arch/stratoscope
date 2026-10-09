@@ -36,5 +36,23 @@
   "persistenceValidated": false,
   "skillClaim": false,
   "interpretation": "Excluded fields are unassessed, not no-break outcomes; candidate groups are not independent events or confirmed classifications",
-  "next": "Inspect boundary PV and contour topology; independently annotate candidates and non-events with flow and adjacent times before modifying screens"
+  "next": "Inspect boundary PV and contour topology; independently annotate candidates and non-events with flow and adjacent times before modifying screens",
+  "boundaryAudit": [
+    {
+      "thetaK": 315,
+      "southBoundaryFailures": 18,
+      "northBoundaryFailures": 0
+    },
+    {
+      "thetaK": 330,
+      "southBoundaryFailures": 23,
+      "northBoundaryFailures": 0
+    },
+    {
+      "thetaK": 350,
+      "southBoundaryFailures": 28,
+      "northBoundaryFailures": 0
+    }
+  ],
+  "boundaryInterpretation": "All excluded fields fail the all-longitude PV<2 PVU condition at 20N. Northern boundary satisfies PV>2 PVU in all84 fields. No gate relaxed; coverage limitation is not absence of breaking."
 }
