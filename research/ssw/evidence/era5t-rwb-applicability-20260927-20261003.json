@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "status": "retrospective_detector_applicability_audit",
+  "sourceSha256": "9bca0fcc00c34f26cf1842f009a4cdb0e99c875508302e02771551fe8c158379",
+  "screenSha256": "69f2405d79ca644fe02a3c166024e0a6eb20ab399d089ac6d42d72c7fffc23b2",
+  "snapshots": 28,
+  "isentropes": [
+    315,
+    330,
+    350
+  ],
+  "screenedFields": 84,
+  "statusCounts": {
+    "unverified_poleward_pv_orientation": 69,
+    "no_eligible_circumpolar_contour": 3,
+    "research_only": 12
+  },
+  "byLevel": {
+    "315": {
+      "unverified_poleward_pv_orientation": 18,
+      "no_eligible_circumpolar_contour": 1,
+      "research_only": 9
+    },
+    "330": {
+      "no_eligible_circumpolar_contour": 2,
+      "unverified_poleward_pv_orientation": 23,
+      "research_only": 3
+    },
+    "350": {
+      "unverified_poleward_pv_orientation": 28
+    }
+  },
+  "candidateGroups": 4,
+  "validated": false,
+  "validatedEventCount": null,
+  "persistenceValidated": false,
+  "skillClaim": false,
+  "interpretation": "Excluded fields are unassessed, not no-break outcomes; candidate groups are not independent events or confirmed classifications",
+  "next": "Inspect boundary PV and contour topology; independently annotate candidates and non-events with flow and adjacent times before modifying screens"
+}

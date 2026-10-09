@@ -161,6 +161,17 @@ Next validate selected known AWB/CWB and non-event cases, then expand to a
 seasonally representative hindcast set. The seven-day case is an engineering
 validation dataset, not enough to estimate teleconnection or SSW skill.
 
+The first retrospective detector applicability screen covers all 84 time/level
+fields in that case. Its strict poleward-PV boundary assumptions exclude 69,
+including all 28 fields at 350 K; three more lack an eligible circumpolar contour.
+Only 12 reach the candidate screen, producing four candidate groups. These are
+not four validated or independent events, and excluded fields are **unassessed**,
+not no-break outcomes. Do not relax the boundary gate to obtain classifications.
+Inspect the boundary PV, contour topology, collocated flow and adjacent times,
+then validate against independently annotated events and non-events. See
+`evidence/era5t-rwb-applicability-20260927-20261003.json`. No persistence, event
+classification or forecast skill has been validated by this screening.
+
 ## Scientific references
 
 - [ECMWF ERA5 documentation](https://confluence.ecmwf.int/spaces/CKB/pages/76414402/ERA5+data+documentation): pressure/isentropic products, source versions and update lag.
