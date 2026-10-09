@@ -239,3 +239,7 @@ current analysis or deleting cached frames. Status older than 90 minutes is
 labelled overdue. The desktop ingest monitor also checks for missed GitHub
 schedules; GitHub scheduled events can be delayed or dropped, so this is a
 recovery mechanism rather than a guaranteed publication deadline.
+
+## SSW precursor research
+
+The isolated multi-model precursor development and validation record are in [SSW_DEVELOPMENT.md](SSW_DEVELOPMENT.md). This research pipeline does not publish data or change the live Pages app. A dated, source-qualified review example is in [research/ssw/pulsecheck.html](research/ssw/pulsecheck.html).

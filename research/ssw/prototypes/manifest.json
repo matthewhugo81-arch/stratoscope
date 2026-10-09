@@ -1,0 +1,22 @@
+{
+  "artifacts": [
+    {
+      "name": "Stratoscope_SSW_Precursor_Development_Package_2026-10-09.zip",
+      "sha256": "5f373f121aba59d30d764dfbbd5c46918e649f0cc8b87f4ee84911de05792bf9",
+      "bytes": 18885,
+      "status": "unvalidated_original_prototype"
+    },
+    {
+      "name": "Stratoscope_Pulsecheck_2026-10-09_Expanded.pdf",
+      "sha256": "ad7585684bc7963ea2b241856bc96cb60e69616f0e9474ea2cec2386efce5835",
+      "bytes": 576654,
+      "status": "unvalidated_original_prototype"
+    },
+    {
+      "name": "Stratoscope_SSW_Early_Warning_Blueprint_2026-10-09.pdf",
+      "status": "unavailable",
+      "reason": "Absent from Downloads and ZIP; shared-chat link returned Failed to get upload status"
+    }
+  ],
+  "conversation": "https://chatgpt.com/share/6ac890c9-5118-83ed-993d-efd72aa6fe5f"
+}

@@ -1,0 +1,178 @@
+[
+  {
+    "name": "published-gefs",
+    "url": "https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/forecast-data-gefs/latest.json",
+    "bytes": 71354,
+    "sha256": "2f1fb0a2c142dc3df6ecba7dde689232f60d805b8a16c1ec6e00ab7a29b13d5e",
+    "model": "gefs",
+    "run": "2026-10-08T18:00:00.000Z",
+    "count": 31,
+    "complete": true,
+    "maxHour": 384,
+    "levels": [
+      10,
+      20,
+      30,
+      50,
+      70,
+      100
+    ],
+    "preparedAt": "2026-10-09T02:13:31.710944+00:00"
+  },
+  {
+    "name": "published-ifs-ens",
+    "url": "https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/forecast-data-ifs-ens/latest.json",
+    "bytes": 33724,
+    "sha256": "9cc13da1287f9d79e6f1ea834a9ec40e25f81daee667265276d95b64a3526df7",
+    "model": "ifs_ens",
+    "run": "2026-10-08T12:00:00.000Z",
+    "count": 51,
+    "complete": true,
+    "maxHour": 360,
+    "levels": [
+      10,
+      50,
+      100
+    ],
+    "preparedAt": "2026-10-08T21:43:05.169664+00:00"
+  },
+  {
+    "name": "published-aifs-ens",
+    "url": "https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/forecast-data-aifs-ens/latest.json",
+    "bytes": 33725,
+    "sha256": "37310f4378dda794f71c3fb181724a04cd59cfd88148b74e2a9084e673c86df6",
+    "model": "aifs_ens",
+    "run": "2026-10-08T18:00:00.000Z",
+    "count": 51,
+    "complete": true,
+    "maxHour": 360,
+    "levels": [
+      10,
+      50,
+      100
+    ],
+    "preparedAt": "2026-10-09T02:34:54.969353+00:00"
+  },
+  {
+    "name": "published-icon",
+    "url": "https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/forecast-data-icon/latest.json",
+    "bytes": 17072,
+    "sha256": "2b19a722df3927e6e4e843600ce4af6b8ff9d85755b83466d463269d6e787d82",
+    "model": "icon",
+    "run": "2026-10-09T00:00:00.000Z",
+    "count": null,
+    "complete": true,
+    "maxHour": 180,
+    "levels": [
+      30,
+      50,
+      70,
+      100
+    ],
+    "preparedAt": "2026-10-09T04:34:07.127Z"
+  },
+  {
+    "name": "published-vortex",
+    "url": "https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/forecast-data-vortex/latest.json",
+    "bytes": 7132,
+    "sha256": "809f6cb205e0ce881db9959def330c91407e4df6c8c70362f5760ad87690aebf",
+    "model": "vortex",
+    "run": "2026-10-08T18:00:00.000Z",
+    "count": 31,
+    "complete": true,
+    "maxHour": null,
+    "levels": null,
+    "preparedAt": "2026-10-09T03:04:36.453763+00:00"
+  },
+  {
+    "name": "diagnostics-gefs",
+    "url": "https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/forecast-data-diagnostics/gefs.json",
+    "bytes": 58230,
+    "sha256": "63bbab5618de3db4578dd3dc55f3c47c0039ce363684f1e3159bf315ca80dcfc",
+    "model": "gefs",
+    "run": "2026-10-08T18:00:00.000Z",
+    "count": 31,
+    "complete": true,
+    "maxHour": 384,
+    "levels": null,
+    "preparedAt": "2026-10-09T02:35:58.758959+00:00"
+  },
+  {
+    "name": "diagnostics-ifs_ens",
+    "url": "https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/forecast-data-diagnostics/ifs_ens.json",
+    "bytes": 88413,
+    "sha256": "e9071706e7338b3a3224b45a64382750b7169eaaba50d9ca32d9713c8b47d56d",
+    "model": "ifs_ens",
+    "run": "2026-10-08T12:00:00.000Z",
+    "count": 51,
+    "complete": true,
+    "maxHour": 360,
+    "levels": null,
+    "preparedAt": "2026-10-08T22:00:54.840412+00:00"
+  },
+  {
+    "name": "diagnostics-aifs_ens",
+    "url": "https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/forecast-data-diagnostics/aifs_ens.json",
+    "bytes": 88268,
+    "sha256": "becee76792f2332e30e8dcf3040d9a45fddf1effc76dee8dbe47f2a940ae86fa",
+    "model": "aifs_ens",
+    "run": "2026-10-08T18:00:00.000Z",
+    "count": 51,
+    "complete": true,
+    "maxHour": 360,
+    "levels": null,
+    "preparedAt": "2026-10-09T02:36:04.519079+00:00"
+  },
+  {
+    "name": "gfs-index",
+    "url": "https://noaa-gfs-bdp-pds.s3.amazonaws.com/gfs.20261009/00/atmos/gfs.t00z.pgrb2.0p25.f000.idx",
+    "bytes": 31819,
+    "sha256": "d22992e3c2cd2e68a1cad2dd3b47bd035ad664f3e6ca3f0d2dccd1d5e55773f2",
+    "preview": "1:0:d=2026100900:PRMSL:mean sea level:anl:\n2:987735:d=2026100900:CLMR:1 hybrid level:anl:\n3:1077363:d=2026100900:ICMR:1 hybrid level:anl:\n4:1322957:d=2026100900:RWMR:1 hybrid level:anl:\n5:1550317:d=2026100900:SNMR:1 hybrid level:anl:\n6:1636104:d=2026100900:GRLE:1 hybrid level:anl:\n7:1677959:d=202610"
+  },
+  {
+    "name": "analysis-index",
+    "url": "https://noaa-gfs-bdp-pds.s3.amazonaws.com/gfs.20261008/00/atmos/gfs.t00z.pgrb2.0p25.anl.idx",
+    "bytes": 27412,
+    "sha256": "8c97b8827650190c410ae02ea9800c4e2fb6b7d617ea7ed9e6ce715305ceabe5",
+    "preview": "1:0:d=2026100800:PRMSL:mean sea level:anl:\n2:1047714:d=2026100800:CLMR:1 hybrid level:anl:\n3:1150730:d=2026100800:ICMR:1 hybrid level:anl:\n4:1432242:d=2026100800:RWMR:1 hybrid level:anl:\n5:1660405:d=2026100800:SNMR:1 hybrid level:anl:\n6:1737443:d=2026100800:GRLE:1 hybrid level:anl:\n7:1768976:d=20261"
+  },
+  {
+    "name": "gefs-index",
+    "url": "https://noaa-gefs-pds.s3.amazonaws.com/gefs.20261009/00/atmos/pgrb2ap5/gec00.t00z.pgrb2a.0p50.f000.idx",
+    "bytes": 4086,
+    "sha256": "31b94bf318542f58f9030640b54d4fd822aba003c0764cf5da8342141775a0f4",
+    "preview": "1:0:d=2026100900:HGT:10 mb:anl:ENS=low-res ctl\n2:212721:d=2026100900:TMP:10 mb:anl:ENS=low-res ctl\n3:337076:d=2026100900:RH:10 mb:anl:ENS=low-res ctl\n4:456562:d=2026100900:UGRD:10 mb:anl:ENS=low-res ctl\n5:708645:d=2026100900:VGRD:10 mb:anl:ENS=low-res ctl\n6:939361:d=2026100900:HGT:50 mb:anl:ENS=low-"
+  },
+  {
+    "name": "ifs-index",
+    "url": "https://data.ecmwf.int/forecasts/20261009/00z/ifs/0p25/oper/20261009000000-0h-oper-fc.index",
+    "error": "HTTP Error 404: Not Found"
+  },
+  {
+    "name": "ifs-ens-index",
+    "url": "https://data.ecmwf.int/forecasts/20261009/00z/ifs/0p25/enfo/20261009000000-0h-enfo-ef.index",
+    "error": "HTTP Error 404: Not Found"
+  },
+  {
+    "name": "aifs-index",
+    "url": "https://data.ecmwf.int/forecasts/20261009/00z/aifs-ens/0p25/enfo/20261009000000-0h-enfo-pf.index",
+    "bytes": 1428190,
+    "sha256": "9d95112214e482abd28b8bb4d187657e8c4ce2816e24be5175cb0923596bb582",
+    "preview": "{\"domain\": \"g\", \"date\": \"20261009\", \"time\": \"0000\", \"expver\": \"0001\", \"class\": \"ai\", \"type\": \"pf\", \"stream\": \"enfo\", \"levtype\": \"sfc\", \"number\": \"15\", \"step\": \"0\", \"param\": \"tp\", \"model\": \"aifs-ens\", \"_offset\": 0, \"_length\": 227}\n{\"domain\": \"g\", \"date\": \"20261009\", \"time\": \"0000\", \"expver\": \"0001\", "
+  },
+  {
+    "name": "icon-list",
+    "url": "https://opendata.dwd.de/weather/nwp/icon/grib/00/fi/",
+    "bytes": 368119,
+    "sha256": "06ecdc87d7292b970a14c9b6a7c6a7129e4fab3fcc7d576f7ceb5c2ac86b5ddc",
+    "preview": "<html>\r\n<head><title>Index of /weather/nwp/icon/grib/00/fi/</title></head>\r\n<body>\r\n<h1>Index of /weather/nwp/icon/grib/00/fi/</h1><hr><pre><a href=\"../\">../</a>\r\n<a href=\"icon_global_icosahedral_pressure-level_2026100900_000_1000_FI.grib2.bz2\">icon_global_icosahedral_pressure-level_20261009..&gt;</"
+  },
+  {
+    "name": "ec46",
+    "url": "https://charts.ecmwf.int/opencharts-api/v1/products/extended-zonal-mean-zonal-wind/?area=nh",
+    "bytes": 577,
+    "sha256": "f60e5e61ef0c58419f9f74d3c101883c2e83621d4e2f0fd86321ce20a95728db",
+    "preview": "{\"data\":{\"type\":\"graphical_product\",\"attributes\":{\"name\":\"extended-zonal-mean-zonal-wind\",\"title\":\"Mean zonal wind at 10 hPa - Sub-seasonal range forecast\",\"description\":\"\"},\"link\":{\"href\":\"https://charts.ecmwf.int/content/20261008200305-b67f9e65fc331e0e75e0f260289f4b093abc46e3.png\",\"type\":\"image/pn"
+  }
+]
