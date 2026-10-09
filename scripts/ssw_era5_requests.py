@@ -7,11 +7,13 @@ from pathlib import Path
 def requests(end):
     dates=f'{end-timedelta(days=6):%Y-%m-%d}/to/{end:%Y-%m-%d}'
     common=dict(date=dates,time='00/06/12/18',type='an',stream='oper',grid='1/1',area='90/0/0/359',format='grib')
-    # Isentropic PV and collocated winds are different from theta on +2 PVU.
+    # ECMWF param 54 is pressure, NOT PV. Retain this already accepted flow
+    # request and add param 60 separately, avoiding duplicate wind downloads.
     return {
         'h500':dict(dataset='reanalysis-era5-complete',request=dict(common,levtype='pl',levelist='500',param='129')),
         'wind10':dict(dataset='reanalysis-era5-complete',request=dict(common,levtype='pl',levelist='10',param='131')),
         'isentropic':dict(dataset='reanalysis-era5-complete',request=dict(common,levtype='pt',levelist='315/330/350',param='54/131/132')),
+        'isentropic_pv':dict(dataset='reanalysis-era5-complete',request=dict(common,levtype='pt',levelist='315/330/350',param='60')),
     }
 
 if __name__=='__main__':
@@ -19,4 +21,4 @@ if __name__=='__main__':
     a=p.parse_args();a.output.mkdir(parents=True,exist_ok=True)
     for name,request in requests(a.end_date).items():
         (a.output/(name+'.request.json')).write_text(json.dumps(request,indent=2),encoding='utf-8')
-    print('Prepared three seven-day requests; not submitted. Inspect CDS availability and resume existing request IDs before submitting.')
+    print('Prepared four seven-day requests; not submitted. PV is parameter 60; retain existing pressure/flow request IDs.')

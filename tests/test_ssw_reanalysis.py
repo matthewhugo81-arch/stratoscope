@@ -61,5 +61,13 @@ class ReanalysisTests(unittest.TestCase):
                 with self.assertRaises(ValueError):module.import_history(p,req,root/'output',date(2000,1,7))
                 self.assertFalse((root/'output/reanalysis.json').exists())
 
+    def test_h500_cannot_satisfy_required_isentropic_pv(self):
+        with tempfile.TemporaryDirectory() as root:
+            root=Path(root);p=root/'input.grib';self.fixture(p)
+            req=root/'request.json';req.write_text(json.dumps(dict(dataset='reanalysis-era5-complete',request={})))
+            with self.assertRaisesRegex(ValueError,'isentropic PV'):
+                module.import_history(p,req,root/'output',date(2000,1,7),30,(315,330,350))
+            self.assertFalse((root/'output/reanalysis.json').exists())
+
 
 if __name__=='__main__':unittest.main()

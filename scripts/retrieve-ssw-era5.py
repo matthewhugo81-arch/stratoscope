@@ -67,7 +67,7 @@ def download(client,end,output):
     request.write_text(json.dumps(dict(dataset='reanalysis-era5-complete',request=dict(parts=list(saved.values()))),indent=2),encoding='utf-8')
     spec=importlib.util.spec_from_file_location('era5_import',Path(__file__).with_name('import-ssw-reanalysis.py'))
     module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
-    module.import_history(combined,request,output/'validated',end,20)
+    module.import_history(combined,request,output/'validated',end,20,(315,330,350))
     state['status']='validated'
     (output/'case-status.json').write_text(json.dumps(state,indent=2),encoding='utf-8')
     print('Validated independent ERA5 case',end,flush=True)

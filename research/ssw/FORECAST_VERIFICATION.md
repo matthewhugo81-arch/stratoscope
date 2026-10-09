@@ -90,13 +90,15 @@ counts and uncertainty, and do not describe raw fractions as calibrated risks.
 
 The existing 1993-2016 daily wind climatology on Stratoscope is useful context,
 but cannot verify dated wave-breaking events or forecast trajectories.
-`scripts/ssw_era5_requests.py` writes three bounded ERA5-complete requests for a
-seven-day, six-hourly case: H500; U10; and PV/U/V on 315/330/350 K. The initial
+`scripts/ssw_era5_requests.py` writes four bounded ERA5-complete requests for a
+seven-day, six-hourly case: H500; U10; pressure/U/V on 315/330/350 K; and PV
+on those same isentropes. The pressure/flow request is retained to reuse its
+accepted job rather than duplicate the wind download. The initial
 prepared window is 27 September-3 October 2026, allowing for ERA5T delay. Actual
 availability must be checked. The H500/U10 portions have now been retrieved and
 independently decoded: 28 six-hourly timestamps, 56 fields, all preliminary
 ERA5T expver 5. Array hashes, coverage and finite values pass. The isentropic
-portion remains pending. See `evidence/era5t-case-20260927-20261003.json`.
+PV portion remains pending. See `evidence/era5t-case-20260927-20261003.json`.
 This case precedes the captured forecasts and produces zero prospective scores;
 it validates ingestion, not predictive skill.
 
@@ -104,7 +106,7 @@ Local CDS credentials are absent. Reuse the authorised CDS account via the
 repository's secret-backed research validation workflow or a local CDS configuration; never
 copy secrets into the repository or chat. Check for accepted jobs before submitting
 and retain/resume their IDs. Preserve original request JSON, data hashes and expver.
-Combine these three GRIB parts into one input only after successful downloads;
+Combine the four GRIB parts into one input only after successful downloads;
 retain a request envelope `{"dataset":"reanalysis-era5-complete","request":
 {"parts":[...]}}`. Import with `import-ssw-reanalysis.py --south 20` for the
 wave-breaking domain. Optional U10 must cover the entire verification week.
@@ -123,6 +125,16 @@ and downloads only completed parts instead of occupying a runner while queued.
 `case-status.json` distinguishes `pending` from `validated`: a successful Actions
 run alone is not evidence that the reanalysis case is complete. Subsequent checks
 resume the accepted IDs and preserve completed parts as artifacts.
+
+The resumed original job succeeded, but independent inspection found a request
+configuration error: ECMWF parameter 54 is isentropic pressure, not potential
+vorticity. It returned 224 recognised height/wind records and no PV. This has
+not been admitted as a complete wave-breaking case. The corrected request adds
+only parameter 60 (PV), keeping all three existing jobs. An ecCodes parameter
+identity test now checks the requested PV code, and the case importer must find
+PV/U/V at all three isentropes and every requested time before the workflow can
+mark the case validated. The earlier H500/U10 validation remains valid.
+See the [ECMWF PV definition](https://codes.ecmwf.int/grib/param-db/?id=60).
 
 Next validate selected known AWB/CWB and non-event cases, then expand to a
 seasonally representative hindcast set. The seven-day case is an engineering

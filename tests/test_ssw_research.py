@@ -82,8 +82,8 @@ class Era5ResumeTests(unittest.TestCase):
         def remote(name):
             entry=wanted[name]
             def download(path):
-                self.assertNotEqual(name,'isentropic');downloads.append(name);Path(path).write_bytes(b'GRIB')
-            return SimpleNamespace(collection_id=entry['dataset'],request=entry['request'],status='accepted' if name=='isentropic' else 'successful',download=download)
+                self.assertNotIn(name,('isentropic','isentropic_pv'));downloads.append(name);Path(path).write_bytes(b'GRIB')
+            return SimpleNamespace(collection_id=entry['dataset'],request=entry['request'],status='accepted' if name.startswith('isentropic') else 'successful',download=download)
         client=SimpleNamespace(get_remote=remote)
         with tempfile.TemporaryDirectory() as root:
             root=Path(root);(root/'requests.json').write_text(json.dumps({name:dict(id=name,**entry) for name,entry in wanted.items()}))
@@ -135,6 +135,14 @@ class PacketTests(unittest.TestCase):
         req=requests(date(2026,10,3))
         self.assertEqual(req['isentropic']['request']['levtype'],'pt')
         self.assertEqual(req['isentropic']['request']['param'],'54/131/132')
+        self.assertEqual(req['isentropic_pv']['request']['param'],'60')
+        import eccodes as ec
+        h=ec.codes_grib_new_from_samples('regular_ll_pl_grib1')
+        try:
+            ec.codes_set(h,'centre',98);ec.codes_set(h,'paramId',int(req['isentropic_pv']['request']['param']))
+            self.assertEqual(ec.codes_get(h,'shortName'),'pv')
+            self.assertEqual(ec.codes_get(h,'units'),'K m**2 kg**-1 s**-1')
+        finally:ec.codes_release(h)
         self.assertEqual(req['h500']['request']['date'],'2026-09-27/to/2026-10-03')
 
 if __name__=='__main__':unittest.main()

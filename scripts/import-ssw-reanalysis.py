@@ -12,7 +12,7 @@ import numpy as np
 from ssw_sources import require, digest, stamp, regular_samples
 
 
-def import_history(path, request_path, output, end_date, southern=30):
+def import_history(path, request_path, output, end_date, southern=30, required_isentropes=()):
     request_bytes=request_path.read_bytes();request=json.loads(request_bytes)
     require(request.get('dataset')=='reanalysis-era5-complete' and isinstance(request.get('request'),dict), 'Original ERA5-complete request required')
     require(southern in (0,20,30), 'Unsupported southern grid boundary')
@@ -51,6 +51,8 @@ def import_history(path, request_path, output, end_date, southern=30):
     require(all((t,'h500') in records for t in times), 'Need all 28 six-hour H500 analyses in requested week')
     require(all(t in times for t,_ in records), 'Fields outside requested verification week')
     if wind:require(len(wind)==28 and {w['validTime'] for w in wind}==set(times), 'Incomplete verification wind week')
+    for level in required_isentropes:
+        require(all((t,f'{variable}_{level}K') in records for t in times for variable in ('pv','u','v')), 'Incomplete requested isentropic PV/U/V history')
     output.mkdir(parents=True,exist_ok=True)
     files=[]
     for time in times:
@@ -63,6 +65,7 @@ def import_history(path, request_path, output, end_date, southern=30):
         inputSha256=digest(path.read_bytes()),requestSha256=digest(request_bytes),records=identities,files=files,
         preparedAt=stamp(datetime.now(timezone.utc)),rwbStatus='not_validated',
         grid=dict(lat0=90,latEnd=southern,lon0=0,dx=1,dy=-1,nx=360,ny=91-southern),
+        completeRequestedIsentropicHistory=bool(required_isentropes),requiredIsentropes=list(required_isentropes),
         note='ERA5T expver 5 is preliminary; source delay means this is not a current seven-day observation history')
     temporary=output/'reanalysis.json.tmp';temporary.write_text(json.dumps(result,indent=2),encoding='utf-8');temporary.replace(output/'reanalysis.json')
     if wind:
