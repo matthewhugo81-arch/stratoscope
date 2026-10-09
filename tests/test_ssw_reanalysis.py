@@ -13,7 +13,7 @@ module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
 
 
 class ReanalysisTests(unittest.TestCase):
-    def fixture(self,path,count=28,forecast=False):
+    def fixture(self,path,count=28,forecast=False,wind_count=0):
         with path.open('wb') as f:
             for hour in range(0,count*6,6):
                 time=datetime(2000,1,1)+timedelta(hours=hour)
@@ -25,7 +25,23 @@ class ReanalysisTests(unittest.TestCase):
                         latitudeOfLastGridPointInDegrees=30,longitudeOfLastGridPointInDegrees=359,
                         iDirectionIncrementInDegrees=1,jDirectionIncrementInDegrees=1,jScansPositively=0).items():ec.codes_set(h,k,v)
                     ec.codes_set_values(h,np.full(61*360,5500*9.80665));ec.codes_write(h,f)
+                    if hour<wind_count*6:
+                        ec.codes_set(h,'shortName','u');ec.codes_set(h,'level',10)
+                        ec.codes_set_values(h,np.full(61*360,17.));ec.codes_write(h,f)
                 finally:ec.codes_release(h)
+
+    def test_complete_wind_verification_and_partial_wind_rejection(self):
+        for wind_count in (27,28):
+            with self.subTest(wind_count=wind_count),tempfile.TemporaryDirectory() as root:
+                root=Path(root);p=root/'input.grib';self.fixture(p,wind_count=wind_count)
+                req=root/'request.json';req.write_text(json.dumps(dict(dataset='reanalysis-era5-complete',request={})))
+                if wind_count==27:
+                    with self.assertRaises(ValueError):module.import_history(p,req,root/'output',date(2000,1,7))
+                    self.assertFalse((root/'output/reanalysis.json').exists())
+                else:
+                    module.import_history(p,req,root/'output',date(2000,1,7))
+                    truth=json.loads((root/'output/verification-wind.json').read_text())
+                    self.assertEqual(len(truth['points']),28);self.assertEqual(truth['points'][0]['value'],17)
 
     def test_complete_preliminary_history_keeps_source_class_and_units(self):
         with tempfile.TemporaryDirectory() as root:

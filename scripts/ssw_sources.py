@@ -9,9 +9,12 @@ import bz2
 import hashlib
 import json
 import re
+import time
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from threading import Lock
 from urllib.request import Request, urlopen
+from urllib.error import HTTPError
 
 import eccodes as ec
 import numpy as np
@@ -70,7 +73,22 @@ class Store:
         headers = {'User-Agent': 'Stratoscope-precursor-research/1'}
         if start is not None:
             headers['Range'] = f'bytes={start}-{start + length - 1}'
-        with urlopen(Request(url, headers=headers), timeout=45) as response:
+        for attempt in range(4):
+            try:
+                response = urlopen(Request(url, headers=headers), timeout=45)
+                break
+            except HTTPError as error:
+                if error.code not in (429,503) or attempt==3:raise
+                retry=error.headers.get('Retry-After','') if error.headers else ''
+                try:delay=float(retry)
+                except ValueError:
+                    try:delay=(parsedate_to_datetime(retry)-datetime.now(timezone.utc)).total_seconds()
+                    except (ValueError,TypeError):delay=60*2**attempt
+                # Respect server backoff even when it is longer than our default.
+                delay=max(1,delay);error.close()
+                print(f'Provider throttled; retry in {delay:.0f}s (attempt {attempt+1}/3)',flush=True)
+                time.sleep(delay)
+        with response:
             if start is not None:
                 require(response.status == 206, 'Provider ignored byte range')
                 require(response.headers.get('Content-Range', '').startswith(f'bytes {start}-{start+length-1}/'), 'Wrong byte range')

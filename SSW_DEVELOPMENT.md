@@ -1,5 +1,12 @@
 # SSW precursor development: review branch
 
+The forecasting/reanalysis extension is described in
+[`research/ssw/FORECAST_VERIFICATION.md`](research/ssw/FORECAST_VERIFICATION.md).
+It adds retained published-run archives, prospective verification safeguards,
+native member-wise 300-hPa wave-packet diagnostics, MJO lag leakage checks and
+bounded ERA5 case requests. These are research components; packet arrival,
+AWB/CWB impacts and MJO-added forecast skill are not yet validated.
+
 This branch adds an isolated, read-only precursor pipeline and a reproducible
 pulsecheck. It does **not** enable an operational SSW alert or change the working
 Pages application. Source baseline: `2ed7cab`. The existing `docs/` deployment,
