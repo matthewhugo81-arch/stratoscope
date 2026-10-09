@@ -93,7 +93,12 @@ but cannot verify dated wave-breaking events or forecast trajectories.
 `scripts/ssw_era5_requests.py` writes three bounded ERA5-complete requests for a
 seven-day, six-hourly case: H500; U10; and PV/U/V on 315/330/350 K. The initial
 prepared window is 27 September-3 October 2026, allowing for ERA5T delay. Actual
-availability must be checked; no download has been completed in this iteration.
+availability must be checked. The H500/U10 portions have now been retrieved and
+independently decoded: 28 six-hourly timestamps, 56 fields, all preliminary
+ERA5T expver 5. Array hashes, coverage and finite values pass. The isentropic
+portion remains pending. See `evidence/era5t-case-20260927-20261003.json`.
+This case precedes the captured forecasts and produces zero prospective scores;
+it validates ingestion, not predictive skill.
 
 Local CDS credentials are absent. Reuse the authorised CDS account via the
 repository's secret-backed research validation workflow or a local CDS configuration; never
@@ -111,6 +116,13 @@ matches, saves request IDs as an artifact before waiting, then downloads and
 decodes the case. It has read-only repository permission and cannot publish to
 Pages. An interrupted job must reuse those requests; an uncertain catalogue
 lookup fails closed instead of submitting again.
+
+The first runner reached its 30-minute limit while waiting for PV, but preserved
+the completed H500/U10 downloads. The downloader now checks each request's status
+and downloads only completed parts instead of occupying a runner while queued.
+`case-status.json` distinguishes `pending` from `validated`: a successful Actions
+run alone is not evidence that the reanalysis case is complete. Subsequent checks
+resume the accepted IDs and preserve completed parts as artifacts.
 
 Next validate selected known AWB/CWB and non-event cases, then expand to a
 seasonally representative hindcast set. The seven-day case is an engineering

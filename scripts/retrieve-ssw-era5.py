@@ -42,13 +42,21 @@ def submit(client, end, output):
     return saved
 
 def download(client,end,output):
-    saved=json.loads((output/'requests.json').read_text());parts=[]
+    saved=json.loads((output/'requests.json').read_text());parts=[];statuses={}
     for name,entry in requests(end).items():
         record=saved[name]
         if record['dataset']!=entry['dataset'] or record['request']!=entry['request']:raise ValueError('Checkpoint mismatch')
         remote=client.get_remote(record['id'])
         if remote.collection_id!=entry['dataset'] or remote.request!=entry['request']:raise ValueError('Remote identity mismatch')
+        status=remote.status;statuses[name]=dict(id=record['id'],status=status)
+        if status in ('failed','dismissed','deleted'):raise ValueError(f'{name} request is {status}; investigate before resubmission')
+        if status!='successful':continue
         target=output/(name+'.grib');remote.download(str(target));parts.append(target)
+    state=dict(endDate=end.isoformat(),status='ready_to_validate' if len(parts)==len(saved) else 'pending',requests=statuses)
+    (output/'case-status.json').write_text(json.dumps(state,indent=2),encoding='utf-8')
+    if state['status']=='pending':
+        print('ERA5 case pending; completed downloads and accepted IDs retained. Resume on a later check.',flush=True)
+        return state
     combined=output/'combined.grib'
     with combined.open('wb') as handle:
         for part in parts:
@@ -60,7 +68,10 @@ def download(client,end,output):
     spec=importlib.util.spec_from_file_location('era5_import',Path(__file__).with_name('import-ssw-reanalysis.py'))
     module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
     module.import_history(combined,request,output/'validated',end,20)
+    state['status']='validated'
+    (output/'case-status.json').write_text(json.dumps(state,indent=2),encoding='utf-8')
     print('Validated independent ERA5 case',end,flush=True)
+    return state
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--phase',choices=['submit','download'],required=True)

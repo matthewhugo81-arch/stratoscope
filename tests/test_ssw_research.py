@@ -73,6 +73,24 @@ class ArchiveTests(unittest.TestCase):
             self.assertEqual(blob,b'field');sleep.assert_called_once_with(123);self.assertEqual(request.call_count,2)
 
 class Era5ResumeTests(unittest.TestCase):
+    def test_pending_parts_do_not_block_or_claim_validation(self):
+        from datetime import date
+        from types import SimpleNamespace
+        spec=importlib.util.spec_from_file_location('era5_retrieve_pending',Path(__file__).parents[1]/'scripts/retrieve-ssw-era5.py')
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        wanted=requests(date(2026,10,3));downloads=[]
+        def remote(name):
+            entry=wanted[name]
+            def download(path):
+                self.assertNotEqual(name,'isentropic');downloads.append(name);Path(path).write_bytes(b'GRIB')
+            return SimpleNamespace(collection_id=entry['dataset'],request=entry['request'],status='accepted' if name=='isentropic' else 'successful',download=download)
+        client=SimpleNamespace(get_remote=remote)
+        with tempfile.TemporaryDirectory() as root:
+            root=Path(root);(root/'requests.json').write_text(json.dumps({name:dict(id=name,**entry) for name,entry in wanted.items()}))
+            result=module.download(client,date(2026,10,3),root)
+            self.assertEqual(result['status'],'pending');self.assertEqual(downloads,['h500','wind10'])
+            self.assertFalse((root/'validated').exists());self.assertFalse((root/'combined.grib').exists())
+
     def test_existing_matching_requests_are_not_resubmitted(self):
         from datetime import date
         from types import SimpleNamespace

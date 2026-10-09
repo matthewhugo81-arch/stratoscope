@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "status": "partial_case_validated",
+  "sourceClass": "reanalysis",
+  "dataset": "reanalysis-era5-complete",
+  "preliminary": true,
+  "expver": "5",
+  "start": "2026-09-27T00:00:00Z",
+  "end": "2026-10-03T18:00:00Z",
+  "snapshots": 28,
+  "fields": [
+    "h500",
+    "u10"
+  ],
+  "grid": {
+    "lat0": 90,
+    "latEnd": 20,
+    "lon0": 0,
+    "dx": 1,
+    "dy": -1,
+    "nx": 360,
+    "ny": 71
+  },
+  "gribSha256": "f9e37f3ef99b5cbbc2724550b83a71a0393515ab7c1b3f098eac638be2204328",
+  "requestSha256": "16ecb403d273fb2c34b4c08048da3437f103c16adf00476b9b4e14ee3e64d087",
+  "arrayHashesVerified": 28,
+  "prospectiveVerificationCases": 0,
+  "reason": "Case predates all retained forecast runs; no skill score claimed",
+  "pending": "isentropic PV/U/V request remains separate",
+  "originalWorkflow": 37905743651
+}
