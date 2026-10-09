@@ -97,8 +97,10 @@ accepted job rather than duplicate the wind download. The initial
 prepared window is 27 September-3 October 2026, allowing for ERA5T delay. Actual
 availability must be checked. The H500/U10 portions have now been retrieved and
 independently decoded: 28 six-hourly timestamps, 56 fields, all preliminary
-ERA5T expver 5. Array hashes, coverage and finite values pass. The isentropic
-PV portion remains pending. See `evidence/era5t-case-20260927-20261003.json`.
+ERA5T expver 5. Array hashes, coverage and finite values pass. The corrected
+isentropic PV portion arrived on 9 October and has also passed independent local
+decoding. See `evidence/era5t-case-20260927-20261003.json` for the original subset
+and `evidence/era5t-pv-case-20260927-20261003.json` for the completed case.
 This case precedes the captured forecasts and produces zero prospective scores;
 it validates ingestion, not predictive skill.
 
@@ -135,6 +137,25 @@ identity test now checks the requested PV code, and the case importer must find
 PV/U/V at all three isentropes and every requested time before the workflow can
 mark the case validated. The earlier H500/U10 validation remains valid.
 See the [ECMWF PV definition](https://codes.ecmwf.int/grib/param-db/?id=60).
+
+The subsequent resume workflow 37919923140 reused all four accepted requests,
+including PV request `76a49d44-8a06-4c6c-9bc6-ab25bd6002d1`. Artifact 11611407075
+contains the completed case. Local re-decoding verified 308 recognised records:
+H500, U10 and PV/U/V at 315/330/350 K for all 28 timestamps, all expver 5.
+Every local array equals its workflow counterpart, with finite values and the
+expected 71-by-360 grid. This validates the source dataset, not AWB/CWB events
+or forecast skill. The prior incorrectly specified dataset remains excluded
+from complete-PV verification. Dated PDFs retain their earlier evidence cutoffs.
+
+The 9 October 06 UTC native GEFS core fields now cover 0/120 h with all 31
+members. At 14 October 06 UTC, mean U10 is 18.918 m/s, just 0.043 m/s weaker
+than the preceding cycle at the same valid time; no member is easterly at either
+sample. GFS and GEFS 06 UTC native 300-hPa wave envelopes cover six daily samples
+through 120 h. These sparse native cases remain separate from the published
+00 UTC complete ensemble wind/temperature timelines. PDF interpretation should
+explain map evolution, model differences, conditional forecast implications and
+what would change the assessment, without treating an envelope as a break or
+converting broad height anomalies into unverified local weather predictions.
 
 Next validate selected known AWB/CWB and non-event cases, then expand to a
 seasonally representative hindcast set. The seven-day case is an engineering
