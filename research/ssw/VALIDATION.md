@@ -2,7 +2,7 @@
 
 Baseline source: `2ed7cabc99c4bb0a583c6ea98bc1948576c1690c`.
 
-- Python: all 80 tests pass, including 27 new SSW tests.
+- Python: all 81 tests pass, including 28 new SSW tests.
 - JavaScript: all 76 existing tests pass.
 - TypeScript: `tsc --noEmit` passes.
 - Pages: Vite build passes into `work/pages-validation`; deployed `docs/`

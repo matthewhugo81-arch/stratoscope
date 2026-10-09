@@ -47,6 +47,8 @@ right to set rwb_validated in the precursor state machine.
     require(pv.shape==u.shape==v.shape==(len(lat),len(lon)) and np.isfinite(pv).all() and np.isfinite(u).all() and np.isfinite(v).all(), 'Complete PV and collocated flow required')
     require(len(lon)>=144 and np.allclose(lon,np.arange(len(lon))*360/len(lon)), 'Complete periodic longitude grid required')
     require(np.all(np.diff(lat)>0) and lat[0]<=20 and lat[-1]>=80, 'Ascending 20..80N coverage required')
+    if not (np.all(pv[0]<contour_pvu) and np.all(pv[-1]>contour_pvu)):
+        return dict(status='unverified_poleward_pv_orientation',candidates=[],validated=False)
     import contourpy
     tiled=np.tile(pv,(1,3));x=np.concatenate([lon-360,lon,lon+360])
     lines=contourpy.contour_generator(x=x,y=lat,z=tiled,line_type='Separate').lines(contour_pvu)

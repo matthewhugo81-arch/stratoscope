@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import numpy as np
+import eccodes as ec
 
 sys.path.insert(0,str(Path(__file__).parents[1]/'scripts'))
 import ssw_sources as source
@@ -72,6 +73,19 @@ class SourceTests(unittest.TestCase):
             (Path(tmp)/(key+'.bin')).write_bytes(b'corrupt')
             (Path(tmp)/(key+'.json')).write_text('{"url":"https://example.test/data","sha256":"wrong"}')
             with self.assertRaises(ValueError):store.get(url,0,20)
+
+    def test_native_wind_cannot_hide_missing_longitude_between_display_samples(self):
+        h=ec.codes_grib_new_from_samples('regular_ll_pl_grib2')
+        try:
+            for key,value in dict(centre=7,dataDate=20261009,dataTime=0,shortName='u',level=10,
+                Ni=1440,Nj=721,latitudeOfFirstGridPointInDegrees=90,longitudeOfFirstGridPointInDegrees=0,
+                latitudeOfLastGridPointInDegrees=-90,longitudeOfLastGridPointInDegrees=359.75,
+                iDirectionIncrementInDegrees=.25,jDirectionIncrementInDegrees=.25,jScansPositively=0).items():ec.codes_set(h,key,value)
+            values=np.full((721,1440),10.);values[120,1]=9999.
+            ec.codes_set_values(h,values.ravel());blob=ec.codes_get_message(h)
+        finally:ec.codes_release(h)
+        with self.assertRaisesRegex(ValueError,'native 60N'):
+            source.decode(blob,'gfs',self.run,0,dict(level=10,key='u',member=0))
 
 
 class PhysicsTests(unittest.TestCase):

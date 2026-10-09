@@ -261,7 +261,10 @@ def decode(blob, model, run, hour, entry, analysis=False, icon_grid=None):
             ranges = {'height':(-1000,65000), 'temperature':(100,350), 'pressure':(1000,110000), 'u':(-250,250), 'v':(-250,250)}
             lo, hi = ranges[key]
             require(np.isfinite(sampled).all() and (sampled > lo).all() and (sampled < hi).all(), f'Implausible {model} {key} {entry["level"]}: {sampled.min()} .. {sampled.max()}')
-            wind = float(circle.mean()) if key == 'u' and entry['level'] == 10 and circle is not None else None
+            native_wind = key == 'u' and entry['level'] == 10 and circle is not None
+            if native_wind:
+                require(np.isfinite(circle).all() and (np.abs(circle)<250).all(), 'Incomplete native 60N longitude circle')
+            wind = float(circle.mean()) if native_wind else None
             return sampled, wind, dict(shortName=get('shortName'), units=get('units'), centre=get('centre',int),
                 member=entry['member'], level=entry['level'], run=stamp(run), leadHours=hour,
                 validTime=stamp(run+timedelta(hours=hour)), gridType=get('gridType'), nativePoints=int(values.size),
