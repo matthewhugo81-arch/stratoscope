@@ -28,11 +28,13 @@ def envelope(v, latitudes, longitudes, wavenumbers=(4,9), band=(35,65)):
 def lagged_predictor(index, issue_time, valid_time, lag_days):
     """Select only a known-at-issue MJO record; future/revised histories leak skill."""
     from datetime import timedelta
+    import re
     from ssw_research_archive import utc
     issue,valid=utc(issue_time),utc(valid_time)
     require(isinstance(lag_days,int) and lag_days>=0 and valid>=issue, 'Invalid lead/lag')
     target=(valid-timedelta(days=lag_days)).date().isoformat()
     require(index.get('definition') in ('BOM_RMM','CPC_WH'), 'Named index definition required')
+    require(re.fullmatch('[a-f0-9]{64}',index.get('inputSha256','')) and index.get('sourceUrl','').startswith('https://'), 'MJO source receipt required')
     if utc(index['retrievedAt'])>issue:
         return dict(status='unavailable_at_issue',causalAttribution=False)
     rows=[r for r in index['records'] if r['date']==target]

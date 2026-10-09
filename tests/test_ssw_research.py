@@ -106,7 +106,7 @@ class PacketTests(unittest.TestCase):
         with self.assertRaises(ValueError):envelope(v,lat,lon)
 
     def test_mjo_lag_prevents_lookahead_and_preserves_definition(self):
-        index=dict(definition='BOM_RMM',retrievedAt='2026-10-09T00:00:00Z',records=[dict(date='2026-10-08',rmm1=.3,rmm2=.4,phase=5)])
+        index=dict(definition='BOM_RMM',inputSha256='a'*64,sourceUrl='https://example.test/index',retrievedAt='2026-10-09T00:00:00Z',records=[dict(date='2026-10-08',rmm1=.3,rmm2=.4,phase=5)])
         result=lagged_predictor(index,'2026-10-09T08:00:00Z','2026-10-18T00:00:00Z',10)
         self.assertFalse(result['active']);self.assertEqual(result['amplitude'],.5);self.assertFalse(result['causalAttribution'])
         index['retrievedAt']='2026-10-10T00:00:00Z'

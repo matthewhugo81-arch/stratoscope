@@ -115,10 +115,11 @@ def collect(output):
         url=ROOT+'forecast-data-diagnostics/'+model+'.json'
         try:
             db=fetch(url); mb=fetch(ROOT+'forecast-data-'+model.replace('_','-')+'/latest.json')
-            rec,new=archive(output,db,mb,now,url)
+            rec,new=archive(output,db,mb,datetime.now(timezone.utc),url)
             prior=[]
             for path in (output/model).glob('*/*/receipt.json'):
                 r=json.loads(path.read_text())
+                require(utc(r['run'])<=utc(rec['run']), 'Published cycle regressed behind retained archive; do not downgrade')
                 if utc(r['run'])<utc(rec['run']): prior.append((utc(r['run']),utc(r['firstSeenAt']),path))
             if prior:
                 previous=max(prior)[2]
