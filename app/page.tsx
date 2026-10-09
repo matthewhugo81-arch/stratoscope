@@ -28,6 +28,8 @@ export default function Home(){
  const [view,setView]=useState<EnsembleView>('mean'),[member,setMember]=useState(0),[progress,setProgress]=useState(0),[pair,setPair]=useState<{mean:Frame;spread:Frame}|null>(null);
  const [playing,setPlaying]=useState(false),[delay,setDelay]=useState(1000),[showStamps,setShowStamps]=useState(false),[zonalReady,setZonalReady]=useState(''),[,setCacheVersion]=useState(0);
  const direction=useRef(1);
+ const preloadSelection=useRef({hour:0,loading:true});preloadSelection.current={hour,loading};
+ const [backgroundLoading,setBackgroundLoading]=useState(false);
  const [showMembers,setShowMembers]=useState(false);
  const config=MODELS[model],maxHour=config.maxHour,run=meta?.model===model?meta.run:'',cyclic=isCycle(model),ensemble=isEnsemble(model),count=ensemble?memberCount(model):0,selectionMember=ensemble&&view==='member'?member:-1;
  const prepared=ensemble&&selectionMember<0;
@@ -49,21 +51,39 @@ export default function Home(){
  },[model,refresh,prepared]);
  useEffect(()=>{
   if(!run||!supports(model,level))return;const c=new AbortController();setError('');setRetryAt(0);setProgress(0);setLoading(true);
-  let preload:ReturnType<typeof setTimeout>|undefined;
   const apply=(result:Awaited<ReturnType<typeof loadForecast>>)=>{
    if(c.signal.aborted)return;setFrame(result.frame);if(result.pair)setPair(result.pair);setLoading(false);
-   // A single adjacent frame or prepared summary; no browser ensemble calculations.
-   const adjacent=hour+direction.current*6;
-   if(cyclic&&adjacent>=0&&adjacent<=maxHour)preload=setTimeout(()=>{
-    const connection=(navigator as Navigator & {connection?:{saveData?:boolean;effectiveType?:string}}).connection;
-    if(document.visibilityState!=='visible'||connection?.saveData||connection?.effectiveType?.includes('2g'))return;
-    void loadForecast(model,run,adjacent,level,selectionMember,c.signal,()=>{}).then(()=>{if(!c.signal.aborted)setCacheVersion(v=>v+1)}).catch(()=>{});
-   },120);
+
   };
   const cached=peekForecast(model,run,hour,level,selectionMember);
   if(cached)apply(cached);else void loadForecast(model,run,hour,level,selectionMember,c.signal,n=>{if(!c.signal.aborted)setProgress(n)}).then(apply).catch(e=>{if(!c.signal.aborted){if(e.retryAfter)setRetryAt(Date.now()+e.retryAfter*1000);setError(e.name==='TimeoutError'?'The model download took too long. Please retry.':e.message);setLoading(false)}});
-  return()=>{clearTimeout(preload);c.abort()};
+  return()=>c.abort();
  },[run,model,hour,level,selectionMember,refresh,attempt]);
+ useEffect(()=>{
+  if(!run||!cyclic||!supports(model,level))return;
+  const c=new AbortController();let timer:ReturnType<typeof setTimeout>;
+  const schedule=()=>{timer=setTimeout(()=>void fill(),250)};
+  const fill=async()=>{
+   if(c.signal.aborted)return;
+   const connection=(navigator as Navigator & {connection?:{saveData?:boolean;effectiveType?:string}}).connection;
+   if(document.visibilityState!=='visible'||connection?.saveData||connection?.effectiveType?.includes('2g')||preloadSelection.current.loading){setBackgroundLoading(false);schedule();return;}
+   const selectedHour=preloadSelection.current.hour;
+   const hours=Array.from({length:maxHour/6+1},(_,i)=>i*6);
+   hours.sort((a,b)=>{
+    const distance=(h:number)=>(direction.current*(h-selectedHour)+maxHour+6)%(maxHour+6);
+    return distance(a)-distance(b);
+   });
+   const next=hours.find(h=>!peekForecast(model,run,h,level,selectionMember));
+   if(next===undefined){setBackgroundLoading(false);return;}
+   setBackgroundLoading(true);
+   try{
+    await loadForecast(model,run,next,level,selectionMember,c.signal,()=>{});
+    if(!c.signal.aborted){setCacheVersion(v=>v+1);schedule();}
+   }catch{if(!c.signal.aborted)setBackgroundLoading(false);}
+  };
+  schedule();
+  return()=>{clearTimeout(timer);c.abort();setBackgroundLoading(false)};
+ },[run,model,level,selectionMember,refresh,cyclic,maxHour]);
  useEffect(()=>{
   const step=(e:KeyboardEvent)=>{
    if(e.defaultPrevented||e.altKey||e.ctrlKey||e.metaKey||e.shiftKey||!['ArrowLeft','ArrowRight'].includes(e.key))return;
@@ -132,7 +152,7 @@ export default function Home(){
     <button className="stamps-toggle" aria-label={showStamps?'Hide frame previews':'Show frame previews'} aria-expanded={showStamps} aria-controls="forecast-stamps" onClick={()=>setShowStamps(v=>!v)} title="Show downloaded forecast thumbnails"><Images size={17}/><span>Frames</span></button>
    </div>
    <div className="timeline-track"><Slider aria-label="Forecast hour" value={[hour]} min={0} max={maxHour} step={6} onValueChange={v=>chooseHour(v[0])}/><div className="day-ticks">{Array.from({length:maxHour/24+1},(_,i)=><button key={i} onClick={()=>chooseHour(i*24)} className={hour===i*24?'active':''}>{i===0?(cyclic?'Run':'00Z'):`+${i}d`}</button>)}</div>
-    <div className="playback-status" role="status" title="Downloaded frames are saved in this browser when storage is available, including across model changes and reloads. One run per model is retained. Refresh data clears that model’s saved frames.">{error?'Paused after download error':playing?(loading||!matching?'Buffering':zonalReady!==zonalKey?'Waiting for 10 hPa wind':readyCount===times.length?'Looping from memory':'Playing & loading'):loading?'Loading selected frame':'Ready'} · {readyCount}/{times.length} frames in memory · local run cache{ensemble&&view!=='member'&&readyCount<times.length?' · prepared ensemble maps':''}</div>
+    <div className="playback-status" role="status" title="Downloaded frames are saved in this browser when storage is available, including across model changes and reloads. One run per model is retained. Refresh data clears that model’s saved frames.">{error?'Paused after download error':playing?(loading||!matching?'Buffering':zonalReady!==zonalKey?'Waiting for 10 hPa wind':readyCount===times.length?'Looping from memory':'Playing & loading'):loading?'Loading selected frame':backgroundLoading?'Ready · downloading timeline':'Ready'} · {readyCount}/{times.length} frames in memory · local run cache{ensemble&&view!=='member'&&readyCount<times.length?' · prepared ensemble maps':''}</div>
    </div>
   </section>
   {showStamps&&<ForecastStamps times={times} hour={hour} run={run} field={field} onSelect={chooseHour}/>}
