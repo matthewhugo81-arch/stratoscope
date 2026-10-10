@@ -1,0 +1,25 @@
+name: Source security checks
+on:
+  push:
+    branches: [main, security/project-safeguards-20261010]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: source-security-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Test security checks with non-working fixtures
+        run: python3 -m unittest discover -s tests -p test_source_security.py -v
+      - name: Check tracked source without reading real credentials
+        run: python3 scripts/check-source-security.py

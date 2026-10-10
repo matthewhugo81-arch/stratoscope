@@ -1,0 +1,5 @@
+# Route review requests for project files to the repository owner.
+# This is not an access-control rule by itself. Mandatory review needs a
+# separately configured GitHub branch protection rule or ruleset.
+* @matthewhugo81-arch
+/.github/CODEOWNERS @matthewhugo81-arch
