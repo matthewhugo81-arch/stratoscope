@@ -1,0 +1,14 @@
+[
+  {
+    "hour": 0,
+    "maxAbsoluteDifferenceKms": 4.999204552547099e-07,
+    "comparison": "existing direct covariance against new spectral diagnostics total",
+    "members": 31
+  },
+  {
+    "hour": 120,
+    "maxAbsoluteDifferenceKms": 4.5883255861411953e-07,
+    "comparison": "existing direct covariance against new spectral diagnostics total",
+    "members": 31
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "model": "aifs_ens",
+    "run": "2026-10-09T00:00:00Z",
+    "nativeCirclesRechecked": 102,
+    "unchangedDiagnostics": true
+  },
+  {
+    "model": "gefs",
+    "run": "2026-10-09T00:00:00Z",
+    "nativeCirclesRechecked": 62,
+    "unchangedDiagnostics": true
+  },
+  {
+    "model": "gfs",
+    "run": "2026-10-09T00:00:00Z",
+    "nativeCirclesRechecked": 2,
+    "unchangedDiagnostics": true
+  },
+  {
+    "model": "ifs",
+    "run": "2026-10-08T12:00:00Z",
+    "nativeCirclesRechecked": 4,
+    "unchangedDiagnostics": true
+  },
+  {
+    "model": "ifs_ens",
+    "run": "2026-10-08T12:00:00Z",
+    "nativeCirclesRechecked": 204,
+    "unchangedDiagnostics": true
+  }
+]

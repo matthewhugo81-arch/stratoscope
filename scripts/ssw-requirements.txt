@@ -1,0 +1,3 @@
+-r ensemble-requirements.txt
+scipy==1.18.1
+contourpy==1.4.0

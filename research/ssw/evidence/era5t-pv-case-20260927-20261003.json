@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "status": "complete_requested_case_independently_validated",
+  "sourceClass": "reanalysis",
+  "dataset": "reanalysis-era5-complete",
+  "preliminary": true,
+  "expver": [
+    "5"
+  ],
+  "start": "2026-09-27T00:00:00Z",
+  "end": "2026-10-03T18:00:00Z",
+  "snapshots": 28,
+  "records": 308,
+  "fields": [
+    "h500",
+    "pv_315K",
+    "pv_330K",
+    "pv_350K",
+    "u10",
+    "u_315K",
+    "u_330K",
+    "u_350K",
+    "v_315K",
+    "v_330K",
+    "v_350K"
+  ],
+  "grid": {
+    "lat0": 90,
+    "latEnd": 20,
+    "lon0": 0,
+    "dx": 1,
+    "dy": -1,
+    "nx": 360,
+    "ny": 71
+  },
+  "gribSha256": "9bca0fcc00c34f26cf1842f009a4cdb0e99c875508302e02771551fe8c158379",
+  "requestSha256": "1f85152771d78570f9ec502f87b32bca5fe9d5e59ba5727b18525e53adc82192",
+  "arrayHashesVerified": 28,
+  "localArraysEqualWorkflowArrays": true,
+  "prospectiveVerificationCases": 0,
+  "rwbStatus": "not_validated",
+  "skillClaim": false,
+  "workflow": 37919923140,
+  "artifact": 11611407075,
+  "checkedAt": "2026-10-09T10:53:22.754076+00:00"
+}
