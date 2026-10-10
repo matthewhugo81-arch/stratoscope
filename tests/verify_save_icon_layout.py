@@ -39,7 +39,7 @@ createRoot(document.getElementById('root')).render(React.createElement('main',{s
  React.createElement('div',{id:'layout-other'},
   React.createElement('div',{className:'heat-flux-heading'},React.createElement('h3',{},'Heat flux'),button()),
   React.createElement('div',{className:'zonal-card'},React.createElement('div',{className:'eyebrow'},'Zonal wind',button())),
-  React.createElement('div',{className:'globe-tools'},button()),
+  React.createElement('div',{className:'globe-tools',style:{position:'relative',inset:'auto',margin:'12px 0'}},button()),
   React.createElement('div',{className:'ec46-chart'},React.createElement('div',{className:'seasonal-issue'},'EC46',button())),
   React.createElement('div',{className:'vortex-stage',style:{height:90}},React.createElement('div',{className:'vortex-view-controls'},button()))
  )
@@ -63,7 +63,7 @@ def dimensions(page):
       const icon=button.querySelector('svg'),label=button.querySelector('span');
       const b=button.getBoundingClientRect(),i=icon.getBoundingClientRect();
       const style=getComputedStyle(icon),text=getComputedStyle(label);
-      return {buttonWidth:b.width,buttonHeight:b.height,iconWidth:i.width,iconHeight:i.height,
+      return {buttonWidth:b.width,buttonHeight:b.height,iconWidth:parseFloat(style.width),iconHeight:parseFloat(style.height),iconBounds:[i.width,i.height],
         iconMinWidth:style.minWidth,labelDisplay:text.display,labelFont:text.fontSize,
         label:label.textContent,visible:getComputedStyle(button.parentElement).display!=='none'};
     })''')
@@ -86,7 +86,7 @@ def assert_small(page):
 
 def save_png(page, selector):
     with page.expect_download(timeout=30000) as future:
-        page.locator(selector).click()
+        page.locator(selector).first.click()
     download=future.value
     assert download.suggested_filename.endswith('.png')
     raw=Path(download.path()).read_bytes()
@@ -138,16 +138,8 @@ def main():
                         # Exercise genuine chart downloads on both browser engines.
                         exports=[]
                         if width in [390,1440]:
-                            for selector in ['.nh-diagnostic-chart:first-of-type h3 button.image-save',
-                                             '#layout-seasonal button.image-save']:
-                                # Use an explicit container index: the heading also has SVG icons.
-                                if selector.startswith('.nh-diagnostic-chart'):
-                                    selector='.nh-diagnostic-chart:nth-of-type(3) h3 button.image-save' if False else '#northern-diagnostics .nh-diagnostic-chart h3 button.image-save'
-                                    with page.expect_download(timeout=30000) as future:page.locator(selector).first.click()
-                                    download=future.value;raw=Path(download.path()).read_bytes()
-                                    assert raw.startswith(b'\x89PNG\r\n\x1a\n') and len(raw)>3500
-                                    exports.append({'name':download.suggested_filename,'bytes':len(raw)})
-                                else:exports.append(save_png(page,selector))
+                            for selector in ['#northern-diagnostics .nh-diagnostic-chart h3 button.image-save', '#layout-seasonal button.image-save']:
+                                exports.append(save_png(page,selector))
                             assert page.locator('.image-save-error:visible').count()==0
                         # Busy spinner must have exactly the same safe dimensions.
                         spinner=page.locator('#layout-other .heat-flux-heading button.image-save')
