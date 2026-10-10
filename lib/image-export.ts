@@ -146,7 +146,7 @@ export function captureLayeredGlobe(base:HTMLCanvasElement|null,overlay:HTMLCanv
  ctx.drawImage(overlay,0,0,result.width,result.height);
  return result;
 }
-export async function saveZonalWindSnapshot(options:{value:number;direction:string;model:string;run:string;valid:string;member:string;grid:string}){
+export async function saveZonalWindSnapshot(options:{value:number;display:string;direction:string;model:string;run:string;valid:string;member:string;grid:string}){
  const canvas=document.createElement('canvas');canvas.width=960;canvas.height=320;
  const ctx=canvas.getContext('2d');if(!ctx)throw Error('Canvas export unavailable.');
  ctx.fillStyle=BG;ctx.fillRect(0,0,canvas.width,canvas.height);
