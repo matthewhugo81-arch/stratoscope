@@ -1,0 +1,29 @@
+name: Verify chart image saves
+on:
+  push:
+    branches: [feat/subtle-chart-save-20261010]
+    paths: [.github/workflows/verify-chart-export.yml]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Integrate scoped save controls
+        run: |
+          python scripts/apply-export-native.py
+          python scripts/apply-export-diagnostics.py
+          python scripts/apply-export-maps.py
+          python scripts/apply-export-style.py
+      - run: npm ci --no-audit --no-fund
+      - name: Typecheck and all native regression tests
+        run: |
+          npm exec -- tsc --noEmit
+          node --test tests/*.test.mjs
+      - name: Build the actual GitHub Pages application
+        run: npm run build:pages
