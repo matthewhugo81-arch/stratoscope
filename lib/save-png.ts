@@ -62,11 +62,18 @@ export async function saveElementPng(element:HTMLElement|SVGElement|null,meta:Pn
  const bounds=element.getBoundingClientRect();
  if(bounds.width<30||bounds.height<30)throw Error('The chart is not ready to save.');
  const {toCanvas}=await import('html-to-image');
+ // Member galleries scroll on phones. Export the complete grid (all 31/51
+ // members), not only the rows currently visible on screen.
+ const memberGrid=element instanceof HTMLElement&&element.classList.contains('member-maps-grid');
+ const width=memberGrid?1150:Math.max(bounds.width,element.scrollWidth);
+ const height=memberGrid?Math.ceil(element.children.length/7)*165:Math.max(bounds.height,element.scrollHeight);
  const ratio=Math.max(1,Math.min(2,window.devicePixelRatio||1));
  const canvas=await toCanvas(element,{
   backgroundColor:'#0e202b',
   cacheBust:false,
-  pixelRatio:Math.min(ratio,4096/Math.max(bounds.width,bounds.height)),
+  width,height,
+  style:memberGrid?{width:'1150px',height:height+'px',maxHeight:'none',overflow:'visible',gridTemplateColumns:'repeat(7,minmax(0,1fr))',gridAutoRows:'minmax(0,1fr)'}:undefined,
+  pixelRatio:Math.min(ratio,4096/Math.max(width,height)),
   skipFonts:true,
   filter:(node:HTMLElement)=>!node.hasAttribute?.('data-save-exclude')
     &&!node.classList?.contains('image-save-button')
