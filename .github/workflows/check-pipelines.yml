@@ -6,12 +6,16 @@ on:
     paths:
       - 'scripts/check-pipelines.py'
       - 'scripts/prepare-ensembles.py'
+      - 'scripts/ecmwf_transport.py'
+      - 'scripts/pipeline_freshness.py'
+      - 'scripts/seasonal_config.py'
       - 'tests/test_pipeline_reliability.py'
+      - 'tests/test_ecmwf_feed_recovery.py'
       - '.github/workflows/check-pipelines.yml'
   schedule:
     - cron: '11 */3 * * *'
   workflow_run:
-    workflows: [Prepare public ensemble maps, Prepare GEFS model maps, Prepare public DWD ICON maps, Prepare GEFS vortex geometry, Prepare ERA5 daily wind climatology]
+    workflows: [Prepare public ensemble maps, Prepare GEFS model maps, Prepare public DWD ICON maps, Prepare GEFS vortex geometry, Prepare ERA5 daily wind climatology, Prepare native seasonal wind charts, Prepare northern diagnostic charts]
     branches: [main]
     types: [completed]
 permissions:
@@ -32,7 +36,9 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install --disable-pip-version-check -r scripts/ensemble-requirements.txt
       - name: Check reliability regressions before recovery
-        run: python -m unittest discover -s tests -p test_pipeline_reliability.py -v
+        run: |
+          python -m unittest discover -s tests -p test_pipeline_reliability.py -v
+          python -m unittest discover -s tests -p test_ecmwf_feed_recovery.py -v
       - name: Audit public feeds and recover idle preparation
         env:
           GH_TOKEN: ${{ github.token }}
