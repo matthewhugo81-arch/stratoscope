@@ -23,6 +23,16 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check playwright
           python -m playwright install --with-deps chromium webkit
+      - name: Give the standalone toolbar fixture its own positioning context
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('tests/verify_save_icon_layout.py');text=p.read_text()
+          old="{className:'globe-tools'},button())"
+          assert text.count(old)==1
+          text=text.replace(old,"{className:'globe-tools',style:{position:'relative',inset:'auto',margin:'12px 0'}},button())")
+          p.write_text(text)
+          PY
       - name: Prove the reported mobile icon regression is covered
         run: python -u tests/verify_save_icon_layout.py --expect-bug
       - name: Isolate chart geometry from control icons
@@ -48,14 +58,13 @@ jobs:
           button.image-save>span{display:inline;margin:0;padding:0;background:none;color:inherit;font:inherit;letter-spacing:normal}
           '''
           p.write_text(css)
-          # Keep the regression helper readable: one shared PNG assertion for both chart types.
+          # One shared PNG assertion for both chart types.
           p=Path('tests/verify_save_icon_layout.py');text=p.read_text()
           text=text.replace('page.locator(selector).click()','page.locator(selector).first.click()')
           start=text.index('                            for selector in [')
           end=text.index("                            assert page.locator('.image-save-error:visible').count()==0",start)
-          text=text[:start]+'''                            for selector in ['#northern-diagnostics .nh-diagnostic-chart h3 button.image-save', '#layout-seasonal button.image-save']:
-                                          exports.append(save_png(page,selector))
-          '''.replace('                                          exports','                                exports').rstrip()+'\n'+text[end:]
+          replacement="                            for selector in ['#northern-diagnostics .nh-diagnostic-chart h3 button.image-save', '#layout-seasonal button.image-save']:\n                                exports.append(save_png(page,selector))\n"
+          text=text[:start]+replacement+text[end:]
           p.write_text(text)
           PY
       - name: Compile and test CSS regression guards and existing code
