@@ -56,6 +56,17 @@ def current_forecast(data,model,nominal):
   return True
  except (KeyError,TypeError,ValueError,OverflowError,AttributeError):return False
 
+# Official C3S known issue I2, reviewed 2026-10-10. Select the 55 most
+# recent AVAILABLE native members, not five consecutive calendar starts.
+# https://confluence.ecmwf.int/spaces/CKB/pages/87853536/C3S+Seasonal+Forecast+known+issues
+BOM_MISSING_STARTS={'2026-04':{'2026-03-29'},'2026-10':{'2026-09-29'}}
+def forecast_request_label(model,nominal,index,hindcast=False):
+ label=f'{model}-{nominal:%Y%m}-{index}'
+ # The older-month order changes; retain the old checkpoint for audit and
+ # continue reusing the unchanged first-of-month CDS request.
+ if model=='ammc' and not hindcast and index==0 and nominal.strftime('%Y-%m') in BOM_MISSING_STARTS:
+  label+='-c3s-i2-v1'
+ return label
 def starts_for(model,nominal,hindcast=False):
  prev=nominal-timedelta(days=1)
  if hindcast:
@@ -65,6 +76,12 @@ def starts_for(model,nominal,hindcast=False):
    end=prev.replace(day=28) if prev.month==2 else prev
    return [end-timedelta(days=d) for d in range(8)]+[nominal]
   return [nominal]
+ if model=='ammc':
+  missing=BOM_MISSING_STARTS.get(nominal.strftime('%Y-%m'),set())
+  candidates=[nominal-timedelta(days=d) for d in range(11)]
+  starts=[d for d in candidates if d.strftime('%Y-%m-%d') not in missing][:5]
+  if len(starts)!=5:raise ValueError('Insufficient documented available BOM starts')
+  return starts
  count={'egrr':25,'rjtd':11,'ammc':5}.get(model,1)
  return [nominal-timedelta(days=d) for d in range(count)]
 def requests_for(model,nominal,hindcast=False):

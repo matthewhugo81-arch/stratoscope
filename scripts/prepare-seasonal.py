@@ -118,7 +118,7 @@ def retrieve(client,dataset,request,label):
 def prepare_ensemble(client,model,nominal,hindcast=False):
  records=[]
  for i,request in enumerate(requests_for(model,nominal,hindcast)):
-  label=f'{model}-{nominal:%Y%m}-{i}'
+  label=forecast_request_label(model,nominal,i,hindcast)
   saved=load('requests/'+label+'.json')
   # Reuse the exact accepted request from before BOM daily availability was verified.
   # Only this known superset of requested leads is compatible; all other fields must match.
