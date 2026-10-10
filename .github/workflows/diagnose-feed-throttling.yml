@@ -1,0 +1,76 @@
+name: Diagnose ECMWF feed throttling
+on:
+  push:
+    branches: [fix/ecmwf-feed-recovery-20261010]
+    paths: [.github/workflows/diagnose-feed-throttling.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  diagnose:
+    if: github.repository == 'matthewhugo81-arch/stratoscope'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check -r scripts/ensemble-requirements.txt
+      - name: Summarize schedules, failures and actual mirror availability
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -u - <<'PY'
+          import importlib.util,json,os,urllib.request,urllib.error,time,sys
+          from datetime import datetime,timezone
+          from concurrent.futures import ThreadPoolExecutor
+          repo='matthewhugo81-arch/stratoscope'
+          def get(path):
+              req=urllib.request.Request('https://api.github.com/repos/'+repo+path,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'User-Agent':'Stratoscope-feed-diagnosis'})
+              with urllib.request.urlopen(req,timeout=40) as r:return json.load(r)
+          for workflow in ['check-pipelines.yml','prepare-ensembles.yml','prepare-gefs.yml','prepare-icon.yml','prepare-vortex.yml','prepare-diagnostics.yml','prepare-seasonal.yml']:
+              meta=get('/actions/workflows/'+workflow)
+              print('WORKFLOW',workflow,'state',meta['state'],flush=True)
+              runs=get('/actions/workflows/'+workflow+'/runs?branch=main&per_page=12')['workflow_runs']
+              for r in runs:
+                  print('RUN',workflow,json.dumps({k:r.get(k) for k in ['id','event','status','conclusion','created_at','updated_at']}),flush=True)
+                  if workflow=='prepare-ensembles.yml':
+                      jobs=get('/actions/runs/'+str(r['id'])+'/jobs')['jobs']
+                      for j in jobs:print('MODEL_JOB',json.dumps({k:j.get(k) for k in ['id','name','status','conclusion','started_at','completed_at']}),flush=True)
+              if workflow=='check-pipelines.yml':
+                  scheduled=get('/actions/workflows/'+workflow+'/runs?event=schedule&per_page=4')['workflow_runs']
+                  print('THREE_HOURLY_HISTORY',json.dumps([{k:r.get(k) for k in ['id','event','status','conclusion','created_at','updated_at']} for r in scheduled]),flush=True)
+          sys.path.insert(0,'scripts')
+          from seasonal_config import MODELS,current_forecast,latest
+          for model in MODELS:
+              url=f'https://raw.githubusercontent.com/{repo}/forecast-data-seasonal/forecast/{model}.json'
+              try:
+                  with urllib.request.urlopen(url,timeout=25) as r:d=json.load(r)
+                  target=latest(model,datetime.now(timezone.utc))
+                  print('SEASONAL',model,d['nominal'],d['complete'],d['memberCount'],'current',current_forecast(d,model,target),flush=True)
+              except Exception as e:print('SEASONAL_ERROR',model,str(e),flush=True)
+          spec=importlib.util.spec_from_file_location('prep','scripts/prepare-ensembles.py');prep=importlib.util.module_from_spec(spec);spec.loader.exec_module(prep)
+          run=datetime(2026,10,10,12,tzinfo=timezone.utc)
+          for origin in ['https://ecmwf-forecasts.s3.eu-central-1.amazonaws.com','https://storage.googleapis.com/ecmwf-open-data','https://data.ecmwf.int/forecasts']:
+              prep.EC_ORIGIN=origin
+              for model in ['ifs_ens','aifs_ens']:
+                  started=time.monotonic()
+                  try:
+                      def fast(url,start=None,length=None,attempts=1):
+                          headers={'User-Agent':'Stratoscope-official-mirror-verification'}
+                          if start is not None:headers['Range']=f'bytes={start}-{start+length-1}'
+                          with urllib.request.urlopen(urllib.request.Request(url,headers=headers),timeout=25) as r:
+                              if start is not None:assert r.status==206 and r.headers['Content-Range'].startswith(f'bytes {start}-{start+length-1}/')
+                              b=r.read()
+                              if length is not None:assert len(b)==length
+                              return b
+                      prep.request=fast
+                      entries=prep.ec_entries(model,run,360,[10,50,100],probe=True)
+                      assert len(entries)==612 and len({tuple(e[3:]) for e in entries})==612
+                      item=next(e for e in entries if e[3:]==(1,10,'u'))
+                      payload=fast(item[0],item[1],item[2])
+                      values,zonal=prep.decode(payload,model,run,360,*item[3:])
+                      print('MIRROR_VERIFIED',origin,model,'12Z','terminal entries',len(entries),'one native member field',zonal,'seconds',round(time.monotonic()-started,2),flush=True)
+                  except Exception as e:print('MIRROR_ERROR',origin,model,type(e).__name__,str(e),'seconds',round(time.monotonic()-started,2),flush=True)
+          PY
