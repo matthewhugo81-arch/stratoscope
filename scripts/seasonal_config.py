@@ -1,5 +1,6 @@
 """C3S system definitions, verified against official documentation in October 2026."""
 from datetime import datetime,timedelta,timezone
+import math
 MODELS={
  'egrr':dict(name='Met Office · GloSea',centre='ukmo',system='610',forecast=50,hindcast=28,per_start=2,hc_per_start=7),
  'ecmf':dict(name='ECMWF',centre='ecmwf',system='51',forecast=51,hindcast=25,per_start=51,hc_per_start=25),
@@ -20,8 +21,41 @@ def forecast_dates(model,nominal):return [nominal+timedelta(hours=forecast_inter
 
 def iso(d):return d.strftime('%Y-%m-%dT%H:%M:%S.000Z')
 def latest(model,now):
+ """Latest nominal issue due under the C3S publication schedule, not a claim
+ that every provider file is already available. Downloads still validate data.
+ https://climate.copernicus.eu/c3s-seasonal-forecast-spring-updates
+ """
+ if model not in MODELS:raise ValueError('Unknown seasonal model')
+ if now.tzinfo is None or now.utcoffset() is None:raise ValueError('Timezone-aware release time required')
+ now=now.astimezone(timezone.utc)
  first=now.replace(day=1,hour=0,minute=0,second=0,microsecond=0)
- return first if now.day >= (7 if model=='ecmf' else 11) else (first-timedelta(days=1)).replace(day=1)
+ release=first.replace(day=6 if model=='ecmf' else 10,hour=12)
+ return first if now>=release else (first-timedelta(days=1)).replace(day=1)
+
+def current_forecast(data,model,nominal):
+ """Dependency-free guard for already validated compact publications.
+ Used by both the lightweight scheduler and importer; never skip partial data
+ or overwrite a newer complete issue with an older scheduled target.
+ """
+ try:
+  cfg=MODELS[model];n=forecast_steps(model)
+  if not isinstance(data,dict) or data.get('version')!=2 or data.get('complete') is not True:return False
+  if data['model']!=model or data['system']!=cfg['system'] or data['name']!=cfg['name'] or data['source']!=SOURCE:return False
+  if data['latitude']!=60 or data['level']!=10 or data['units']!='m/s' or data['sampling']!=f'{forecast_interval(model)}-hourly instantaneous':return False
+  issue=datetime.fromisoformat(data['nominal'].replace('Z','+00:00'))
+  if issue.tzinfo is None or issue<nominal or iso(issue)!=data['nominal'] or issue.day!=1 or issue.hour!=0 or issue.minute or issue.second:return False
+  if data['dates']!=[iso(d) for d in forecast_dates(model,issue)]:return False
+  def values(a):return isinstance(a,list) and len(a)==n and all(type(v) in (int,float) and math.isfinite(v) and abs(v)<200 for v in a)
+  if data['memberCount']!=cfg['forecast'] or len(data['members'])!=cfg['forecast'] or not values(data['mean']) or not values(data['easterlyFraction']):return False
+  if len({m['id'] for m in data['members']})!=cfg['forecast'] or not all(values(m['values']) for m in data['members']):return False
+  starts=[m['start'] for m in data['members']]
+  if set(starts)!={iso(s) for s in starts_for(model,issue)} or any(starts.count(start)!=cfg['per_start'] for start in set(starts)):return False
+  for i in range(n):
+   if abs(data['mean'][i]-sum(m['values'][i] for m in data['members'])/cfg['forecast'])>=.00011:return False
+   if abs(data['easterlyFraction'][i]-sum(m['values'][i]<0 for m in data['members'])/cfg['forecast'])>=.0000011:return False
+  return True
+ except (KeyError,TypeError,ValueError,OverflowError):return False
+
 def starts_for(model,nominal,hindcast=False):
  prev=nominal-timedelta(days=1)
  if hindcast:
