@@ -54,7 +54,7 @@ def current_forecast(data,model,nominal):
    if abs(data['mean'][i]-sum(m['values'][i] for m in data['members'])/cfg['forecast'])>=.00011:return False
    if abs(data['easterlyFraction'][i]-sum(m['values'][i]<0 for m in data['members'])/cfg['forecast'])>=.0000011:return False
   return True
- except (KeyError,TypeError,ValueError,OverflowError):return False
+ except (KeyError,TypeError,ValueError,OverflowError,AttributeError):return False
 
 def starts_for(model,nominal,hindcast=False):
  prev=nominal-timedelta(days=1)

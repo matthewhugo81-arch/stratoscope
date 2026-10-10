@@ -130,8 +130,8 @@ def prepare_ensemble(client,model,nominal,hindcast=False):
  return ensemble(records,model,nominal,hindcast)
 def forecast(client,model,nominal):
  name=f'forecast/{model}.json';cfg=MODELS[model];old=load(name)
- if old and old['nominal']==iso(nominal) and old['system']==cfg['system']:
-  print('Forecast already prepared:',model,iso(nominal));return
+ if current_forecast(old,model,nominal):
+  print('Complete forecast already prepared:',model,old['nominal']);return
  members=prepare_ensemble(client,model,nominal);array=np.array([m['values'] for m in members])
  data=dict(version=2,complete=True,model=model,name=cfg['name'],system=cfg['system'],nominal=iso(nominal),preparedAt=iso(datetime.now(timezone.utc)),latitude=60,level=10,units='m/s',sampling=f'{forecast_interval(model)}-hourly instantaneous',dates=[iso(d) for d in forecast_dates(model,nominal)],members=members,memberCount=len(members),mean=np.round(array.mean(axis=0),4).tolist(),easterlyFraction=np.round((array<0).mean(axis=0),6).tolist(),source=SOURCE,climateKey=f"{model}-{cfg['system']}-{nominal.month:02}",attribution='Contains modified Copernicus Climate Change Service information (2026). '+cfg['name']+'. Source terms and attribution: '+SOURCE)
  publish(name,data)
