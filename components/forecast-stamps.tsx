@@ -1,5 +1,6 @@
 'use client';
 import {memo,useEffect,useRef} from 'react';
+import {SaveImageButton} from './save-image-button';
 import type {Frame} from '@/lib/grib';
 import {color,inverseGlobe,sample,sampleWind,viewBasis} from '@/lib/globe';
 
@@ -32,8 +33,9 @@ export function ForecastStamps({times,hour,run,field,onSelect}:{times:{hour:numb
   const a=row.getBoundingClientRect(),b=selected.getBoundingClientRect();
   if(b.left<a.left||b.right>a.right)row.scrollLeft+=b.left-a.left-(a.width-b.width)/2;
  },[hour]);
+ const selected=times.find(item=>item.hour===hour)?.frame;
  return <section ref={section} className="forecast-stamps" id="forecast-stamps" aria-label="Forecast frame previews">
-  <div className="stamps-heading"><span>NORTH-POLE PREVIEWS</span><span>Downloaded frames · click a time to view</span></div>
+  <div className="stamps-heading"><span>NORTH-POLE PREVIEWS</span><span>Downloaded frames · click a time to view</span><SaveImageButton target={()=>section.current?.querySelector<HTMLElement>('.forecast-stamp[aria-current="step"]')??null} title="North-pole forecast preview" subtitle={`Run ${run.slice(0,16)} UTC · forecast +${hour}h · ${field}`} caption="Low-resolution 2°? No: thumbnail of the loaded forecast. Save the main globe for full detail." filename={`stratoscope-preview-${run.slice(0,13)}-f${hour}-${field}`} disabled={!selected}/></div>
   <div className="stamps-track" ref={track}>{times.map(time=>{
    const valid=run?new Date(Date.parse(run)+time.hour*3600000):null;
    const label=valid?valid.toLocaleString('en-GB',{timeZone:'UTC',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false}):'';
