@@ -16,7 +16,7 @@ async function download(blob:Blob,filename:string){
  const url=URL.createObjectURL(blob);
  try{
   const a=document.createElement('a');a.href=url;a.download=cleanFilename(filename);
-  a.style.display='none';document.body.append(a);
+  a.style.display='none';document.body.insertAdjacentElement('beforeend',a);
   try{a.click()}finally{a.remove()}
  }finally{
   // Safari may need time to finish creating the download.
@@ -68,7 +68,7 @@ export async function saveElementPng(element:HTMLElement|SVGElement|null,meta:Pn
  const width=memberGrid?1150:Math.max(bounds.width,element.scrollWidth);
  const height=memberGrid?Math.ceil(element.children.length/7)*165:Math.max(bounds.height,element.scrollHeight);
  const ratio=Math.max(1,Math.min(2,window.devicePixelRatio||1));
- const canvas=await toCanvas(element,{
+ const canvas=await toCanvas(element as HTMLElement,{
   backgroundColor:'#0e202b',
   cacheBust:false,
   width,height,
