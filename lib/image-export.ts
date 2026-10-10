@@ -109,9 +109,10 @@ export async function saveImageSnapshot(source:Drawable,options:SnapshotOptions)
  ctx.fillText(options.title,gutter,66,w-2*gutter);
  if(options.subtitle){ctx.fillStyle=MUTED;ctx.font='14px Arial, sans-serif';ctx.fillText(options.subtitle,gutter,91,w-2*gutter);}
  ctx.fillStyle='#112b35';ctx.fillRect(gutter,header,plotWidth,plotHeight);
- let drawable:Drawable|HTMLImageElement=source;
+ let drawable:HTMLCanvasElement|HTMLImageElement;
  if(source instanceof SVGSVGElement)drawable=await snapshotSvg(source);
  else if(source instanceof HTMLImageElement)drawable=await snapshotExternalImage(source);
+ else drawable=source;
  ctx.drawImage(drawable,gutter,header,plotWidth,plotHeight);
  const baseY=header+plotHeight+26;
  ctx.strokeStyle=EDGE;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(gutter,baseY-12);ctx.lineTo(w-gutter,baseY-12);ctx.stroke();
