@@ -1,5 +1,7 @@
 'use client';
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
+import {SaveImageButton} from './save-image-button';
+import {saveImageSnapshot} from '@/lib/image-export';
 import {fetchDiagnostics,diagnosticMean,type NorthernDiagnostics} from '@/lib/northern-diagnostics';
 import type {EnsembleModel} from '@/lib/models';
 import {diagnosticAxis} from '@/lib/diagnostic-axis';
@@ -8,6 +10,7 @@ const names={gefs:'GEFS',ifs_ens:'ECMWF ENS',aifs_ens:'AIFS ENS'};
 const colours={gefs:'#f4ac58',ifs_ens:'#a7e4d6',aifs_ens:'#b69ef5'};
 const format=(time:number)=>new Date(time).toLocaleString('en-GB',{timeZone:'UTC',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false});
 export function NorthernComparison(){
+ const windSvg=useRef<SVGSVGElement>(null),temperatureSvg=useRef<SVGSVGElement>(null);
  const [open,setOpen]=useState(false),[data,setData]=useState<Partial<Record<EnsembleModel,NorthernDiagnostics>>>({}),[failed,setFailed]=useState<EnsembleModel[]>([]),[loading,setLoading]=useState(false),[refresh,setRefresh]=useState(0),[members,setMembers]=useState<EnsembleModel[]>([]),[enabled,setEnabled]=useState<EnsembleModel[]>(models),[cursor,setCursor]=useState<number|null>(null);
  useEffect(()=>{
   if(!open)return;const c=new AbortController();setLoading(true);setFailed([]);
@@ -23,7 +26,7 @@ export function NorthernComparison(){
   const {min,max,ticks}=diagnosticAxis(vals,key==='wind'&&includeZero);
   const w=1000,h=280,left=62,right=18,top=20,bottom=44,x=(time:number)=>left+(time-start)/(end-start||1)*(w-left-right),y=(v:number)=>h-bottom-(v-min)/(max-min)*(h-top-bottom);
   const path=(d:NorthernDiagnostics,m?:number)=>d.points.map((p,i)=>`${i?'L':'M'}${x(Date.parse(d.run)+p.hour*3600000).toFixed(2)},${y(m===undefined?diagnosticMean(p[key]):p[key][m]).toFixed(2)}`).join(' ');
-  return <div className="nh-diagnostic-chart"><h3>{title} <span>{unit}</span></h3><svg viewBox={`0 0 ${w} ${h}`} role="img" aria-label={title+' forecast model comparison'} onPointerMove={e=>{const r=e.currentTarget.getBoundingClientRect();const px=(e.clientX-r.left)/r.width*w;setCursor(start+Math.round(Math.max(0,Math.min(1,(px-left)/(w-left-right)))*(end-start)/21600000)*21600000);}}>
+  return <div className="nh-diagnostic-chart"><h3>{title} <span>{unit}</span><SaveImageButton description={title+' comparison'} disabled={!series.length} onSave={()=>saveImageSnapshot(key==='wind'?windSvg.current!:temperatureSvg.current!,{filename:`stratoscope-northern-${key}-${new Date(t).toISOString().slice(0,10)}`,title:'Northern diagnostics · '+title,subtitle:`GEFS / IFS ENS / AIFS ENS · ${unit} · Forecast comparison`,details:[`Comparison valid: ${new Date(t).toISOString()} · Models shown: ${series.map(d=>names[d.model]).join(', ')}`,`Displayed members: ${series.filter(d=>members.includes(d.model)).map(d=>names[d.model]).join(', ')||'Ensemble means only'}`,...series.slice(0,3).map(d=>`${names[d.model]} initialized ${d.run}`)],source:'Complete NOAA GEFS and ECMWF IFS/AIFS ensemble diagnostics; data remain separately run-qualified'})}/></h3><svg ref={key==='wind'?windSvg:temperatureSvg} viewBox={`0 0 ${w} ${h}`} role="img" aria-label={title+' forecast model comparison'} onPointerMove={e=>{const r=e.currentTarget.getBoundingClientRect();const px=(e.clientX-r.left)/r.width*w;setCursor(start+Math.round(Math.max(0,Math.min(1,(px-left)/(w-left-right)))*(end-start)/21600000)*21600000);}}>
    {ticks.map(v=><g key={v}><line x1={left} x2={w-right} y1={y(v)} y2={y(v)} stroke={v===0&&key==='wind'?'#f4ac58':'#29414c'} strokeDasharray={v===0&&key==='wind'?'6 5':undefined}/><text x={left-10} y={y(v)+4} textAnchor="end">{v}</text></g>)}
    {Array.from({length:7},(_,i)=>start+(end-start)*i/6).map(time=><text key={time} x={x(time)} y={h-14} textAnchor="middle">{new Date(time).toLocaleDateString('en-GB',{timeZone:'UTC',day:'numeric',month:'short'})}</text>)}
    {series.map(d=><g key={d.model}>{members.includes(d.model)&&Array.from({length:d.count},(_,m)=><path key={m} d={path(d,m)} stroke={colours[d.model]} strokeOpacity=".18" strokeWidth=".8" fill="none"/>)}<path d={path(d)} stroke={colours[d.model]} strokeWidth="2.8" fill="none"/></g>)}
