@@ -152,7 +152,7 @@ export async function saveZonalWindSnapshot(options:{value:number;display:string
  ctx.fillStyle=BG;ctx.fillRect(0,0,canvas.width,canvas.height);
  ctx.fillStyle='#97c5c7';ctx.font='600 19px Arial, sans-serif';ctx.fillText('60°N  /  10 hPa',42,52);
  ctx.fillStyle=options.value<0?'#fa9aa7':'#b5efdd';ctx.font='bold 100px Arial, sans-serif';
- ctx.fillText((options.value>0?'+':'')+options.value.toFixed(1),42,185);
+ ctx.fillText(options.display,42,185);
  ctx.fillStyle='#b9d5da';ctx.font='28px Arial, sans-serif';ctx.fillText('m/s',420,174);
  ctx.fillStyle='#b9d5da';ctx.font='24px Arial, sans-serif';ctx.fillText(options.direction,42,236);
  ctx.fillStyle='#91aeba';ctx.font='16px Arial, sans-serif';ctx.fillText('Positive = westerly   |   Negative = easterly',42,285);
