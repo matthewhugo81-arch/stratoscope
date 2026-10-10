@@ -1,0 +1,80 @@
+name: Repair Save icon layout
+on:
+  push:
+    branches: [fix/save-icon-sizing-20261010]
+    paths: [.github/workflows/repair-save-icon-layout.yml]
+permissions:
+  contents: write
+concurrency:
+  group: save-icon-layout-repair
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: github.repository == 'matthewhugo81-arch/stratoscope' && github.event.repository.private == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - run: npm ci --no-audit --no-fund
+      - name: Install isolated mobile browser test tools
+        run: |
+          python -m pip install --disable-pip-version-check playwright
+          python -m playwright install --with-deps chromium webkit
+      - name: Prove the reported mobile icon regression is covered
+        run: python -u tests/verify_save_icon_layout.py --expect-bug
+      - name: Isolate chart geometry from control icons
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          p=Path('app/globals.css')
+          assert subprocess.check_output(['git','hash-object',str(p)],text=True).strip()=='507b7e3ed1856c5785f1f736e16eac97abfd1f9e', 'Live stylesheet changed; review before patching'
+          css=p.read_text()
+          edits=[
+              ('.nh-diagnostic-chart svg','.nh-diagnostic-chart>svg',3),
+              ('.native-seasonal-chart svg','.native-seasonal-chart .seasonal-plot>svg',1),
+              ('.seasonal-plot svg','.seasonal-plot>svg',1),
+              ('.nh-diagnostic-chart h3 span','.nh-diagnostic-chart h3>span:not(.image-save-wrap)',1),
+          ]
+          for old,new,count in edits:
+              assert css.count(old)==count,(old,css.count(old))
+              css=css.replace(old,new)
+          css+='''
+          /* Export glyphs are controls, never chart-sized SVGs. Also bounds the busy spinner. */
+          button.image-save>svg{display:block;width:13px;min-width:13px;max-width:13px;height:13px;min-height:13px;max-height:13px;flex:0 0 13px}
+          button.image-save>span{display:inline;margin:0;padding:0;background:none;color:inherit;font:inherit;letter-spacing:normal}
+          '''
+          p.write_text(css)
+          # Keep the regression helper readable: one shared PNG assertion for both chart types.
+          p=Path('tests/verify_save_icon_layout.py');text=p.read_text()
+          text=text.replace('page.locator(selector).click()','page.locator(selector).first.click()')
+          start=text.index('                            for selector in [')
+          end=text.index("                            assert page.locator('.image-save-error:visible').count()==0",start)
+          text=text[:start]+'''                            for selector in ['#northern-diagnostics .nh-diagnostic-chart h3 button.image-save', '#layout-seasonal button.image-save']:
+                                          exports.append(save_png(page,selector))
+          '''.replace('                                          exports','                                exports').rstrip()+'\n'+text[end:]
+          p.write_text(text)
+          PY
+      - name: Compile and test CSS regression guards and existing code
+        run: |
+          npm exec -- tsc --noEmit
+          node --test tests/*.test.mjs
+          python -m py_compile tests/verify_save_icon_layout.py
+      - name: Rebuild tracked GitHub Pages website
+        run: npm run build:pages
+      - name: Verify compact controls and PNG exports at ten browser/viewport combinations
+        run: python -u tests/verify_save_icon_layout.py
+      - name: Preserve existing 3D fullscreen, heat flux, globe and member PNG downloads
+        run: python -u tests/verify_png_exports.py
+      - name: Commit only tested styling, tests and rebuilt static assets
+        run: |
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/globals.css tests/verify_save_icon_layout.py tests/save-icon-css.test.mjs docs
+          git commit -m 'Keep Save icons at 13px; separate chart SVG rules and verify mobile Chromium/WebKit'
+          git push origin HEAD:refs/heads/fix/save-icon-sizing-20261010
+          echo "TESTED_COMMIT=$(git rev-parse HEAD)"
