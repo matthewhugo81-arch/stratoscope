@@ -1,10 +1,12 @@
 'use client';
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
+import {SaveImageButton} from './save-image-button';
 import type {SeasonalClimate,EraClimate,EraProgress} from '@/lib/seasonal';
 export type WindPlot={name:string;nominal:string;dates:string[];members:{id:string;values:number[]}[];mean:number[];easterlyFraction:number[];sampling:string;attribution:string};
 const date=(s:string)=>new Date(s).toLocaleDateString('en-GB',{timeZone:'UTC',day:'numeric',month:'short',year:'numeric'});
 const signed=(v:number)=>(v>0?'+':'')+v.toFixed(1);
 export function SeasonalChart({data,climate,era,eraProgress,referenceError}:{data:WindPlot;climate:SeasonalClimate|null;era:EraClimate|null;eraProgress?:EraProgress|null;referenceError?:boolean}){
+ const plot=useRef<SVGSVGElement>(null);
  const [now,setNow]=useState(()=>Date.now());
  useEffect(()=>{if(era)return;const timer=setInterval(()=>setNow(Date.now()),60000);return()=>clearInterval(timer)},[era]);
  const [day,setDay]=useState(()=>{const i=data.dates.findIndex(s=>Date.parse(s)>=Date.now());return i<0?data.dates.length-1:i}),[members,setMembers]=useState(true),[history,setHistory]=useState(true),[reference,setReference]=useState(true);
@@ -20,7 +22,7 @@ export function SeasonalChart({data,climate,era,eraProgress,referenceError}:{dat
  const ticks=Array.from({length:(max-min)/20+1},(_,i)=>min+i*20),active=Math.min(day,n-1);
  const inspect=(e:React.PointerEvent<SVGSVGElement>)=>{const r=e.currentTarget.getBoundingClientRect();setDay(Math.max(0,Math.min(n-1,Math.round(((e.clientX-r.left)/r.width*960-58)/882*(n-1)))))};
  return <div className="native-seasonal-chart">
-  <div className="seasonal-issue"><strong>{data.name}</strong><span>Issue {date(data.nominal)} · {data.members.length} members · {data.sampling}</span></div>
+  <div className="seasonal-issue"><strong>{data.name}</strong><span>Issue {date(data.nominal)} · {data.members.length} members · {data.sampling}</span><SaveImageButton target={()=>plot.current} title={`${data.name} · Seasonal zonal wind`} subtitle={`60°N · 10 hPa · Issue ${date(data.nominal)} · ${data.members.length} members · ${data.sampling}`} caption={`u wind (m/s): turquoise = forecast mean · blue = members${era&&reference?' · white = ERA5 1993–2016 mean':''}`} filename={`stratoscope-seasonal-${data.name}-${data.nominal.slice(0,10)}`}/></div>
   {!era&&<p className="seasonal-pending" role="status">
    <strong>ERA5 reference pending.</strong>{' '}
    {eraProgress?<>{eraProgress.completedYears.length}/24 years prepared for 1993–2016.{eraProgress.nextYear!==null&&<> Next unfinished year: {eraProgress.nextYear}.</>}{' '}
@@ -31,7 +33,7 @@ export function SeasonalChart({data,climate,era,eraProgress,referenceError}:{dat
    <a href="https://github.com/matthewhugo81-arch/stratoscope/actions/workflows/prepare-era5.yml" target="_blank" rel="noreferrer">Import progress ↗</a>
   </p>}
   <div className="seasonal-legend"><span className="forecast-key">Forecast mean</span><span className="member-key">Members</span>{climate&&<><span className="climate-key">Model climate mean</span><span className="band-key">Historical 25–75%, 10–90% & full range</span></>}{era&&<span className="era-key">ERA5 daily climate mean</span>}</div>
-  <div className="seasonal-plot"><svg viewBox="0 0 960 350" role="img" aria-label={`${data.name} 60N 10hPa zonal wind ensemble${climate?' with 1993–2016 model climatology':''}${era?' and ERA5 climate mean':''}`} onPointerMove={inspect}>
+  <div className="seasonal-plot"><svg ref={plot} viewBox="0 0 960 350" role="img" aria-label={`${data.name} 60N 10hPa zonal wind ensemble${climate?' with 1993–2016 model climatology':''}${era?' and ERA5 climate mean':''}`} onPointerMove={inspect}>
    <text x={12} y={16} fill="#a4bfcc" fontSize={11}>m/s</text>
    {ticks.map(t=><g key={t}><line x1={58} x2={940} y1={y(t)} y2={y(t)} stroke={t===0?'#e9bd7e':'#293e4a'} strokeDasharray={t===0?'5 4':undefined}/><text x={47} y={y(t)+4} textAnchor="end" fill="#a4bfcc" fontSize={12}>{t>0?'+':''}{t}</text></g>)}
    {history&&climate&&<><path d={band(climateValues(climate.min),climateValues(climate.max))} fill="#e6a653" opacity={.07}/><path d={band(climateValues(climate.p10),climateValues(climate.p90))} fill="#e6a653" opacity={.12}/><path d={band(climateValues(climate.p25),climateValues(climate.p75))} fill="#e6a653" opacity={.22}/><path d={path(climateValues(climate.mean))} fill="none" stroke="#efb56e" strokeWidth={2}/></>}
