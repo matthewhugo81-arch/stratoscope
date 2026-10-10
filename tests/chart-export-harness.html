@@ -1,0 +1,35 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Chart export test harness</title></head><body><div id="root"></div><script type="module">
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import {SeasonalChart} from '../components/seasonal-chart.tsx';
+import {Ec46Chart} from '../components/ec46-chart.tsx';
+import {NorthernComparison} from '../components/northern-diagnostics.tsx';
+import {VortexView} from '../components/vortex-view.tsx';
+import {PolarMap} from '../components/polar-map.tsx';
+import {ForecastStamps} from '../components/forecast-stamps.tsx';
+import {MemberPanels} from '../components/member-panels.tsx';
+import {ZonalWindCard} from '../components/zonal-wind-card.tsx';
+import {fetchSeasonal,fetchEra} from '../lib/seasonal.ts';
+import {preparedMeta,preparedPair} from '../lib/prepared-ensembles.ts';
+import '../app/globals.css';
+const params=new URLSearchParams(location.search),mode=params.get('mode')||'seasonal',h=React.createElement,signal=AbortSignal.timeout(90000);
+let content;
+if(mode==='seasonal'){
+ const data=await fetchSeasonal(params.get('id')||'egrr',signal),era=await fetchEra(signal);window.testIssue=data.nominal;
+ content=h(SeasonalChart,{data,era,climate:null});
+}else if(mode==='ec46')content=h(Ec46Chart,{refresh:0});
+else if(mode==='northern')content=h(NorthernComparison);
+else if(mode==='vortex')content=h(VortexView);
+else if(mode==='empty')content=h(PolarMap,{frame:null,field:'temperature',contours:true,graticule:true,windArrows:true});
+else{
+ const meta=await preparedMeta('gefs',signal),pair=await preparedPair('gefs',meta.run,0,10,signal);window.testRun=meta.run;
+ if(mode==='map')content=h(PolarMap,{frame:pair.mean,field:'temperature',contours:true,graticule:true,windArrows:true});
+ if(mode==='members')content=h(MemberPanels,{model:'gefs',run:meta.run,hour:0,field:'temperature',onClose:()=>{},onInspect:()=>{}});
+ if(mode==='stamps'){
+  const next=await preparedPair('gefs',meta.run,6,10,signal);
+  content=h(ForecastStamps,{times:[{hour:0,frame:pair.mean},{hour:6,frame:next.mean},{hour:12}],hour:0,run:meta.run,field:'temperature',onSelect:()=>{}});
+ }
+ if(mode==='zonal')content=h(ZonalWindCard,{model:'gefs',run:meta.run,hour:0,member:-1,mapLevel:10,mapFrame:pair.mean,mapBusy:false,mapError:'',mapProgress:0,refresh:0});
+}
+createRoot(document.getElementById('root')).render(h('div',{className:'glosea-outlook',style:{margin:12,padding:16}},content));
+</script></body></html>
