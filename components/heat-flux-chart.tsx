@@ -1,10 +1,13 @@
 'use client';
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
+import {SaveImageButton} from './save-image-button';
+import {saveImageSnapshot} from '@/lib/image-export';
 import {loadHeatFlux,heatFluxSummary,type HeatFluxSeries} from '@/lib/heat-flux';
 import type {VortexCatalogue} from '@/lib/vortex';
 import {diagnosticAxis} from '@/lib/diagnostic-axis';
 
 export function HeatFluxChart({catalogue,hour,displayedRun,onSelect}:{catalogue:VortexCatalogue|null;hour:number;displayedRun:string;onSelect:(hour:number)=>void}){
+ const svgRef=useRef<SVGSVGElement>(null);
  const [data,setData]=useState<HeatFluxSeries|null>(null),[error,setError]=useState(''),[members,setMembers]=useState(false),[retry,setRetry]=useState(0);
  useEffect(()=>{
   setError('');setData(null);if(!catalogue?.heatFlux)return;
@@ -22,9 +25,9 @@ export function HeatFluxChart({catalogue,hour,displayedRun,onSelect}:{catalogue:
  const signed=(v:number)=>(v>0?'+':'')+v.toFixed(1);
  const date=(v:number)=>new Date(Date.parse(displayedRun)+v*3600000).toLocaleDateString('en-GB',{timeZone:'UTC',day:'numeric',month:'short'});
  return <div className="heat-flux-chart" aria-label="GEFS 100 hPa eddy heat flux">
-  <div className="heat-flux-heading"><h3>Eddy heat flux <span>100 hPa · 45–75°N · K m/s</span></h3><label><input type="checkbox" checked={members} onChange={e=>setMembers(e.target.checked)}/>All 31 members</label></div>
+  <div className="heat-flux-heading"><h3>Eddy heat flux <span>100 hPa · 45–75°N · K m/s</span></h3><label><input type="checkbox" checked={members} onChange={e=>setMembers(e.target.checked)}/>All 31 members</label><SaveImageButton description="GEFS eddy heat-flux chart" disabled={!series} onSave={()=>saveImageSnapshot(svgRef.current!,{filename:`stratoscope-gefs-heat-flux-${displayedRun.slice(0,10)}-f${hour}`,title:'GEFS · 100 hPa eddy heat flux',subtitle:`Run ${displayedRun} · 45–75°N · K m/s`,details:[`Selected: ${date(hour)} · forecast +${hour}h${selected?` · mean ${signed(selected.mean)} K m/s`:''}`,`Ensemble mean · 10th–90th member range · ${members?'all 31 members shown':'member curves hidden'}`,'Positive heat transport indicates poleward eddy flux, not guaranteed SSW'],source:'NOAA GEFS · 31-member heat-flux diagnostic · Instantaneous member statistics'})}/></div>
   <div className="heat-flux-legend"><span>━ Ensemble mean</span><span>▰ 10–90% member range</span><span>┆ Displayed vortex time</span></div>
-  <div className="heat-flux-plot">{series?<svg viewBox={`0 0 ${w} ${h}`} role="group" aria-label="GEFS heat-flux forecast with ensemble mean and 10–90 percent member range">
+  <div className="heat-flux-plot">{series?<svg ref={svgRef} viewBox={`0 0 ${w} ${h}`} role="group" aria-label="GEFS heat-flux forecast with ensemble mean and 10–90 percent member range">
    {ticks.map(v=><g key={v}><line x1={left} x2={w-right} y1={y(v)} y2={y(v)} stroke={v===0?'#90aab9':'#29414c'} strokeDasharray={v===0?'5 4':undefined}/><text x={left-9} y={y(v)+4} textAnchor="end">{v}</text></g>)}
    <path d={line(points.map(p=>p.high))+' '+[...points].reverse().map(p=>`L${x(p.hour)},${y(p.low)}`).join(' ')+' Z'} fill="#9edfcf" fillOpacity=".16"/>
    {members&&Array.from({length:31},(_,m)=><path key={m} d={line(points.map(p=>p.members[m]))} fill="none" stroke="#78bec7" strokeOpacity=".24" strokeWidth=".7"/>)}
