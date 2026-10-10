@@ -11,20 +11,50 @@ on:
         options: [all, egrr, ecmf, lfpw, edzw, cmcc, rjtd, ammc]
         default: all
   schedule:
-    - cron: '37 13 7,11 * *'
+    # Includes 12:37 UTC on release day: ECMWF 6th, other systems 10th.
+    # Subsequent checks only start downloads for an unprepared issue.
+    - cron: '37 */3 * * *'
 permissions:
   contents: write
 concurrency:
-  group: ${{ inputs.phase == 'era5' && 'era5-daily-reference' || format('seasonal-{0}', inputs.phase || 'update') }}
+  group: ${{ inputs.phase == 'era5' && 'era5-daily-reference' || 'seasonal-forecast' }}
   cancel-in-progress: false
 jobs:
-  prepare:
+  plan:
     if: github.repository == 'matthewhugo81-arch/stratoscope' && github.event.repository.private == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      needed: ${{ steps.plan.outputs.needed }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Check release boundaries and skip guards
+        run: python -m unittest discover -s tests -p test_seasonal_release.py -v
+      - name: Plan only missing released issues
+        id: plan
+        env:
+          REQUESTED_MODEL: ${{ inputs.model || 'all' }}
+          REQUESTED_PHASE: ${{ inputs.phase || 'update' }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            python -u scripts/plan-seasonal-update.py --manual --model "$REQUESTED_MODEL" --phase "$REQUESTED_PHASE"
+          else
+            python -u scripts/plan-seasonal-update.py --model "$REQUESTED_MODEL" --phase "$REQUESTED_PHASE"
+          fi
+  prepare:
+    needs: plan
+    if: needs.plan.outputs.needed == 'true'
     strategy:
       fail-fast: false
       max-parallel: 2
-      matrix:
-        model: ${{ fromJSON(inputs.phase == 'era5' && '["era5"]' || inputs.model != '' && inputs.model != 'all' && format('["{0}"]', inputs.model) || github.event_name == 'schedule' && '["egrr","ecmf","lfpw","edzw","cmcc","rjtd","ammc"]' || '["egrr","ecmf","lfpw","edzw","cmcc","rjtd","ammc"]') }}
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     runs-on: ubuntu-latest
     timeout-minutes: 350
     steps:
