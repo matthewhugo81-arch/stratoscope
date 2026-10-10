@@ -124,7 +124,7 @@ def click_save(page,name,prefix,timeout=60000):
     button=page.get_by_role('button',name=name,exact=True)
     button.wait_for(state='visible',timeout=timeout)
     page.wait_for_function("""name=>{const b=[...document.querySelectorAll('button')].find(b=>b.getAttribute('aria-label')===name);
-        return b&&!b.disabled;}""",name,timeout=timeout)
+        return b&&!b.disabled;}""",arg=name,timeout=timeout)
     with page.expect_download(timeout=timeout) as info:button.click()
     verify_png(info.value,prefix)
     assert page.locator('.image-save-error').count()==0,'Save produced UI error'
