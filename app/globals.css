@@ -238,3 +238,26 @@ footer{font-size:11px;line-height:1.5}
 .pipeline-note{display:block;font-size:11px;line-height:1.5;color:#efc281;margin-top:8px}.pipeline-current{display:block;font-size:10px;line-height:1.5;color:#8bbab0;margin-top:8px}
 .heat-flux-chart{margin-top:18px;padding-top:16px;border-top:1px solid #29414c;color:#bed2dc}.heat-flux-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.heat-flux-heading h3{font-size:15px;margin:0;color:#e1edf2;font-weight:500}.heat-flux-heading h3 span{font-size:12px;color:#93adbd;margin-left:10px}.heat-flux-heading label{font-size:12px;display:flex;align-items:center;gap:6px}.heat-flux-heading input{accent-color:#a6e3d4}.heat-flux-legend{display:flex;gap:18px;flex-wrap:wrap;font-size:11px;margin:10px 0;color:#a6e3d4}.heat-flux-legend span:last-child{color:#f1c17b}.heat-flux-plot{width:100%;aspect-ratio:1000/220;min-height:155px}.heat-flux-plot svg{width:100%;height:100%;display:block;overflow:visible}.heat-flux-plot svg text{font-size:11px;fill:#9fbacb;font-family:monospace}.heat-flux-plot rect[role=button]{cursor:pointer}.heat-flux-plot rect[role=button]:focus-visible{outline:1px solid #f1c17b}.heat-flux-plot>p{padding:25px 0;font-size:13px}.heat-flux-reading{min-height:22px;font-size:12px;font-variant-numeric:tabular-nums;color:#d3e7e6}.heat-flux-note{font-size:11px;line-height:1.6;max-width:1100px;margin:5px 0;color:#95aebd}@media(max-width:600px){.heat-flux-heading h3 span{display:block;margin:4px 0}.heat-flux-reading{min-height:38px}.heat-flux-legend{gap:10px}}
 .vortex-fullscreen{margin-left:auto}.vortex-heading .vortex-stamp{order:1}.vortex-heat{border-top:1px solid #29414c;margin-top:14px;padding-top:12px}.vortex-heat summary{cursor:pointer;font-size:13px;color:#a6e3d4}.vortex-heat .heat-flux-chart{border-top:0;margin-top:8px;padding-top:8px}.vortex-outlook:fullscreen,.vortex-outlook.vortex-expanded{position:fixed;inset:0;z-index:1000;width:100%;height:100dvh;max-width:none;margin:0;padding:14px 20px;border:0;border-radius:0;background:#0d202a;overflow:auto;overscroll-behavior:contain}.vortex-expanded .vortex-stage .vortex-canvas,.vortex-expanded .vortex-stage .vortex-pending{height:calc(100dvh - 170px);min-height:300px}.vortex-expanded .vortex-heading{flex-wrap:wrap}.vortex-expanded .vortex-method{margin-top:12px}@media(max-width:750px){.vortex-outlook.vortex-expanded{padding:10px}.vortex-expanded .vortex-stage .vortex-canvas,.vortex-expanded .vortex-stage .vortex-pending{height:calc(100dvh - 210px)}}
+
+
+/* Subtle local PNG download controls, unobtrusive beside chart labels. */
+.image-save-wrap{display:inline-flex;align-items:center;flex-shrink:0;position:relative;white-space:nowrap;letter-spacing:normal}
+button.image-save{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:5px 8px;min-width:0;min-height:28px;border:1px solid #3b5962;border-radius:5px;background:#142b34;color:#a7c9cf;font:11px/1.1 Arial,sans-serif;letter-spacing:normal;white-space:nowrap}
+button.image-save:hover:not(:disabled){border-color:#79aaa8;background:#1c3940;color:#d3f5eb}
+button.image-save:focus-visible{outline:2px solid #aadacb;outline-offset:2px}
+button.image-save:disabled{opacity:.4}
+.image-save-status{position:absolute;top:calc(100% + 4px);right:0;z-index:15;width:max-content;max-width:min(275px,75vw);padding:5px 8px;border:1px solid #385960;border-radius:4px;background:#0b2029;white-space:normal;color:#a9d5c8;font:11px/1.45 Arial,sans-serif;box-shadow:0 3px 12px #0007}
+.image-save-error{color:#efc281}
+.seasonal-issue>.image-save-wrap{margin-left:auto}
+.zonal-card>.eyebrow{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.zonal-card>.eyebrow>.image-save-wrap{margin-left:auto}
+.heat-flux-heading .image-save-wrap{margin-left:auto}
+.nh-diagnostic-chart h3{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.nh-diagnostic-chart h3>.image-save-wrap{margin-left:auto}
+.member-maps-dialog>header>div{min-width:0;flex:1}
+.vortex-view-controls>.image-save-wrap,.vortex-view-controls>.image-save-wrap span{padding:0;background:transparent}
+.vortex-view-controls>.image-save-wrap{pointer-events:none}
+.vortex-view-controls>.image-save-wrap button{pointer-events:auto}
+.vortex-view-controls>.image-save-wrap .image-save-status{padding:5px 8px;background:#0b2029}
+@media(max-width:750px){.vortex-stage .vortex-view-controls>.image-save-wrap{display:inline-flex!important}}
+@media(max-width:580px){.vortex-view-controls>.image-save-wrap{display:inline-flex!important}.vortex-view-controls>.image-save-wrap svg{display:block}.vortex-view-controls>.image-save-wrap .image-save-status{display:block}.globe-tools .image-save{padding:6px 9px}.member-maps-dialog>header{gap:6px}.member-maps-dialog>header .image-save{padding:5px 7px}}
