@@ -156,6 +156,11 @@ class AuditTests(unittest.TestCase):
 
 
 class DiscoveryTests(unittest.TestCase):
+    def setUp(self):
+        # Existing single-source cycle tests remain; separate tests exercise all replicas.
+        source_patch=patch.object(prep, "EC_DOWNLOAD_SOURCES", (prep.EC_DOWNLOAD_SOURCES[0],))
+        source_patch.start();self.addCleanup(source_patch.stop)
+
     def test_ifs_only_probes_full_horizon_cycles(self):
         with patch.object(prep, 'ec_entries', return_value=entries('ifs_ens')) as inventory:
             run = prep.discover('ifs_ens', NOW)

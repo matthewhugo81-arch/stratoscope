@@ -11,7 +11,6 @@ import urllib.error
 
 ORIGINS = (
     'https://storage.googleapis.com/ecmwf-open-data',
-    'https://ecmwf-forecasts.s3.eu-central-1.amazonaws.com',
     'https://data.ecmwf.int/forecasts',
 )
 TRANSIENT_CODES = {408, 429, 500, 502, 503, 504}

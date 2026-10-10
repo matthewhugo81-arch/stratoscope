@@ -31,6 +31,9 @@ CONFIG = {
 }
 KEYS = ['temperature', 'height', 'u', 'v']
 EC_ORIGIN = 'https://data.ecmwf.int/forecasts'
+transport_spec=importlib.util.spec_from_file_location('ecmwf_transport',Path(__file__).with_name('ecmwf_transport.py'))
+transport=importlib.util.module_from_spec(transport_spec);transport_spec.loader.exec_module(transport)
+EC_DOWNLOAD_SOURCES=transport.ORIGINS
 NOAA_ORIGIN = 'https://noaa-gefs-pds.s3.amazonaws.com'
 DECODE_LOCK = Lock()
 
@@ -79,12 +82,13 @@ def request(url, start=None, length=None, attempts=4):
             time.sleep(delay)
 
 
-def ec_base(model, run, hour, control=False):
+def ec_base(model, run, hour, control=False, origin=None):
     day, cycle = run.strftime('%Y%m%d'), run.strftime('%H')
     system = 'aifs-ens' if model == 'aifs_ens' else 'ifs'
     stream = 'oper' if model == 'ifs_ens' and control else 'enfo'
     kind = 'fc' if stream == 'oper' else 'cf' if control else 'ef' if model == 'ifs_ens' else 'pf'
-    return f'{EC_ORIGIN}/{day}/{cycle}z/{system}/0p25/{stream}/{day}{cycle}0000-{hour}h-{stream}-{kind}'
+    root=transport.validate_origin(origin or EC_DOWNLOAD_SOURCES[0])
+    return f'{root}/{day}/{cycle}z/{system}/0p25/{stream}/{day}{cycle}0000-{hour}h-{stream}-{kind}'
 
 
 def noaa_base(run, hour, member, part):
@@ -93,10 +97,10 @@ def noaa_base(run, hour, member, part):
     return f'{NOAA_ORIGIN}/gefs.{day}/{cycle}/atmos/pgrb2{part}p5/{name}.t{cycle}z.pgrb2{part}.0p50.f{hour:03}'
 
 
-def ec_entries(model, run, hour, levels, probe=False):
+def ec_entries(model, run, hour, levels, probe=False, origin=None):
     result = []
     for control in [False, True]:
-        base = ec_base(model, run, hour, control)
+        base = ec_base(model, run, hour, control, origin=origin)
         entries = [json.loads(line) for line in request(base + '.index', attempts=3 if probe else 4).decode().splitlines()]
         params = {'t': 'temperature', 'z' if model == 'aifs_ens' else 'gh': 'height', 'u': 'u', 'v': 'v'}
         for item in entries:
@@ -186,8 +190,8 @@ def decode_field(message, model, run, hour, member, level, key):
         ec.codes_release(handle)
 
 
-def calculate(model, run, hour, levels, workers, panel_writer=None, heat_writer=None):
-    entries = noaa_entries(run, hour, levels, workers) if model == 'gefs' else ec_entries(model, run, hour, levels)
+def calculate(model, run, hour, levels, workers, panel_writer=None, heat_writer=None, origin=None):
+    entries = noaa_entries(run, hour, levels, workers) if model == 'gefs' else ec_entries(model, run, hour, levels, origin=origin)
     expected = {(m, level, key) for m in range(CONFIG[model]['count']) for level in levels for key in KEYS}
     identities = [tuple(item[3:]) for item in entries]
     assert len(identities) == len(set(identities)) and set(identities) == expected, 'Incomplete or duplicate ensemble'
@@ -268,7 +272,7 @@ def discover(model, now=None):
                             if ('b' if level in [20,30,70] else 'a') != part:continue
                             assert all((key,f'{level} mb') in fields for key in ['TMP','HGT','UGRD','VGRD'])
             else:
-                entries = ec_entries(model,run,cfg['maxHour'],cfg['levels'],probe=True)
+                entries = transport.complete_inventory(ec_entries,model,run,cfg['maxHour'],cfg['levels'],cfg['count'],KEYS,origins=EC_DOWNLOAD_SOURCES)
                 identities = {(m,l,k) for _,_,_,m,l,k in entries}
                 assert len(entries)==cfg['count']*len(cfg['levels'])*4
                 assert all((m,l,k) in identities for m in range(cfg['count']) for l in cfg['levels'] for k in KEYS)
@@ -318,7 +322,7 @@ def _prepare_hour(task):
     def panel_writer(values, diagnostics):
         filename = f'{run_key}/10/{hour}.members.bin.gz'
         panels[str(hour)] = {'path': filename, **save_panels(output/filename, model, run, hour, values, diagnostics)}
-    result = calculate(model, run, hour, levels, workers, panel_writer, heat_writer)
+    result = transport.calculate_hour(calculate, model, run, hour, levels, workers, panel_writer, heat_writer, origins=EC_DOWNLOAD_SOURCES)
     files = {}
     for level, (planes, zonal) in result.items():
         filename = f'{run_key}/{level}/{hour}.bin.gz'

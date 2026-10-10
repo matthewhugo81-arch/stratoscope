@@ -296,14 +296,22 @@ def main():
     parser=argparse.ArgumentParser();parser.add_argument('--recover',action='store_true');parser.add_argument('--publish',action='store_true');args=parser.parse_args()
     assert os.environ.get('GITHUB_REPOSITORY',REPO)==REPO
     now=datetime.now(timezone.utc);prep=preparation()
+    spec=importlib.util.spec_from_file_location('pipeline_freshness',Path(__file__).with_name('pipeline_freshness.py'))
+    health=importlib.util.module_from_spec(spec);spec.loader.exec_module(health)
+    try:previous=public('forecast-status')
+    except Exception:previous=None
     with ThreadPoolExecutor(max_workers=6) as pool:results=list(pool.map(lambda m:audit(m,now,prep),MODELS))
     results+=derived(results)
     if os.environ.get('GH_TOKEN'):
         recover_results(results,args.recover,now)
+    health.record_health(results,previous,now,github if os.environ.get('GH_TOKEN') else None,WORKFLOWS)
+    seasonal=health.seasonal_health(public,now)
     reference=era_reference(args.recover,now) if os.environ.get('GH_TOKEN') else None
-    data=dict(version=1,checkedAt=stamp(datetime.now(timezone.utc)),models=results,era5=reference)
+    data=dict(version=1,checkedAt=stamp(datetime.now(timezone.utc)),models=results,era5=reference,seasonal=seasonal,scheduledIntervalHours=3)
+    last=health.parsed(previous.get('checkedAt')) if isinstance(previous,dict) else None
+    if last:data['previousCheckGapMinutes']=round(max(0,(now-last).total_seconds()/60),1)
     print(json.dumps(data,indent=2),flush=True)
     if args.publish:publish(data)
-    if any(d['status']=='error' for d in results) or reference and reference['status']=='error':raise SystemExit(1)
+    if any(d['status']=='error' for d in results+seasonal) or reference and reference['status']=='error':raise SystemExit(1)
 
 if __name__=='__main__':main()
