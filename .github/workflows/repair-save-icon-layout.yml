@@ -21,9 +21,9 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - name: Install isolated mobile browser test tools
         run: |
-          python -m pip install --disable-pip-version-check playwright
-          python -m playwright install --with-deps chromium webkit
-      - name: Give the standalone toolbar fixture its own positioning context
+          python -m pip install --disable-pip-version-check playwright==1.63.0
+          python -m playwright install --with-deps chromium webkit > /tmp/playwright-setup.log 2>&1 || { tail -n 80 /tmp/playwright-setup.log; exit 1; }
+      - name: Isolate fixture positioning and measure CSS dimensions before transforms
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -31,6 +31,11 @@ jobs:
           old="{className:'globe-tools'},button())"
           assert text.count(old)==1
           text=text.replace(old,"{className:'globe-tools',style:{position:'relative',inset:'auto',margin:'12px 0'}},button())")
+          old='iconWidth:i.width,iconHeight:i.height'
+          assert text.count(old)==1
+          # A rotating 13px spinner has an axis-aligned bounding box up to
+          # 13*sqrt(2)px; CSS width and height must remain exactly 13px.
+          text=text.replace(old,'iconWidth:parseFloat(style.width),iconHeight:parseFloat(style.height),iconBounds:[i.width,i.height]')
           p.write_text(text)
           PY
       - name: Prove the reported mobile icon regression is covered
