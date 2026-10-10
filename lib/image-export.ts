@@ -46,7 +46,7 @@ async function snapshotSvg(svg:SVGSVGElement){
  const properties=['fill','stroke','stroke-width','stroke-opacity','fill-opacity','opacity','font-size','font-family','font-weight','letter-spacing','text-anchor','dominant-baseline','visibility'];
  for(let i=0;i<all.length;i++){
   const css=getComputedStyle(all[i]);
-  for(const prop of properties){const value=css.getPropertyValue(prop);if(value)copied[i].style.setProperty(prop,value);}
+  for(const prop of properties){const value=css.getPropertyValue(prop);if(value)(copied[i] as SVGElement).style.setProperty(prop,value);}
  }
  const {width,height}=dimensions(svg);
  clone.setAttribute('width',String(width));
