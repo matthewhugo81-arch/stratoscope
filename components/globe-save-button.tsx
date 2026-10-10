@@ -27,7 +27,7 @@ export function GlobeSaveButton({disabled,onPrepare}:{disabled:boolean;onPrepare
    if(mobile){
     const file=new File([image.blob],image.filename,{type:'image/png'});
     let shareable=false;
-    try{shareable=Boolean(navigator.share&&navigator.canShare?.({files:[file]}));}catch{}
+    try{shareable=Boolean(typeof navigator.share==='function'&&navigator.canShare?.({files:[file]}));}catch{}
     setReady({...image,file,shareable,url:URL.createObjectURL(image.blob)});
    }else downloadBlob(image.blob,image.filename);
   }catch(e){if(mounted.current)setError(e instanceof Error?e.message:'The image could not be prepared.');}

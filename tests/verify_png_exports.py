@@ -112,14 +112,20 @@ try:
             page.goto(BASE,wait_until="domcontentloaded")
             page.locator("#sample-seasonal .seasonal-plot svg").wait_for()
             page.locator("#sample-globe .globe-overlay").wait_for()
-            page.locator("#sample-globe .globe-tools .image-save").wait_for()
+            page.locator("#sample-globe .globe-save-row .image-save").wait_for()
             page.wait_for_timeout(450)
             id=f"{width}x{height}"
             first=download(page,"#sample-seasonal .image-save",f"{id}-seasonal.png")
             page.locator("#sample-seasonal .glosea-slider").fill("190")
             changed=download(page,"#sample-seasonal .image-save",f"{id}-seasonal-changed.png")
             assert verify(first)!=verify(changed),"Selected chart time must change exported pixels"
-            download(page,"#sample-globe .image-save",f"{id}-globe.png")
+            if mobile:
+                page.locator("#sample-globe .globe-save-row .image-save").click()
+                page.locator(".globe-save-dialog").wait_for(state="visible")
+                download(page,".globe-save-actions a[download]",f"{id}-globe.png")
+                page.get_by_role("button",name="Close image preview").click()
+            else:
+                download(page,"#sample-globe .globe-save-row .image-save",f"{id}-globe.png")
             download(page,"#save-readout",f"{id}-zonal.png")
             download(page,"#save-mosaic",f"{id}-mosaic.png")
             page.get_by_role("button",name="Show 3D vortex structure").click()
