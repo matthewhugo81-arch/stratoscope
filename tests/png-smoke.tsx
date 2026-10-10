@@ -15,7 +15,7 @@ const temperature=Array.from({length:n},(_,i)=>188+13*Math.cos(i/nx*.14)+8*Math.
 const height=Array.from({length:n},(_,i)=>28900+850*Math.sin(i%nx*.04)+220*Math.cos(i/nx*.17));
 const u=Array.from({length:n},(_,i)=>-6+2*Math.sin(i%nx*.02));
 const v=Array.from({length:n},(_,i)=>3+Math.cos(i%nx*.02));
-const frame:Frame={model:'gfs',run,hour:0,valid:run,level:10,grid:{nx,ny,lat0:90,lon0:0,dx:1,dy:-1},temperature,height,u,v,zonalWind60N:{value:-7,samples:360,longitudeStep:1,basis:'native'}};
+const frame:Frame={model:'gfs',run,hour:0,valid:run,level:10,source:'synthetic-browser-test',grid:{nx,ny,lat0:90,lon0:0,dx:1,dy:-1},temperature,height,u,v,zonalWind60N:{value:-7,samples:360,longitudeStep:1,basis:'native'}};
 const dates=Array.from({length:360},(_,i)=>new Date(Date.parse(run)+(i+1)*43200000).toISOString());
 const members=Array.from({length:4},(_,m)=>({id:'demo-'+m,values:dates.map((_,i)=>10*Math.sin(i/17)-m*2)}));
 const mean=dates.map((_,i)=>10*Math.sin(i/17)-3);
