@@ -261,3 +261,6 @@ button.image-save:disabled{opacity:.4}
 .vortex-view-controls>.image-save-wrap .image-save-status{padding:5px 8px;background:#0b2029}
 @media(max-width:750px){.vortex-stage .vortex-view-controls>.image-save-wrap{display:inline-flex!important}}
 @media(max-width:580px){.vortex-view-controls>.image-save-wrap{display:inline-flex!important}.vortex-view-controls>.image-save-wrap svg{display:block}.vortex-view-controls>.image-save-wrap .image-save-status{display:block}.globe-tools .image-save{padding:6px 9px}.member-maps-dialog>header{gap:6px}.member-maps-dialog>header .image-save{padding:5px 7px}}
+
+/* Frame-strip PNG action stays secondary to the timeline labels. */
+.stamps-heading>.image-save-wrap{margin-left:auto}
