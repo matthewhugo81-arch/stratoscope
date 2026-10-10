@@ -6,8 +6,11 @@ on:
       - 'app/globals.css'
       - 'components/*.tsx'
       - 'lib/image-export.ts'
+      - 'lib/globe-image.ts'
+      - 'lib/globe.ts'
       - 'tests/save-icon-css.test.mjs'
       - 'tests/verify_save_icon_layout.py'
+      - 'tests/verify_globe_mobile_save.py'
       - '.github/workflows/test-chart-controls.yml'
   pull_request:
     branches: [main]
@@ -15,8 +18,11 @@ on:
       - 'app/globals.css'
       - 'components/*.tsx'
       - 'lib/image-export.ts'
+      - 'lib/globe-image.ts'
+      - 'lib/globe.ts'
       - 'tests/save-icon-css.test.mjs'
       - 'tests/verify_save_icon_layout.py'
+      - 'tests/verify_globe_mobile_save.py'
       - '.github/workflows/test-chart-controls.yml'
 permissions:
   contents: read
@@ -39,9 +45,11 @@ jobs:
           node --test tests/*.test.mjs
       - name: Prepare browser regression tools
         run: |
-          python -m pip install --disable-pip-version-check playwright==1.63.0
+          python -m pip install --disable-pip-version-check playwright==1.63.0 pillow
           python -m playwright install --with-deps chromium webkit > /tmp/playwright-setup.log 2>&1 || { tail -n 80 /tmp/playwright-setup.log; exit 1; }
       - name: Check phone and desktop controls and local PNG downloads
         # Synthetic forecast responses only. No CDS, forecast preparation,
         # data publication, paid service, artifact or Actions cache is used.
-        run: python -u tests/verify_save_icon_layout.py
+        run: |
+          python -u tests/verify_save_icon_layout.py
+          python -u tests/verify_globe_mobile_save.py
