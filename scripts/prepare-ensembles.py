@@ -67,6 +67,9 @@ def request(url, start=None, length=None, attempts=4):
                     assert len(data) == length, 'Truncated provider response'
                 return data
         except Exception as error:
+            # Missing/not-yet-published files are not transient transport faults.
+            if isinstance(error, urllib.error.HTTPError) and error.code not in {408, 429, 500, 502, 503, 504}:
+                raise
             if attempt == attempts-1:
                 raise
             delay = retry_delay(error, attempt)
@@ -94,7 +97,7 @@ def ec_entries(model, run, hour, levels, probe=False):
     result = []
     for control in [False, True]:
         base = ec_base(model, run, hour, control)
-        entries = [json.loads(line) for line in request(base + '.index', attempts=1 if probe else 4).decode().splitlines()]
+        entries = [json.loads(line) for line in request(base + '.index', attempts=3 if probe else 4).decode().splitlines()]
         params = {'t': 'temperature', 'z' if model == 'aifs_ens' else 'gh': 'height', 'u': 'u', 'v': 'v'}
         for item in entries:
             if item.get('levtype') != 'pl' or int(item.get('levelist', -1)) not in levels or item['param'] not in params:
@@ -249,7 +252,8 @@ def save_frame(path, model, run, hour, level, planes, zonal):
 
 def discover(model, now=None):
     now = now or datetime.now(timezone.utc)
-    interval = 6
+    # IFS 06/18 UTC does not provide this product's full 360-hour horizon.
+    interval = 12 if model == 'ifs_ens' else 6
     start = datetime.fromtimestamp(int(now.timestamp())//(interval*3600)*(interval*3600), timezone.utc)
     cfg = CONFIG[model]
     for back in range(6):
@@ -258,7 +262,7 @@ def discover(model, now=None):
             if model == 'gefs':
                 for member in [0,30]:
                     for part in ['a','b']:
-                        lines = request(noaa_base(run,384,member,part)+'.idx',attempts=1).decode().splitlines()
+                        lines = request(noaa_base(run,384,member,part)+'.idx',attempts=3).decode().splitlines()
                         fields = {(line.split(':')[3],line.split(':')[4]) for line in lines}
                         for level in cfg['levels']:
                             if ('b' if level in [20,30,70] else 'a') != part:continue
@@ -270,11 +274,14 @@ def discover(model, now=None):
                 assert all((m,l,k) in identities for m in range(cfg['count']) for l in cfg['levels'] for k in KEYS)
             print('Newest complete provider cycle:',model,run.isoformat(),flush=True)
             return run
-        except Exception as e:
-            if isinstance(e, urllib.error.HTTPError) and e.code in [429, 503]:
-                # Throttling is not evidence that a newer cycle is incomplete.
+        except urllib.error.HTTPError as error:
+            # Only an absent/expired file establishes that this cycle is not
+            # available. An outage must never silently select an older cycle.
+            if error.code not in {404, 410}:
                 raise
-            print('Cycle not complete:',model,run.isoformat(),type(e).__name__,flush=True)
+            print('Cycle not complete:',model,run.isoformat(),f'HTTP {error.code}',flush=True)
+        except AssertionError as error:
+            print('Cycle not complete:',model,run.isoformat(),str(error) or 'Incomplete inventory',flush=True)
     raise RuntimeError('No complete provider cycle found for '+model)
 
 def already_published(model,run):
