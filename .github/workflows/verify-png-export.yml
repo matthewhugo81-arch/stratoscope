@@ -1,4 +1,5 @@
 name: Verify and build image save controls
+# Re-run after compile fixes; deployment remains gated on browser PNG checks.
 on:
   push:
     branches: [feat/subtle-png-export-20261010]
