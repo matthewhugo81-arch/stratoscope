@@ -1,6 +1,6 @@
 import {temperatureBands,temperatureTicks} from './temperature-scale';
 import {windStops,windMax} from './globe';
-import {MODELS} from './models';
+import {MODELS,isModel} from './models';
 import type {Frame} from './grib';
 import {utcStamp,type ExportGradient} from './chart-export-meta';
 export function mapGradient(field:string,spread=false):ExportGradient{
@@ -9,6 +9,7 @@ export function mapGradient(field:string,spread=false):ExportGradient{
  return {title:(spread?'Population standard deviation · ':'Wind speed · ')+(wind?'m/s':'°C'),stops:windStops.map((rgb,i)=>({at:i/(windStops.length-1),colour:`rgb(${rgb.join(',')})`})),ticks:Array.from({length:5},(_,i)=>({at:i/4,label:String(limit*i/4)}))};
 }
 export function mapTitle(frame:Frame,field:string){
- return MODELS[frame.model??'gfs'].label+` · ${frame.level} hPa · ${field==='wind'?'wind speed':'temperature'}`+(frame.ensemble?` · ${frame.ensemble.view}${frame.ensemble.view==='member'?' '+frame.ensemble.member:''}`:'');
+ const model=frame.model??'gfs';if(!isModel(model))throw Error('The displayed model identity could not be verified.');
+ return MODELS[model].label+` · ${frame.level} hPa · ${field==='wind'?'wind speed':'temperature'}`+(frame.ensemble?` · ${frame.ensemble.view}${frame.ensemble.view==='member'?' '+frame.ensemble.member:''}`:'');
 }
 export function mapSubtitle(frame:Frame){return ['Run '+utcStamp(frame.run),`Forecast +${frame.hour}h · Valid ${utcStamp(frame.valid)}`];}
