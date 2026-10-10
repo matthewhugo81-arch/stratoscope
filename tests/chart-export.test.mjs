@@ -33,3 +33,8 @@ test('canvas snapshots precede asynchronous decoding and WebGL is redrawn before
  const map=await readFile(new URL('../components/polar-map.tsx',import.meta.url),'utf8');assert.match(map,/beforeSave=\{\(\)=>paint.current\(\)\}/);
  const button=await readFile(new URL('../components/save-image-button.tsx',import.meta.url),'utf8');assert.ok(button.includes('if(lock.current||disabled)return'));assert.ok(button.includes('role="alert"'));
 });
+
+test('northern export selects forecast SVGs rather than the download-button icon',async()=>{
+ const source=await readFile(new URL('../components/northern-diagnostics.tsx',import.meta.url),'utf8');
+ assert.ok(source.includes('> svg[role="img"]'));
+});

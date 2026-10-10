@@ -31,6 +31,8 @@ for y in range(60,300,40):d.line((40,y,920,y),fill='grey')
 for i in range(15):d.line([(40+j*22,180+((j*19+i*7)%100)-50) for j in range(40)],fill=(20,70+i*10,210),width=1)
 stream=io.BytesIO();im.save(stream,format='PNG');EC_BYTES=stream.getvalue()
 def ec_route(route,cors=True):
+ if not cors and route.request.resource_type in ['fetch','xhr'] and '/opencharts-api/' not in route.request.url:
+  route.abort('accessdenied');return
  if '/opencharts-api/' in route.request.url:
   route.fulfill(status=200,body=json.dumps({'data':{'attributes':{'name':'extended-zonal-mean-zonal-wind'},'link':{'href':EC_IMAGE,'type':'image/png'}}}),content_type='application/json',headers={'Access-Control-Allow-Origin':'*'})
  else:route.fulfill(status=200,body=EC_BYTES,content_type='image/png',headers={'Access-Control-Allow-Origin':'*'} if cors else {})
@@ -49,7 +51,8 @@ def verify_png(path,details):
   assert im.format=='PNG' and im.width<=4096 and im.height<=8192 and im.width*im.height<=12000000,(im.format,im.size)
   rgba=im.convert('RGBA');assert rgba.getextrema()[3]==(255,255),'Unexpected transparent chart background'
   for box in details['images']:
-   region=rgba.crop((int(box['x']),int(box['y']),int(box['x']+box['w']),int(box['y']+box['h']))).convert('RGB')
+   bounds=(int(box['x']),int(box['y']),int(box['x']+box['w']),int(box['y']+box['h']))
+   region=rgba.crop(bounds).convert('RGB')
    colours=region.resize((80,80)).getcolors(6400)
    assert colours is None or len(colours)>10,'Blank chart or missing map layer'
   assert any('STRATOSCOPE' in t['s'] for t in details['texts'])

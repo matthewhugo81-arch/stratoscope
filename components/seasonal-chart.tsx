@@ -1,10 +1,14 @@
 'use client';
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
+import {SaveImageButton} from './save-image-button';
+import {imageFilename,utcStamp,type ChartImage} from '@/lib/chart-export';
+
 import type {SeasonalClimate,EraClimate,EraProgress} from '@/lib/seasonal';
 export type WindPlot={name:string;nominal:string;dates:string[];members:{id:string;values:number[]}[];mean:number[];easterlyFraction:number[];sampling:string;attribution:string};
 const date=(s:string)=>new Date(s).toLocaleDateString('en-GB',{timeZone:'UTC',day:'numeric',month:'short',year:'numeric'});
 const signed=(v:number)=>(v>0?'+':'')+v.toFixed(1);
 export function SeasonalChart({data,climate,era,eraProgress,referenceError}:{data:WindPlot;climate:SeasonalClimate|null;era:EraClimate|null;eraProgress?:EraProgress|null;referenceError?:boolean}){
+ const exportRoot=useRef<HTMLDivElement>(null);
  const [now,setNow]=useState(()=>Date.now());
  useEffect(()=>{if(era)return;const timer=setInterval(()=>setNow(Date.now()),60000);return()=>clearInterval(timer)},[era]);
  const [day,setDay]=useState(()=>{const i=data.dates.findIndex(s=>Date.parse(s)>=Date.now());return i<0?data.dates.length-1:i}),[members,setMembers]=useState(true),[history,setHistory]=useState(true),[reference,setReference]=useState(true);
@@ -19,8 +23,15 @@ export function SeasonalChart({data,climate,era,eraProgress,referenceError}:{dat
  const band=(low:number[],high:number[])=>path(high)+' '+low.map((_,k)=>{const i=n-1-k;return `L${x(i).toFixed(2)},${y(low[i]).toFixed(2)}`}).join(' ')+' Z';
  const ticks=Array.from({length:(max-min)/20+1},(_,i)=>min+i*20),active=Math.min(day,n-1);
  const inspect=(e:React.PointerEvent<SVGSVGElement>)=>{const r=e.currentTarget.getBoundingClientRect();setDay(Math.max(0,Math.min(n-1,Math.round(((e.clientX-r.left)/r.width*960-58)/882*(n-1)))))};
- return <div className="native-seasonal-chart">
-  <div className="seasonal-issue"><strong>{data.name}</strong><span>Issue {date(data.nominal)} · {data.members.length} members · {data.sampling}</span></div>
+ const imageSpec=():ChartImage=>({
+  title:data.name+' · zonal wind at 60°N, 10 hPa',filename:imageFilename(data.name,'seasonal-wind',data.nominal,'valid',data.dates[active]),
+  subtitle:['Issue '+utcStamp(data.nominal),`${data.members.length} members · ${data.sampling} · signed u wind, m/s`],
+  plots:[{element:exportRoot.current?.querySelector<SVGSVGElement>('.seasonal-plot svg'),caption:`${utcStamp(data.dates[active])} · Forecast mean ${signed(data.mean[active])} m/s · ${Math.round(data.easterlyFraction[active]*data.members.length)}/${data.members.length} members easterly`}],
+  legend:[{label:'Forecast mean',colour:'#b5efdd'},...(members?[{label:'Ensemble members',colour:'#599aae'}]:[]),...(climate&&history?[{label:'Model climate mean and historical ranges · 1993–2016',colour:'#efb56e'}]:[]),...(era&&reference?[{label:'ERA5 daily climate mean · 1993–2016',colour:'#edf2f4',dashed:true}]:[])],
+  notes:['Positive wind is westerly; negative is easterly. Raw ensemble scenarios, not a calibrated SSW probability.',...(!era?['ERA5 reference is not available in this saved view.']:[]),data.attribution]
+ });
+ return <div ref={exportRoot} className="native-seasonal-chart">
+  <div className="seasonal-issue"><strong>{data.name}</strong><span>Issue {date(data.nominal)} · {data.members.length} members · {data.sampling}</span><SaveImageButton label="seasonal wind outlook" getImage={imageSpec}/></div>
   {!era&&<p className="seasonal-pending" role="status">
    <strong>ERA5 reference pending.</strong>{' '}
    {eraProgress?<>{eraProgress.completedYears.length}/24 years prepared for 1993–2016.{eraProgress.nextYear!==null&&<> Next unfinished year: {eraProgress.nextYear}.</>}{' '}

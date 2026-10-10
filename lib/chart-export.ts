@@ -9,7 +9,8 @@ export async function chartPng(input:ChartImage):Promise<Blob>{
  const plots=input.plots.map(freezePlot);
  if(!plots.length&&!input.readout)throw Error('There is no loaded chart to save.');
  if(plots.length>70)throw Error('Too many chart panels to save in one image.');
- const layout=imageLayout(input,plots),size=boundedImageSize(layout.width,layout.height);
+ const snapshot={...input,legend:input.legend?.map(v=>({...v})),gradients:input.gradients?.map(v=>({...v,stops:v.stops.map(s=>({...s})),ticks:v.ticks.map(t=>({...t}))}))};
+ const layout=imageLayout(snapshot,plots),size=boundedImageSize(layout.width,layout.height);
  const canvas=document.createElement('canvas');canvas.width=size.width;canvas.height=size.height;
  const ctx=canvasContext(canvas);ctx.scale(size.scale,size.scale);ctx.fillStyle='#0d202a';ctx.fillRect(0,0,layout.width,layout.height);ctx.textBaseline='top';
  for(const box of layout.boxes){

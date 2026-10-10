@@ -1,5 +1,9 @@
 'use client';
 import {memo,useEffect,useRef} from 'react';
+import {SaveImageButton} from './save-image-button';
+import {imageFilename,utcStamp,type ChartImage} from '@/lib/chart-export';
+import {mapGradient,mapTitle,mapSubtitle} from '@/lib/chart-export-map';
+
 import type {Frame} from '@/lib/grib';
 import {color,inverseGlobe,sample,sampleWind,viewBasis} from '@/lib/globe';
 
@@ -32,12 +36,17 @@ export function ForecastStamps({times,hour,run,field,onSelect}:{times:{hour:numb
   const a=row.getBoundingClientRect(),b=selected.getBoundingClientRect();
   if(b.left<a.left||b.right>a.right)row.scrollLeft+=b.left-a.left-(a.width-b.width)/2;
  },[hour]);
+ const imageSpec=():ChartImage=>{
+  const ready=times.filter(t=>t.frame),first=ready[0]?.frame;
+  if(!first)throw Error('No downloaded frames are available.');
+  return {title:mapTitle(first,field)+' · frame previews',filename:imageFilename(first.model,'previews',field,first.level+'hPa',run),subtitle:['Run '+utcStamp(run),`${ready.length}/${times.length} downloaded frames · only downloaded previews are included`],columns:8,plots:ready.map(t=>({element:track.current?.querySelector<HTMLCanvasElement>(`[data-export-hour="${t.hour}"] canvas`),title:t.hour===0?'Initial':`+${t.hour}h`,caption:utcStamp(t.frame!.valid)})),gradients:[mapGradient(field,first.ensemble?.view==='spread')],notes:['North-pole thumbnail overview; use Save on the main map for a detailed image.','Source: '+(first.source??'official model fields')+' · Stratoscope']};
+ };
  return <section ref={section} className="forecast-stamps" id="forecast-stamps" aria-label="Forecast frame previews">
-  <div className="stamps-heading"><span>NORTH-POLE PREVIEWS</span><span>Downloaded frames · click a time to view</span></div>
+  <div className="stamps-heading"><span>NORTH-POLE PREVIEWS</span><span>Downloaded frames · click a time to view</span><SaveImageButton label="forecast frame previews" getImage={imageSpec} disabled={!times.some(t=>t.frame)}/></div>
   <div className="stamps-track" ref={track}>{times.map(time=>{
    const valid=run?new Date(Date.parse(run)+time.hour*3600000):null;
    const label=valid?valid.toLocaleString('en-GB',{timeZone:'UTC',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false}):'';
-   return <button key={time.hour} className={`forecast-stamp ${hour===time.hour?'selected':''}`} aria-label={`Forecast +${time.hour} hours, ${label} UTC${time.frame?', downloaded':', not downloaded'}`} aria-current={hour===time.hour?'step':undefined} onClick={()=>onSelect(time.hour)}>
+   return <button key={time.hour} data-export-hour={time.hour} className={`forecast-stamp ${hour===time.hour?'selected':''}`} aria-label={`Forecast +${time.hour} hours, ${label} UTC${time.frame?', downloaded':', not downloaded'}`} aria-current={hour===time.hour?'step':undefined} onClick={()=>onSelect(time.hour)}>
     {time.frame?<Stamp frame={time.frame} field={field}/>:<span className="stamp-empty">To load</span>}
     <strong>{time.hour===0?'Initial':`+${time.hour}h`}</strong><small>{valid?`${String(valid.getUTCDate()).padStart(2,'0')} ${valid.toLocaleString('en-GB',{month:'short',timeZone:'UTC'})}`:'—'}</small><small>{valid?`${String(valid.getUTCHours()).padStart(2,'0')}:00 UTC`:''}</small>
    </button>;

@@ -1,10 +1,14 @@
 'use client';
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
+import {SaveImageButton} from './save-image-button';
+import {imageFilename,utcStamp,type ChartImage} from '@/lib/chart-export';
+
 import {loadHeatFlux,heatFluxSummary,type HeatFluxSeries} from '@/lib/heat-flux';
 import type {VortexCatalogue} from '@/lib/vortex';
 import {diagnosticAxis} from '@/lib/diagnostic-axis';
 
 export function HeatFluxChart({catalogue,hour,displayedRun,onSelect}:{catalogue:VortexCatalogue|null;hour:number;displayedRun:string;onSelect:(hour:number)=>void}){
+ const exportRoot=useRef<HTMLDivElement>(null);
  const [data,setData]=useState<HeatFluxSeries|null>(null),[error,setError]=useState(''),[members,setMembers]=useState(false),[retry,setRetry]=useState(0);
  useEffect(()=>{
   setError('');setData(null);if(!catalogue?.heatFlux)return;
@@ -21,8 +25,15 @@ export function HeatFluxChart({catalogue,hour,displayedRun,onSelect}:{catalogue:
  const selected=points.find(p=>p.hour===hour);
  const signed=(v:number)=>(v>0?'+':'')+v.toFixed(1);
  const date=(v:number)=>new Date(Date.parse(displayedRun)+v*3600000).toLocaleDateString('en-GB',{timeZone:'UTC',day:'numeric',month:'short'});
- return <div className="heat-flux-chart" aria-label="GEFS 100 hPa eddy heat flux">
-  <div className="heat-flux-heading"><h3>Eddy heat flux <span>100 hPa · 45–75°N · K m/s</span></h3><label><input type="checkbox" checked={members} onChange={e=>setMembers(e.target.checked)}/>All 31 members</label></div>
+ const imageSpec=():ChartImage=>({
+  title:'GEFS eddy heat flux · 100 hPa · 45–75°N',filename:imageFilename('GEFS-heat-flux',displayedRun,'f'+hour),
+  subtitle:['Run '+utcStamp(displayedRun),'Selected valid time '+utcStamp(new Date(Date.parse(displayedRun)+hour*3600000).toISOString()),'31 members · 12-hourly forecast samples · K m/s'],
+  plots:[{element:exportRoot.current?.querySelector<SVGSVGElement>('.heat-flux-plot svg'),caption:selected?`Mean ${signed(selected.mean)} K m/s · 10–90% range ${signed(selected.low)} to ${signed(selected.high)}`:''}],
+  legend:[{label:'Ensemble mean',colour:'#a6e3d4'},{label:'Shading: 10–90% member range',colour:'#9edfcf'},...(members?[{label:'All 31 members',colour:'#78bec7'}]:[]),{label:'Selected vortex time',colour:'#f1c17b',dashed:true}],
+  notes:['Poleward eddy heat transport: a proxy for upward wave activity, not an SSW probability or an anomaly.','Source: NOAA GEFS · Stratoscope member-by-member zonal eddy covariance, area weighted over 45–75°N.']
+ });
+ return <div ref={exportRoot} className="heat-flux-chart" aria-label="GEFS 100 hPa eddy heat flux">
+  <div className="heat-flux-heading"><h3>Eddy heat flux <span>100 hPa · 45–75°N · K m/s</span></h3><label><input type="checkbox" checked={members} onChange={e=>setMembers(e.target.checked)}/>All 31 members</label><SaveImageButton label="heat flux" getImage={imageSpec} disabled={!series}/></div>
   <div className="heat-flux-legend"><span>━ Ensemble mean</span><span>▰ 10–90% member range</span><span>┆ Displayed vortex time</span></div>
   <div className="heat-flux-plot">{series?<svg viewBox={`0 0 ${w} ${h}`} role="group" aria-label="GEFS heat-flux forecast with ensemble mean and 10–90 percent member range">
    {ticks.map(v=><g key={v}><line x1={left} x2={w-right} y1={y(v)} y2={y(v)} stroke={v===0?'#90aab9':'#29414c'} strokeDasharray={v===0?'5 4':undefined}/><text x={left-9} y={y(v)+4} textAnchor="end">{v}</text></g>)}

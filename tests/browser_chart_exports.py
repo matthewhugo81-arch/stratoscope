@@ -25,6 +25,8 @@ def save(page,label,folder,required=()):
  assert download.suggested_filename.startswith('stratoscope-') and download.suggested_filename.endswith('.png')
  path=folder/(str(len(results))+'-'+download.suggested_filename);download.save_as(path)
  details=page.evaluate('window.__png');size=verify_png(path,details)
+ if label.startswith('10 hPa') or label=='northern diagnostic comparison':
+  assert all(abs(b['h']/b['w']-.28)<.001 for b in details['images']), 'Selected an icon rather than the forecast SVG'
  text=' '.join(t['s'] for t in details['texts'])
  for part in required:assert part in text,(part,text)
  expect(button).to_be_enabled()
@@ -44,7 +46,7 @@ def run():
    folder=Path(temporary);browser=pw.chromium.launch()
    for model in ['egrr','ecmf','lfpw','edzw','cmcc','rjtd','ammc']:
     c,p,errors=new_page(browser,'seasonal&id='+model)
-    p.locator('.seasonal-plot svg').wait_for();issue=p.evaluate('window.testIssue').slice(0,10) if False else p.evaluate('window.testIssue')[:10]
+    p.locator('.seasonal-plot svg').wait_for();issue=p.evaluate('window.testIssue')[:10]
     save(p,'seasonal wind outlook',folder,[issue,'60°N, 10 hPa','Forecast mean'])
     if model=='egrr':
      p.get_by_label('Members',exact=True).uncheck()
@@ -93,9 +95,9 @@ def run():
    expect(p.get_by_role('link',name='Open original chart ↗')).to_be_visible();assert not errors,errors;c.close()
    c,p,errors=new_page(browser,'empty');expect(p.get_by_role('button',name='Save model map as PNG')).to_be_disabled();c.close()
    c,p,errors=new_page(browser,'seasonal');p.locator('.seasonal-plot svg').wait_for()
-   p.evaluate('window.originalToBlob=HTMLCanvasElement.prototype.toBlob;HTMLCanvasElement.prototype.toBlob=function(callback){callback(null)}')
+   p.evaluate('()=>{window.originalToBlob=HTMLCanvasElement.prototype.toBlob;HTMLCanvasElement.prototype.toBlob=function(callback){callback(null)}}')
    p.get_by_role('button',name='Save seasonal wind outlook as PNG').click();expect(p.get_by_role('alert')).to_contain_text('could not create the PNG')
-   p.evaluate('HTMLCanvasElement.prototype.toBlob=window.originalToBlob')
+   p.evaluate('()=>{HTMLCanvasElement.prototype.toBlob=window.originalToBlob}')
    save(p,'seasonal wind outlook',folder,['Forecast mean'])
    # The export must not read a different frame or metadata after async decoding.
    race=p.evaluate('''async()=>{

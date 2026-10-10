@@ -1,8 +1,11 @@
 'use client';
 import {useEffect,useState} from 'react';
 import {RefreshCw} from 'lucide-react';
+import {SaveImageButton} from './save-image-button';
+import {imageFilename,utcStamp,type ChartImage} from '@/lib/chart-export';
+
 import type {Frame} from '@/lib/grib';
-import {isEnsemble,memberCount,supports,type ModelId} from '@/lib/models';
+import {MODELS,isEnsemble,memberCount,supports,type ModelId} from '@/lib/models';
 import {loadForecast,peekForecast,peekForecastZonal} from '@/lib/forecast-client';
 import {frameZonalWind,matchesZonalFrame,windDisplay} from '@/lib/zonal-wind';
 
@@ -31,8 +34,9 @@ export function ZonalWindCard({model,run,hour,member,mapLevel,mapFrame,mapBusy,m
  const description=ensemble?(member<0?`Ensemble mean · ${memberCount(model)} members`:member===0?'Control member':`Member ${String(member).padStart(2,'0')}`):'Zonal-mean u wind';
  const valid=run?new Date(Date.parse(run)+hour*3600000).toISOString():'';
  const stamp=valid?new Date(valid).toLocaleString('en-GB',{timeZone:'UTC',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false}).replace(',',''):'';
+ const imageSpec=():ChartImage=>({title:MODELS[model].label+' · 60°N, 10 hPa zonal wind',filename:imageFilename(model,'zonal-wind',run,'f'+hour,member<0?'mean':'member-'+member),subtitle:['Run '+utcStamp(run),`Forecast +${hour}h · Valid ${utcStamp(valid)}`,description],plots:[],readout:{value:(presentation?.text??'—')+' m/s',label:presentation?.direction??'Unavailable'},notes:[`${diagnostic?.longitudeStep}° ${diagnostic?.basis==='native'?'source':'display'} grid · all longitudes`,'Positive is westerly; negative is easterly. An instantaneous signed u-wind diagnostic, not a daily mean or a confirmed SSW.','Source: '+MODELS[model].label+' · Stratoscope']});
  return <section className="zonal-card" aria-label="60°N 10 hPa zonal wind">
-  <div className="eyebrow">POLAR VORTEX WIND</div><h4>60°N <span>·</span> 10 hPa</h4>
+  <div className="chart-export-heading"><div className="eyebrow">POLAR VORTEX WIND</div><SaveImageButton label="zonal wind readout" getImage={imageSpec} disabled={!diagnostic||!presentation||mapBusy}/></div><h4>60°N <span>·</span> 10 hPa</h4>
   {!available?<p className="zonal-unavailable">10 hPa is unavailable from this source. Choose direct GFS, direct ECMWF or an ensemble.</p>:<>
    <div className="zonal-reading" aria-live="polite" aria-atomic="true">
     {diagnostic&&presentation?<><output aria-label="Zonal-mean u wind" className={`zonal-value ${presentation.tone}`}>{presentation.text}<small> m/s</small></output><span className={`zonal-direction ${presentation.tone}`}>{presentation.direction}</span></>:issue?<><span className="zonal-empty">—</span><span className="zonal-unavailable" title={issue}>Wind value unavailable</span>{mapLevel!==10&&<button className="text-button" onClick={()=>setAttempt(n=>n+1)}>Retry 10 hPa wind</button>}</>:<span className="zonal-loading"><RefreshCw size={13} className="spin"/>{!run?'Finding model run…':mapBusy&&mapLevel!==10?'Waiting for map…':ensemble&&member<0?'Loading prepared 10 hPa wind…':'Loading 10 hPa…'}</span>}
