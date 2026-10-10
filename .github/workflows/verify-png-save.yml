@@ -43,3 +43,5 @@ jobs:
             git push origin HEAD:refs/heads/feature/subtle-save-imagery-20261010
           fi
           echo "TESTED_DEPLOYMENT_COMMIT=$(git rev-parse HEAD)"
+
+# Re-run after making the PNG screenshot selector unambiguous.
