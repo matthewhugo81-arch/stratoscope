@@ -26,6 +26,10 @@ jobs:
           from pathlib import Path
           p=Path('tests/browser_chart_exports.py')
           s=p.read_text().replace("p.evaluate('window.testIssue').slice(0,10) if False else p.evaluate('window.testIssue')[:10]", "p.evaluate('window.testIssue')[:10]")
+          # Playwright invokes a returned function. Use an explicit function body
+          # so assigning toBlob cannot accidentally call it with no callback.
+          s=s.replace("p.evaluate('window.originalToBlob=HTMLCanvasElement.prototype.toBlob;HTMLCanvasElement.prototype.toBlob=function(callback){callback(null)}')", "p.evaluate('()=>{window.originalToBlob=HTMLCanvasElement.prototype.toBlob;HTMLCanvasElement.prototype.toBlob=function(callback){callback(null)}}')")
+          s=s.replace("p.evaluate('HTMLCanvasElement.prototype.toBlob=window.originalToBlob')", "p.evaluate('()=>{HTMLCanvasElement.prototype.toBlob=window.originalToBlob}')")
           p.write_text(s)
           PY
           python -m py_compile tests/export_browser_support.py tests/browser_chart_exports.py
@@ -38,8 +42,8 @@ jobs:
         run: npm run build:pages
       - name: Install isolated browser test tools
         run: |
-          python -m pip install --disable-pip-version-check playwright pillow
-          python -m playwright install --with-deps chromium webkit
+          python -m pip install --disable-pip-version-check playwright pillow > /tmp/export-test-install.log 2>&1 || { tail -80 /tmp/export-test-install.log; exit 1; }
+          python -m playwright install --with-deps chromium webkit >> /tmp/export-test-install.log 2>&1 || { tail -80 /tmp/export-test-install.log; exit 1; }
       - name: Verify PNG pixels, provenance, mobile, fullscreen and recovery
         run: python -u tests/browser_chart_exports.py
       - name: Commit only tested source, regression coverage and rebuilt assets
