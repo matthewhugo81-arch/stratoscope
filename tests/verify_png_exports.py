@@ -110,7 +110,7 @@ try:
                 else:r.fulfill(status=200,body=payload,content_type="application/json",headers={"Access-Control-Allow-Origin":"*"})
             page.route("**/forecast-data-vortex/**",route)
             page.goto(BASE,wait_until="domcontentloaded")
-            page.locator("#sample-seasonal svg").wait_for()
+            page.locator("#sample-seasonal .seasonal-plot svg").wait_for()
             page.locator("#sample-globe .globe-overlay").wait_for()
             page.locator("#sample-globe .globe-tools .image-save").wait_for()
             page.wait_for_timeout(450)
