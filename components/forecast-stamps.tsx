@@ -35,7 +35,7 @@ export function ForecastStamps({times,hour,run,field,onSelect}:{times:{hour:numb
  },[hour]);
  const selected=times.find(item=>item.hour===hour)?.frame;
  return <section ref={section} className="forecast-stamps" id="forecast-stamps" aria-label="Forecast frame previews">
-  <div className="stamps-heading"><span>NORTH-POLE PREVIEWS</span><span>Downloaded frames · click a time to view</span><SaveImageButton target={()=>section.current?.querySelector<HTMLElement>('.forecast-stamp[aria-current="step"]')??null} title="North-pole forecast preview" subtitle={`Run ${run.slice(0,16)} UTC · forecast +${hour}h · ${field}`} caption="Low-resolution 2°? No: thumbnail of the loaded forecast. Save the main globe for full detail." filename={`stratoscope-preview-${run.slice(0,13)}-f${hour}-${field}`} disabled={!selected}/></div>
+  <div className="stamps-heading"><span>NORTH-POLE PREVIEWS</span><span>Downloaded frames · click a time to view</span><SaveImageButton target={()=>section.current?.querySelector<HTMLElement>('.forecast-stamp[aria-current="step"]')??null} title="North-pole forecast preview" subtitle={`Run ${run.slice(0,16)} UTC · forecast +${hour}h · ${field}`} caption="Low-resolution preview only · use the main globe Save control for full detail" filename={`stratoscope-preview-${run.slice(0,13)}-f${hour}-${field}`} disabled={!selected}/></div>
   <div className="stamps-track" ref={track}>{times.map(time=>{
    const valid=run?new Date(Date.parse(run)+time.hour*3600000):null;
    const label=valid?valid.toLocaleString('en-GB',{timeZone:'UTC',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false}):'';
