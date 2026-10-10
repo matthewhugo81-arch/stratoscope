@@ -1,0 +1,90 @@
+name: Activate reviewed ECMWF feed repair
+on:
+  push:
+    branches: [ops/activate-ecmwf-recovery-20261010]
+    paths: [.github/workflows/activate-reviewed-feed-repair.yml]
+permissions:
+  contents: read
+  actions: write
+jobs:
+  activate:
+    if: github.repository == 'matthewhugo81-arch/stratoscope' && github.event.repository.private == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Cancel only superseded ensemble jobs on the known throttled code
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -u - <<'PY'
+          import json,os,time,urllib.request,urllib.error
+          repo='matthewhugo81-arch/stratoscope'
+          expected='eecb0545c25313c07dac228602cacb293f246cb9'
+          obsolete='1391aeb7c218ca5ae87c142d5d963721438af8ce'
+          active={'queued','in_progress','waiting','pending','requested'}
+          def api(path,payload=None):
+              body=None if payload is None else json.dumps(payload).encode()
+              req=urllib.request.Request('https://api.github.com/repos/'+repo+path,data=body,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','User-Agent':'Stratoscope-reviewed-feed-activation'})
+              with urllib.request.urlopen(req,timeout=45) as r:raw=r.read()
+              return json.loads(raw) if raw else None
+          assert api('/git/ref/heads/main')['object']['sha']==expected,'Main changed; do not alter current jobs blindly'
+          def runs():return api('/actions/workflows/prepare-ensembles.yml/runs?per_page=100&branch=main')['workflow_runs']
+          candidates=[r for r in runs() if r['head_sha']==obsolete and r['status'] in active]
+          candidates.sort(key=lambda r:r['status']=='in_progress')
+          for r in candidates:
+              assert r['path']=='.github/workflows/prepare-ensembles.yml' and r['head_branch']=='main'
+              print('SUPERSEDE_OLD_ENSEMBLE_JOB',r['id'],r['status'],r['created_at'],flush=True)
+              try:api('/actions/runs/'+str(r['id'])+'/cancel',{})
+              except urllib.error.HTTPError as e:
+                  if e.code!=409:raise
+          for _ in range(18):
+              remaining=[r for r in runs() if r['head_sha']==obsolete and r['status'] in active]
+              if not remaining:break
+              time.sleep(5)
+          else:raise RuntimeError('Old attempts did not cancel in time; no duplicate replacement dispatched')
+          current=[r for r in runs() if r['head_sha']==expected]
+          if not current:
+              api('/actions/workflows/prepare-ensembles.yml/dispatches',{'ref':'main','inputs':{'model':'all'}})
+              print('DISPATCHED_VERIFIED_MAIN_ENSEMBLES',flush=True)
+          else:
+              print('VERIFIED_MAIN_RUNS',json.dumps([{k:r.get(k) for k in ['id','status','conclusion','created_at']} for r in current]),flush=True)
+              for r in current[:3]:
+                  jobs=api('/actions/runs/'+str(r['id'])+'/jobs')['jobs']
+                  for j in jobs:print('MODEL_JOB',json.dumps({k:j.get(k) for k in ['id','name','status','conclusion','started_at']}),flush=True)
+          api('/actions/workflows/check-pipelines.yml/dispatches',{'ref':'main'})
+          print('REQUESTED_FRESH_PRODUCTION_AUDIT',flush=True)
+          PY
+      - run: python -m pip install --disable-pip-version-check -r scripts/ensemble-requirements.txt
+      - name: Verify last complete publications, representative downloads and site availability without rewriting data
+        run: |
+          python -u - <<'PY'
+          import importlib.util,json,hashlib,re
+          from urllib.parse import urljoin
+          from datetime import datetime,timezone
+          spec=importlib.util.spec_from_file_location('audit','scripts/check-pipelines.py')
+          audit=importlib.util.module_from_spec(spec);spec.loader.exec_module(audit)
+          for model in ['gefs','ifs_ens','aifs_ens','icon']:
+              branch='forecast-data-'+model.replace('_','-')
+              m=audit.public(branch);audit.validate_catalogue(model,m)
+              for hour in [0,m['maxHour']]:
+                  entry=m['files'][str(m['levels'][0])+'/'+str(hour)]
+                  b=audit.fetch(audit.RAW+branch+'/'+entry['path'])
+                  assert len(b)==entry['bytes'] and hashlib.sha256(b).hexdigest()==entry['sha256']
+              print('PUBLICATION_VERIFIED',model,m['run'],len(m['files']),'frames','first and last representative frame hashes verified',flush=True)
+          vortex=audit.public('forecast-data-vortex')
+          heat=vortex['heatFlux'];raw=audit.fetch(audit.RAW+'forecast-data-vortex/'+heat['path'])
+          assert len(raw)==heat['bytes'] and hashlib.sha256(raw).hexdigest()==heat['sha256']
+          flux=json.loads(raw)
+          assert flux['run']==vortex['run'] and flux['count']==31 and len(flux['points'])==33
+          print('VORTEX_HEAT_FLUX_VERIFIED',vortex['run'],'33 times and 31 members',flush=True)
+          site='https://matthewhugo81-arch.github.io/stratoscope/'
+          html=audit.fetch(site).decode()
+          assets=[urljoin(site,p) for p in re.findall(r'(?:src|href)="([^"]+\.(?:js|css))"',html)]
+          assert assets
+          for asset in assets:assert audit.fetch(asset)
+          print('LIVE_SITE_ASSETS_VERIFIED',len(assets),'checked',datetime.now(timezone.utc).isoformat(),flush=True)
+          PY
