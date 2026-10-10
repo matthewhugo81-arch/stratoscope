@@ -3,6 +3,8 @@ import {useEffect,useRef,useState} from 'react';
 import {Plus,Minus,Compass,RotateCcw} from 'lucide-react';
 import type {Frame} from '@/lib/grib';
 import {windArrowTarget} from '@/lib/wind-arrows';
+import {SaveImageButton} from './save-image-button';
+import {saveCanvasPng} from '@/lib/save-png';
 import {createRenderer,SIZE,CENTER,RADIUS,viewBasis,rotateBasis,projectGlobe,inverseGlobe,sample,sampleWind,color,defaultViewport} from '@/lib/globe';
 export function PolarMap({frame,field,contours,graticule,windArrows}:{frame:Frame|null;field:string;contours:boolean;graticule:boolean;windArrows:boolean}){
  const viewport=useRef({...defaultViewport}),stage=useRef<HTMLDivElement>(null);
@@ -42,8 +44,29 @@ export function PolarMap({frame,field,contours,graticule,windArrows}:{frame:Fram
  };
  useEffect(()=>{try{renderer.current=createRenderer(base.current!);setSoftware(!renderer.current)}catch{renderer.current=null;setSoftware(true)}fetch(new URL('coastline.json',document.baseURI)).then(r=>r.json() as Promise<{features:{geometry:{type:string;coordinates:number[][]|number[][][]}}[]}>).then(j=>{coast.current=j.features.flatMap(f=>f.geometry.type==='LineString'?[f.geometry.coordinates as number[][]]:f.geometry.coordinates as number[][][]);request()}).catch(()=>{});request();const c=overlay.current!;const wheel=(e:WheelEvent)=>{e.preventDefault();setProbe(null);const delta=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?viewport.current.height:1);zoom(Math.exp(-Math.max(-150,Math.min(150,delta))*.0015))};c.addEventListener('wheel',wheel,{passive:false});const resize=new ResizeObserver(([entry])=>{const {width,height}=entry.contentRect;if(!width||!height)return;const dpr=Math.min(window.devicePixelRatio||1,2);viewport.current={width,height,dpr};for(const canvas of [base.current!,c]){canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);}request();});resize.observe(stage.current!);return()=>{resize.disconnect();cancelAnimationFrame(raf.current);renderer.current?.dispose();c.removeEventListener('wheel',wheel)}},[]);
  useEffect(request,[frame,field,contours,graticule,windArrows]);
+
+ async function saveGlobeImage(){
+  if(!frame||!base.current||!overlay.current)throw Error('The forecast globe is not ready.');
+  const vp=viewport.current,surface=document.createElement('canvas');
+  surface.width=overlay.current.width;surface.height=overlay.current.height;
+  if(!surface.width||!surface.height)throw Error('The map has not finished drawing.');
+  // Redraw WebGL immediately before copying: browsers discard the drawing buffer
+  // between frames unless preserveDrawingBuffer is enabled, which we avoid.
+  if(renderer.current)renderer.current.draw(frame,view.current.basis,view.current.zoom,field==='wind',contours,vp);
+  const ctx=surface.getContext('2d');if(!ctx)throw Error('Cannot prepare a map PNG.');
+  ctx.fillStyle='#0b1d27';ctx.fillRect(0,0,surface.width,surface.height);
+  if(renderer.current)ctx.drawImage(base.current,0,0);
+  ctx.drawImage(overlay.current,0,0);
+  const kind=frame.ensemble?.view==='member'?`member-${frame.ensemble.member}`:frame.ensemble?.view??'deterministic';
+  await saveCanvasPng(surface,{
+   title:`${frame.model?.toUpperCase()??'Forecast'} · ${frame.level} hPa · ${field==='temperature'?'Temperature':'Wind speed'}${frame.ensemble?.view==='spread'?' spread':''}`,
+   subtitle:`Run ${frame.run.slice(0,16)} UTC · forecast +${frame.hour}h · valid ${frame.valid.slice(0,16)} UTC`,
+   caption:`Current rotation and zoom · ${field==='temperature'?'Temperature °C':'Wind speed m/s'} · height contours ${contours?'on':'off'} · wind arrows ${windArrows?'on':'off'}`,
+   filename:`stratoscope-${frame.model??'forecast'}-${kind}-${frame.level}hpa-${field}-${frame.run.slice(0,13)}-f${frame.hour}`
+  });
+ }
  const release=(id:number)=>{pointers.current.delete(id);pinch.current=0;if(!pointers.current.size)setDragging(false)};
- return <div className="globe-wrap"><div className="globe-tools"><div><button aria-label="Zoom in" onClick={()=>zoom(1.15)}><Plus size={17}/></button><button aria-label="Zoom out" onClick={()=>zoom(1/1.15)}><Minus size={17}/></button></div><div><button aria-label="Reset to north pole" title="North-pole view" onClick={()=>reset(true)}><Compass size={17}/><span>North pole</span></button><button aria-label="Fit whole globe" title="Fit the whole globe in the available space" onClick={()=>{view.current.zoom=1;setProbe(null);request()}}><RotateCcw size={16}/><span className="fit-label">Fit globe</span></button></div></div><div ref={stage} className={`polar-map globe ${dragging?'dragging':''}`}><canvas ref={base} width={SIZE} height={SIZE} aria-hidden="true"/><canvas ref={overlay} width={SIZE} height={SIZE} className="globe-overlay" tabIndex={0} role="img" aria-label={`${frame?frame.level+' hPa '+field+' '+(frame.ensemble?.view??'')+' globe, valid '+frame.valid:'Globe loading'}. Drag to rotate and tilt. Scroll to zoom. Left and right arrows step forecast time. Shift plus arrows rotate; plus and minus zoom; Home resets north.`}
+ return <div className="globe-wrap"><div className="globe-tools"><div><button aria-label="Zoom in" onClick={()=>zoom(1.15)}><Plus size={17}/></button><button aria-label="Zoom out" onClick={()=>zoom(1/1.15)}><Minus size={17}/></button></div><div><button aria-label="Reset to north pole" title="North-pole view" onClick={()=>reset(true)}><Compass size={17}/><span>North pole</span></button><button aria-label="Fit whole globe" title="Fit the whole globe in the available space" onClick={()=>{view.current.zoom=1;setProbe(null);request()}}><RotateCcw size={16}/><span className="fit-label">Fit globe</span></button></div><SaveImageButton title="current stratosphere globe" filename="stratoscope-forecast-globe" onSave={saveGlobeImage} disabled={!frame}/></div><div ref={stage} className={`polar-map globe ${dragging?'dragging':''}`}><canvas ref={base} width={SIZE} height={SIZE} aria-hidden="true"/><canvas ref={overlay} width={SIZE} height={SIZE} className="globe-overlay" tabIndex={0} role="img" aria-label={`${frame?frame.level+' hPa '+field+' '+(frame.ensemble?.view??'')+' globe, valid '+frame.valid:'Globe loading'}. Drag to rotate and tilt. Scroll to zoom. Left and right arrows step forecast time. Shift plus arrows rotate; plus and minus zoom; Home resets north.`}
  onPointerDown={e=>{e.currentTarget.focus({preventScroll:true});e.currentTarget.setPointerCapture(e.pointerId);pointers.current.set(e.pointerId,{x:e.clientX,y:e.clientY});setDragging(true);setProbe(null);pinch.current=0}}
  onPointerMove={e=>{const active=pointers.current.get(e.pointerId);if(active){pointers.current.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.current.size===2){const [a,b]=Array.from(pointers.current.values()),dist=Math.hypot(a.x-b.x,a.y-b.y);if(pinch.current)zoom(dist/pinch.current);pinch.current=dist;}else{const scale=130/e.currentTarget.getBoundingClientRect().width;move((e.clientX-active.x)*scale,(e.clientY-active.y)*scale)}}else{const r=e.currentTarget.getBoundingClientRect(),p=inverseGlobe(e.clientX-r.left,e.clientY-r.top,view.current.basis,view.current.zoom,viewport.current);setProbe(p)}}}
  onPointerUp={e=>release(e.pointerId)} onPointerCancel={e=>release(e.pointerId)} onLostPointerCapture={e=>release(e.pointerId)} onPointerLeave={()=>{if(!pointers.current.size)setProbe(null)}}
