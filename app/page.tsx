@@ -17,6 +17,7 @@ import {PipelineStatus} from '@/components/pipeline-status';
 import {MODELS,isModel,isCycle,isEnsemble,memberCount,supports,type ModelId,type ForecastMeta,type EnsembleView} from '@/lib/models';
 import {loadForecast,peekForecast,clearForecastCache,activateForecastSequence} from '@/lib/forecast-client';
 import {forecastMeta,clearForecastMeta} from '@/lib/forecast-transport';
+import {preloadTimeline} from '@/lib/forecast-preload';
 import {temperatureGradient,temperaturePosition,temperatureTicks} from '@/lib/temperature-scale';
 import {windGradient,windMax,windTicks} from '@/lib/globe';
 import type {Frame} from '@/lib/grib';
@@ -46,9 +47,9 @@ export default function Home(){
  useEffect(()=>{const hidden=()=>{if(document.hidden)setPlaying(false);};document.addEventListener('visibilitychange',hidden);return()=>document.removeEventListener('visibilitychange',hidden);},[]);
  useEffect(()=>{
   const c=new AbortController();setMeta(null);setLoading(true);setError('');setRetryAt(0);
-  forecastMeta(model,AbortSignal.any([c.signal,AbortSignal.timeout(55000)]),prepared).then(setMeta).catch(e=>{if(e.name!=='AbortError'){setError(e.name==='TimeoutError'?'Finding the latest forecast took too long. Please retry.':e.message);setLoading(false)}});
+  forecastMeta(model,AbortSignal.any([c.signal,AbortSignal.timeout(55000)])).then(setMeta).catch(e=>{if(!c.signal.aborted){setError(e.name==='TimeoutError'?'Finding the latest forecast took too long. Please retry.':e.message);setLoading(false)}});
   return()=>c.abort();
- },[model,refresh,prepared]);
+ },[model,refresh]);
  useEffect(()=>{
   if(!run||!supports(model,level))return;const c=new AbortController();setError('');setRetryAt(0);setProgress(0);setLoading(true);
   const apply=(result:Awaited<ReturnType<typeof loadForecast>>)=>{
@@ -61,29 +62,18 @@ export default function Home(){
  },[run,model,hour,level,selectionMember,refresh,attempt]);
  useEffect(()=>{
   if(!run||!cyclic||!supports(model,level))return;
-  const c=new AbortController();let timer:ReturnType<typeof setTimeout>;
-  const schedule=()=>{timer=setTimeout(()=>void fill(),250)};
-  const fill=async()=>{
-   if(c.signal.aborted)return;
-   const connection=(navigator as Navigator & {connection?:{saveData?:boolean;effectiveType?:string}}).connection;
-   if(document.visibilityState!=='visible'||connection?.saveData||connection?.effectiveType?.includes('2g')||preloadSelection.current.loading){setBackgroundLoading(false);schedule();return;}
-   const selectedHour=preloadSelection.current.hour;
-   const hours=Array.from({length:maxHour/6+1},(_,i)=>i*6);
-   hours.sort((a,b)=>{
-    const distance=(h:number)=>(direction.current*(h-selectedHour)+maxHour+6)%(maxHour+6);
-    return distance(a)-distance(b);
-   });
-   const next=hours.find(h=>!peekForecast(model,run,h,level,selectionMember));
-   if(next===undefined){setBackgroundLoading(false);return;}
-   setBackgroundLoading(true);
-   try{
-    await loadForecast(model,run,next,level,selectionMember,c.signal,()=>{});
-    if(!c.signal.aborted){setCacheVersion(v=>v+1);schedule();}
-   }catch{if(!c.signal.aborted)setBackgroundLoading(false);}
-  };
-  schedule();
-  return()=>{clearTimeout(timer);c.abort();setBackgroundLoading(false)};
- },[run,model,level,selectionMember,refresh,cyclic,maxHour]);
+  const c=new AbortController();
+  const stop=preloadTimeline({maxHour,signal:c.signal,concurrency:prepared||model==='icon'?4:1,
+   selection:()=>{
+    const connection=(navigator as Navigator & {connection?:{saveData?:boolean;effectiveType?:string}}).connection;
+    return {hour:preloadSelection.current.hour,direction:direction.current,paused:document.visibilityState!=='visible'||!!connection?.saveData||!!connection?.effectiveType?.includes('2g')||preloadSelection.current.loading};
+   },
+   hasFrame:h=>!!peekForecast(model,run,h,level,selectionMember),
+   load:h=>loadForecast(model,run,h,level,selectionMember,c.signal,()=>{}),
+   onProgress:()=>setCacheVersion(v=>v+1),onBusy:setBackgroundLoading,
+  });
+  return()=>{stop();c.abort()};
+ },[run,model,level,selectionMember,refresh,attempt,cyclic,maxHour,prepared]);
  useEffect(()=>{
   const step=(e:KeyboardEvent)=>{
    if(e.defaultPrevented||e.altKey||e.ctrlKey||e.metaKey||e.shiftKey||!['ArrowLeft','ArrowRight'].includes(e.key))return;

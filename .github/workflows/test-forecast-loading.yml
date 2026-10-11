@@ -1,0 +1,25 @@
+name: Test forecast loading
+on:
+  push:
+    branches: [main]
+    paths: ['app/page.tsx', 'lib/*.ts', 'tests/*.test.mjs', 'tests/*fixture.mjs', 'package*.json', '.github/workflows/test-forecast-loading.yml']
+  pull_request:
+    branches: [main]
+    paths: ['app/page.tsx', 'lib/*.ts', 'tests/*.test.mjs', 'tests/*fixture.mjs', 'package*.json', '.github/workflows/test-forecast-loading.yml']
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - run: npm ci --no-audit --no-fund
+      - name: Check forecast identities, failover, caching and bounded parallel loading
+        run: |
+          npm exec -- tsc --noEmit
+          node --test tests/*.test.mjs
+          npm run build:pages
