@@ -1,0 +1,61 @@
+name: Diagnose model delivery latency
+on:
+  push:
+    branches: [fix/delivery-latency-20261011]
+    paths: [.github/workflows/diagnose-delivery-latency.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Inspect running jobs and complete 00Z source inventory
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -u - <<'PY'
+          import json,os,urllib.request,urllib.error,concurrent.futures
+          from datetime import datetime,timezone
+          from pathlib import Path
+          repo='matthewhugo81-arch/stratoscope'
+          def read(url,auth=False):
+              headers={'User-Agent':'Stratoscope-read-only-delivery-diagnosis','Cache-Control':'no-cache'}
+              if auth:headers['Authorization']='Bearer '+os.environ['GH_TOKEN']
+              with urllib.request.urlopen(urllib.request.Request(url,headers=headers),timeout=18) as r:return r.read(),dict(r.headers)
+          def api(path):return json.loads(read('https://api.github.com/repos/'+repo+path,True)[0])
+          print('CHECK_TIME',datetime.now(timezone.utc).isoformat(),flush=True)
+          print('MAIN',api('/git/ref/heads/main')['object']['sha'],flush=True)
+          for workflow in ['check-pipelines.yml','prepare-gefs.yml','prepare-ensembles.yml','prepare-icon.yml','prepare-vortex.yml','prepare-diagnostics.yml','prepare-seasonal.yml']:
+              runs=api('/actions/workflows/'+workflow+'/runs?per_page=8&branch=main')['workflow_runs']
+              print('RUNS',workflow,json.dumps([{k:r.get(k) for k in ['id','event','status','conclusion','created_at','updated_at','head_sha']} for r in runs]),flush=True)
+              for r in runs[:3]:
+                  jobs=api('/actions/runs/'+str(r['id'])+'/jobs')['jobs']
+                  print('JOBS',r['id'],json.dumps([{k:j.get(k) for k in ['id','name','status','conclusion','started_at','completed_at']} for j in jobs]),flush=True)
+          roots=['https://storage.googleapis.com/ecmwf-open-data','https://data.ecmwf.int/forecasts']
+          def probe(task):
+              root,system,kind,hour=task
+              stream='oper' if kind=='fc' else 'enfo'
+              url=f'{root}/20261011/00z/{system}/0p25/{stream}/20261011000000-{hour}h-{stream}-{kind}.index'
+              try:
+                  raw,headers=read(url);rows=[json.loads(l) for l in raw.decode().splitlines()]
+                  selected=[r for r in rows if r.get('levtype')=='pl' and str(r.get('levelist')) in ['10','50','100'] and r.get('param') in ['t','gh','z','u','v']]
+                  identities=sorted({(r.get('param'),str(r.get('levelist')),str(r.get('number',0)),str(r.get('type'))) for r in selected})
+                  print('INVENTORY',url,'modified',headers.get('Last-Modified'),json.dumps({'rows':len(rows),'selected':len(selected),'types':sorted({str(r.get('type')) for r in selected}),'fields':sorted({str(r.get('param')) for r in selected}),'members':sorted({int(r.get('number',0)) for r in selected})}),flush=True)
+              except Exception as e:print('INVENTORY_ERROR',url,type(e).__name__,str(e)[:180],flush=True)
+          tasks=[(r,'ifs',kind,h) for r in roots for kind in ['fc','ef'] for h in [0,240,360]]
+          tasks +=[(r,'aifs-ens',kind,360) for r in roots for kind in ['pf','cf']]
+          with concurrent.futures.ThreadPoolExecutor(max_workers=2) as p:list(p.map(probe,tasks))
+          for name,path in [('gefs','gefs.20261011/00/atmos/pgrb2ap5/gep30.t00z.pgrb2a.0p50.f384.idx'),('gfs','gfs.20261011/00/atmos/gfs.t00z.pgrb2.1p00.f240.idx')]:
+              url=('https://noaa-gefs-pds.s3.amazonaws.com/' if name=='gefs' else 'https://noaa-gfs-bdp-pds.s3.amazonaws.com/')+path
+              try:
+                  b,h=read(url);print('NOAA_INVENTORY',name,'bytes',len(b),'modified',h.get('Last-Modified'),flush=True)
+              except Exception as e:print('NOAA_ERROR',name,str(e),flush=True)
+          for path in ['lib/forecast-worker.ts','lib/openmeteo.ts','hooks/use-forecast.ts']:
+              if Path(path).exists():print('SOURCE',path,Path(path).read_text(),flush=True)
+          PY
