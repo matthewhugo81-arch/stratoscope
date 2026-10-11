@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths: ['.github/workflows/prepare-gefs.yml']
   schedule:
-    - cron: '3 * * * *'
+    - cron: '23,53 * * * *'
 permissions:
   contents: write
   actions: write
@@ -34,7 +34,7 @@ jobs:
         run: |
           gh auth setup-git --hostname github.com
           python scripts/publish-ensemble-data.py --model gefs --output work/prepared
-      - name: Explicitly update vortex, heat flux and diagnostics after publication
+      - name: Refresh dependent charts after publication
         if: success() && github.ref == 'refs/heads/main' && hashFiles('work/prepared/latest.json') != ''
         env:
           GH_TOKEN: ${{ github.token }}
