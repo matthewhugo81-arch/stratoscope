@@ -43,11 +43,22 @@ class Mirrors(unittest.TestCase):
         self.assertEqual(calculate.call_count, 2)
         self.assertEqual([c.kwargs['origin'] for c in calculate.call_args_list], list(transport.ORIGINS[:2]))
         self.assertTrue(all(c.args[1:4] == (RUN,24,[10,50,100]) for c in calculate.call_args_list))
-    def test_terminal_inventory_uses_aws_when_google_cycle_has_holes(self):
+    def test_terminal_inventory_keeps_the_canonical_fallback(self):
         read = Mock(side_effect=[error(404), entries(), error(429)])
         self.assertEqual(len(self.inventory(read)), 612)
         self.assertEqual(read.call_count, 2)
-        self.assertEqual(read.call_args_list[1].kwargs['origin'], transport.ORIGINS[1])
+        self.assertEqual(read.call_args_list[1].kwargs['origin'], transport.ORIGINS[-1])
+    def test_cloudfront_missing_object_503_cannot_block_cycle_discovery(self):
+        def read(model, run, hour, levels, probe=False, origin=None):
+            if origin == transport.ORIGINS[1]:
+                raise error(503)
+            if run == RUN:
+                raise error(404)
+            self.assertEqual(run, OLD)
+            return entries()
+        with patch.object(prep, 'ec_entries', side_effect=read) as inventory:
+            self.assertEqual(prep.discover('ifs_ens', NOW), OLD)
+        self.assertNotIn(transport.ORIGINS[1], [c.kwargs['origin'] for c in inventory.call_args_list])
     def test_inventory_error_uses_another_source_for_the_same_cycle(self):
         read=Mock(side_effect=[error(429),entries()])
         self.assertEqual(len(self.inventory(read)),612)

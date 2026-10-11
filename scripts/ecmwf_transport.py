@@ -18,6 +18,9 @@ ORIGINS = (
     'https://d2zvc0wgha4k2l.cloudfront.net',
     'https://data.ecmwf.int/forecasts',
 )
+# CloudFront can return 503 for absent, not-yet-released objects. Use it to
+# recover downloads of a discovered cycle, not to establish cycle absence.
+INVENTORY_ORIGINS = (ORIGINS[0], ORIGINS[-1])
 TRANSIENT_CODES = {408, 429, 500, 502, 503, 504}
 TRANSPORT_ERRORS = (urllib.error.URLError, TimeoutError, ConnectionError, http.client.IncompleteRead)
 
@@ -34,7 +37,7 @@ def validate_origin(origin):
     return origin
 
 
-def complete_inventory(read, model, run, hour, levels, count, keys, origins=ORIGINS):
+def complete_inventory(read, model, run, hour, levels, count, keys, origins=INVENTORY_ORIGINS):
     """Check every replica for this cycle BEFORE considering an older cycle.
 
 An outage on one replica can be satisfied by another complete replica, but if

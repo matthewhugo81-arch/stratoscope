@@ -230,6 +230,12 @@ GRIB ranges and inventories on the same origin. Failed transfers cancel queued
 requests before failover, so a throttled origin cannot keep draining the entire
 hour's download queue. All member, field, level and run validation remains
 required before publication.
+Cycle discovery retains Google and the canonical ECMWF portal: the AWS CDN can
+return a transient 503 for an absent future cycle, so it is a download fallback
+for discovered runs rather than evidence of whether a new cycle exists.
+Diagnostics request fresh catalogues after publication and hash-addressed member
+panels, preventing a cached previous catalogue from incorrectly skipping the
+new run's diagnostic charts.
 
 ECMWF ENS and AIFS preparation now has a separate concurrency lock per model,
 checks twice an hour, and processes two forecast hours in separate native-decoder
