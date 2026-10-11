@@ -1,0 +1,135 @@
+name: Verify model delivery repair
+on:
+  push:
+    branches: [fix/delivery-latency-20261011]
+    paths: [.github/workflows/verify-delivery.yml]
+permissions:
+  contents: write
+jobs:
+  verify:
+    if: github.repository == 'matthewhugo81-arch/stratoscope' && github.event.repository.private == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Integrate delivery state with the existing audit without changing provider data
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          p=Path('scripts/check-pipelines.py')
+          assert subprocess.check_output(['git','hash-object',str(p)],text=True).strip()=='2e23c79702778aa2bcdfe9fa4d7f4b14cd142ddf'
+          s=p.read_text()
+          old='def direct_latest(model, now):\n'
+          assert s.count(old)==1
+          s=s.replace(old,"def delivery_state():\n    spec=importlib.util.spec_from_file_location('delivery_state',Path(__file__).with_name('delivery_state.py'))\n    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)\n    return module\n\ndef direct_latest(model, now):\n    if model=='ecmwf_direct':return delivery_state().latest_direct_ifs(fetch,now)\n")
+          a=s.index("            elif model=='ecmwf_direct':")
+          b=s.index('            else:',a)
+          s=s[:a]+s[b:]
+          old='    seasonal=health.seasonal_health(public,now)'
+          assert s.count(old)==1
+          s=s.replace(old,'    delivery_state().annotate(results,now)\n'+old)
+          p.write_text(s)
+          PY
+      - name: Install existing build and scientific dependencies
+        run: |
+          python -m pip install --disable-pip-version-check -r scripts/ensemble-requirements.txt pyyaml
+          npm ci --no-audit --no-fund
+      - name: Run old and new offline regressions
+        run: |
+          python -m py_compile scripts/watch-delivery.py scripts/delivery_state.py scripts/check-pipelines.py
+          python -m unittest discover -s tests -p test_delivery_watch.py -v
+          python -m unittest discover -s tests -p test_pipeline_reliability.py -v
+          python -m unittest discover -s tests -p test_ecmwf_feed_recovery.py -v
+          python -m unittest discover -s tests -p 'test_seasonal*.py' -v
+          python scripts/check-source-security.py
+          npm exec -- tsc --noEmit
+          node --test tests/*.test.mjs
+          python - <<'PY'
+          import yaml
+          from pathlib import Path
+          for p in Path('.github/workflows').glob('*.yml'):yaml.load(p.read_text(),Loader=yaml.BaseLoader)
+          d=yaml.load(Path('.github/workflows/check-pipelines.yml').read_text(),Loader=yaml.BaseLoader)
+          assert d['on']['schedule']==[{'cron':'11 */3 * * *'}]
+          print('REGRESSION_GATE_PASSED; three-hour audit retained')
+          PY
+      - name: Verify GEFS parallel output against an already published complete run
+        run: |
+          python -u - <<'PY'
+          import importlib.util,json,subprocess,gzip,struct,hashlib,time
+          from pathlib import Path
+          spec=importlib.util.spec_from_file_location('audit','scripts/check-pipelines.py')
+          audit=importlib.util.module_from_spec(spec);spec.loader.exec_module(audit)
+          m=audit.public('forecast-data-gefs');audit.validate_catalogue('gefs',m)
+          started=time.monotonic()
+          subprocess.run(['python','-u','scripts/prepare-ensembles.py','--model','gefs','--run',m['run'],'--hours','0','384','--workers','3','--hour-workers','2','--output','work/gefs-parallel-smoke'],check=True)
+          root=Path('work/gefs-parallel-smoke');smoke=json.loads((root/'latest.json').read_text())
+          assert smoke['complete'] is False and smoke['count']==31 and len(smoke['files'])==12
+          def planes(b):
+              raw=gzip.decompress(b);size=struct.unpack('<I',raw[8:12])[0];head=json.loads(raw[12:12+size])
+              return head,raw[12+size:]
+          for key,e in smoke['files'].items():
+              b=(root/e['path']).read_bytes();head,values=planes(b)
+              assert head['run']==m['run'] and head['count']==31
+              assert len(b)==e['bytes'] and hashlib.sha256(b).hexdigest()==e['sha256']
+              reference=m['files'][key]
+              remote=audit.fetch(audit.RAW+'forecast-data-gefs/'+reference['path'])
+              assert hashlib.sha256(remote).hexdigest()==reference['sha256']
+              old,expected=planes(remote)
+              assert values==expected,(key,'Parallel processing changed the published values')
+          print('GEFS_PARALLEL_EQUIVALENCE_PASS',m['run'],'12 frames, six levels, all 31 members; first/last times',round(time.monotonic()-started,1),'seconds',flush=True)
+          PY
+      - name: Build the production website
+        run: npm run build:pages
+      - name: Install browser for direct IFS integration verification
+        run: |
+          python -m pip install --disable-pip-version-check playwright
+          python -m playwright install chromium
+      - name: Load direct IFS from the real official source in a browser
+        run: |
+          python -u - <<'PY'
+          import json,subprocess,time,urllib.request
+          from pathlib import Path
+          from playwright.sync_api import sync_playwright
+          fixture=Path('delivery-browser-smoke.html')
+          fixture.write_text('''<!doctype html><html><body><script type="module">
+          import {latestEcmwfRun,ecmwfFrame} from './lib/ecmwf.ts';
+          try{const run=await latestEcmwfRun();const f=await ecmwfFrame(run,0,10);window.result={ok:true,run:f.run,model:f.model,level:f.level,points:f.temperature.length,source:f.source,valid:f.valid,finite:f.temperature.every(Number.isFinite)&&f.u.every(Number.isFinite),zonal:f.zonalWind60N?.value};}
+          catch(e){window.result={ok:false,error:String(e)}}
+          </script></body></html>''')
+          log=open('/tmp/delivery-browser.log','w')
+          server=subprocess.Popen(['npm','run','dev:pages'],stdout=log,stderr=subprocess.STDOUT)
+          try:
+              url='http://127.0.0.1:5174/stratoscope/delivery-browser-smoke.html'
+              for _ in range(80):
+                  try:
+                      with urllib.request.urlopen(url,timeout=2) as r:
+                          if r.status==200:break
+                  except Exception:time.sleep(.5)
+              with sync_playwright() as p:
+                  browser=p.chromium.launch();page=browser.new_page()
+                  page.goto(url,wait_until='domcontentloaded');page.wait_for_function('()=>window.result!==undefined',timeout=180000)
+                  result=page.evaluate('window.result');print('DIRECT_IFS_BROWSER',json.dumps(result),flush=True)
+                  assert result['ok'] and result['points']==32760 and result['finite'] and result['level']==10
+                  browser.close()
+          finally:
+              server.terminate()
+              try:server.wait(timeout=10)
+              except subprocess.TimeoutExpired:server.kill()
+              log.close();fixture.unlink(missing_ok=True)
+          PY
+      - name: Commit tested audit integration and rebuilt site only
+        run: |
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/check-pipelines.py docs
+          git commit -m 'Build verified release pickup, direct IFS replicas and accurate upstream-wait labels'
+          git push origin HEAD:refs/heads/fix/delivery-latency-20261011
+          echo "TESTED_COMMIT=$(git rev-parse HEAD)"
