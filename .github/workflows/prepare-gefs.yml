@@ -1,10 +1,14 @@
 name: Prepare GEFS model maps
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/prepare-gefs.yml']
   schedule:
-    - cron: '3 * * * *'
+    - cron: '23,53 * * * *'
 permissions:
   contents: write
+  actions: write
 concurrency:
   group: prepare-gefs-model-maps
   cancel-in-progress: false
@@ -28,3 +32,15 @@ jobs:
         run: |
           gh auth setup-git --hostname github.com
           python scripts/publish-ensemble-data.py --model gefs --output work/prepared
+      - name: Refresh dependent charts after publication
+        if: success() && github.ref == 'refs/heads/main' && hashFiles('work/prepared/latest.json') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run prepare-diagnostics.yml --ref main
+          gh workflow run prepare-vortex.yml --ref main
+      - name: Recheck publication health after this attempt
+        if: always() && !cancelled() && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run check-pipelines.yml --ref main
