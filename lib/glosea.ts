@@ -27,7 +27,7 @@ export function validateGloSea(input:unknown):GloSea{
  return d;
 }
 export async function fetchGloSea(signal:AbortSignal):Promise<GloSea|null>{
- const response=await fetch(GLOSEA_URL,{signal,cache:'no-cache'});
+ const response=await fetch(GLOSEA_URL+'?check='+Date.now(),{signal,cache:'no-cache'});
  if(response.status===404)return null;
  if(!response.ok)throw Error('The seasonal outlook could not be downloaded.');
  const raw=await response.text();if(raw.length>2_000_000)throw Error('Unexpected seasonal data size.');

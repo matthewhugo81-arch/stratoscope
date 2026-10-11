@@ -40,7 +40,7 @@ async function independentlyAuditedRun():Promise<string|undefined>{
  // network error rather than the actual HTTP status. Use our bounded, successful
  // server-side inventory audit in that case; never infer a run from the clock.
  try{
-  const r=await fetch('https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/forecast-status/latest.json',{cache:'no-store',signal:AbortSignal.timeout(10000)});
+  const r=await fetch('https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/forecast-status/latest.json?check='+Date.now(),{cache:'no-store',signal:AbortSignal.timeout(10000)});
   if(!r.ok)return;
   const text=await r.text();if(text.length>100000)return;
   const d=JSON.parse(text),checked=Date.parse(d.checkedAt),age=Date.now()-checked;

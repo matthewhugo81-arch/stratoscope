@@ -75,7 +75,12 @@ def error_description(error):
     return detail
 
 def public(branch, file='latest.json'):
-    return json.loads(fetch(RAW+branch+'/'+file))
+    # Branch URLs are mutable. Cache-Control alone does not bypass GitHub's
+    # shared CDN, including immediately after a successful publication.
+    url = RAW+branch+'/'+file
+    if not re.fullmatch(r'[a-f0-9]{40}', branch):
+        url += '?_fresh='+str(time.time_ns())
+    return json.loads(fetch(url, headers={'Cache-Control': 'no-cache'}))
 
 def github(endpoint, payload=None):
     token = os.environ['GH_TOKEN']
@@ -281,7 +286,9 @@ def publish(data):
 def recover_results(results, recover, now):
     recovered={}
     for result in results:
-        if result['status']!='behind':continue
+        repair_catalogue = (result.get('failureStage') == 'catalogue' and
+                            result.get('sourceStatus') == 'verified' and result.get('availableRun'))
+        if result['status']!='behind' and not repair_catalogue:continue
         model=result['model']
         if model not in recovered:
             try:
@@ -292,7 +299,11 @@ def recover_results(results, recover, now):
         if isinstance(outcome, Exception):
             result.update(status='error', failureStage='recovery', message=error_description(outcome))
         else:
-            result['status'],result['workflowUrl']=outcome
+            if repair_catalogue:
+                # The catalogue is still invalid until the replacement passes.
+                result['recoveryStatus'],result['workflowUrl']=outcome
+            else:
+                result['status'],result['workflowUrl']=outcome
 
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--recover',action='store_true');parser.add_argument('--publish',action='store_true');args=parser.parse_args()

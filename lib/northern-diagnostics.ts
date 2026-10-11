@@ -9,11 +9,11 @@ export function validateDiagnostics(d:NorthernDiagnostics,model:EnsembleModel){
  }
  return d;
 }
-const cache=new Map<EnsembleModel,NorthernDiagnostics>();
+const cache=new Map<EnsembleModel,{at:number;data:NorthernDiagnostics}>();
 export async function fetchDiagnostics(model:EnsembleModel,signal:AbortSignal,refresh=false){
- if(!refresh&&cache.has(model))return cache.get(model)!;
- const r=await fetch(`https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/forecast-data-diagnostics/${model}.json`,{signal,cache:'no-cache'});
+ const hit=cache.get(model);if(!refresh&&hit&&Date.now()-hit.at<300000)return hit.data;
+ const r=await fetch(`https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/forecast-data-diagnostics/${model}.json?check=${Date.now()}`,{signal,cache:'no-cache'});
  if(!r.ok)throw Error('Complete diagnostics are not published yet');
- const d=validateDiagnostics(await r.json(),model);cache.set(model,d);return d;
+ const d=validateDiagnostics(await r.json(),model);cache.set(model,{at:Date.now(),data:d});return d;
 }
 export const diagnosticMean=(values:number[])=>values.reduce((a,b)=>a+b,0)/values.length;

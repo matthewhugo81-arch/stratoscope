@@ -48,6 +48,7 @@ class WatchTests(unittest.TestCase):
         b[0]['publishedRun']=RUN
         self.assertTrue(watch.should_refresh(watch.signature(a),b,0,1000))
         self.assertFalse(watch.should_refresh(watch.signature(a),b,950,1000))
+        self.assertTrue(watch.should_refresh(watch.signature(a),a,0,10800))
     def test_bounded_watch_does_not_loop_forever_or_dispatch_every_tick(self):
         audit=self.audit();t=[0.]
         def clock():return t[0]
@@ -119,7 +120,7 @@ class WorkflowTests(unittest.TestCase):
     def test_three_hour_audit_remains_and_watcher_is_bounded(self):
         self.assertIn("cron: '11 */3 * * *'",(ROOT/'.github/workflows/check-pipelines.yml').read_text())
         text=(ROOT/'.github/workflows/watch-delivery.yml').read_text()
-        self.assertIn('--minutes 50 --interval 300',text)
+        self.assertIn('--minutes 330 --interval 300',text)
         self.assertIn('cancel-in-progress: false',text)
         self.assertNotIn('CDSAPI_KEY',text)
         # The watcher does not trigger itself through its health refresh.

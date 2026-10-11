@@ -45,7 +45,7 @@ export function validateEra(input:unknown):EraClimate{
  return d;
 }
 async function json(path:string,signal:AbortSignal):Promise<unknown|null>{
- const r=await fetch(SEASONAL_ROOT+path,{signal,cache:'no-cache'});if(r.status===404)return null;if(!r.ok)throw Error('Seasonal download is temporarily unavailable.');
+ const r=await fetch(SEASONAL_ROOT+path+'?check='+Date.now(),{signal,cache:'no-cache'});if(r.status===404)return null;if(!r.ok)throw Error('Seasonal download is temporarily unavailable.');
  const raw=await r.text();if(raw.length>2_000_000)throw Error('Unexpected seasonal file size.');return JSON.parse(raw);
 }
 export async function fetchSeasonal(id:SeasonalId,signal:AbortSignal){const d=await json(`forecast/${id}.json`,signal);return d===null?null:validateForecast(d,id);}
@@ -63,6 +63,6 @@ export function validateEraProgress(input:unknown):EraProgress|null{
  return {checkedAt:report.checkedAt,completedYears:d.completedYears,nextYear,status:d.status};
 }
 export async function fetchEraProgress(signal:AbortSignal){
- const r=await fetch('https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/forecast-status/latest.json',{signal,cache:'no-cache'});
+ const r=await fetch('https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/forecast-status/latest.json?check='+Date.now(),{signal,cache:'no-cache'});
  if(!r.ok)throw Error('ERA5 progress could not be checked.');return validateEraProgress(await r.json());
 }

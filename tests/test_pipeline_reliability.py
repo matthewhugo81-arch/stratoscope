@@ -52,6 +52,26 @@ def entries(model):
 
 
 class HttpTests(unittest.TestCase):
+    def test_published_branch_catalogues_bypass_shared_cdn_cache(self):
+        with patch.object(audit, 'fetch', return_value=b'{}') as read, patch('time.time_ns', return_value=123):
+            audit.public('forecast-data-gefs')
+        self.assertTrue(read.call_args.args[0].endswith('/latest.json?_fresh=123'))
+        self.assertEqual(read.call_args.kwargs['headers']['Cache-Control'], 'no-cache')
+        with patch.object(audit, 'fetch', return_value=b'{}') as read:
+            audit.public('a'*40, 'climate/era5-1993-2016.json')
+        self.assertNotIn('?', read.call_args.args[0])
+
+    def test_preparation_catalogue_is_fresh_but_ranges_remain_unchanged(self):
+        url='https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/forecast-data-gefs/latest.json'
+        with patch('urllib.request.urlopen', return_value=response()) as read, patch('time.time_ns', return_value=456):
+            prep.request(url)
+        req=read.call_args.args[0]
+        self.assertEqual(req.full_url,url+'?_fresh=456')
+        self.assertEqual(req.get_header('Cache-control'),'no-cache')
+        with patch('urllib.request.urlopen', return_value=response(b'data',206,{'Content-Range':'bytes 10-13/100'})) as read:
+            prep.request('https://example.invalid/field',10,4)
+        self.assertEqual(read.call_args.args[0].full_url,'https://example.invalid/field')
+
     def test_audit_retries_temporary_service_failure(self):
         with patch.object(audit.urllib.request, 'urlopen', side_effect=[http_error(), response()]) as read, patch.object(audit.time, 'sleep') as sleep:
             self.assertEqual(audit.fetch('https://example.invalid/data'), b'ok')
@@ -197,6 +217,19 @@ class DiscoveryTests(unittest.TestCase):
 
 
 class RecoveryTests(unittest.TestCase):
+    def test_invalid_catalogue_is_repaired_without_claiming_success(self):
+        result=dict(model='gefs',status='error',failureStage='catalogue',sourceStatus='verified',availableRun=RUN)
+        with patch.object(audit,'recovery',return_value=('updating','job')) as recover:
+            audit.recover_results([result],True,NOW)
+        recover.assert_called_once_with('gefs',True,NOW)
+        self.assertEqual(result['status'],'error')
+        self.assertEqual(result['recoveryStatus'],'updating')
+
+    def test_source_outage_does_not_dispatch_speculative_preparation(self):
+        result=dict(model='gefs',status='error',failureStage='provider',sourceStatus='unavailable')
+        with patch.object(audit,'recovery') as recover:audit.recover_results([result],True,NOW)
+        recover.assert_not_called()
+
     def run_record(self, identifier=1, status='completed', created=None, updated=None):
         return dict(id=identifier, status=status, html_url=f'https://example.invalid/run/{identifier}',
                     created_at=audit.stamp(created or NOW-timedelta(hours=2)),

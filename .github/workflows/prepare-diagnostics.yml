@@ -8,6 +8,7 @@ on:
     - cron: '43 * * * *'
 permissions:
   contents: write
+  actions: write
 concurrency:
   group: northern-diagnostic-series
   cancel-in-progress: false
@@ -23,7 +24,8 @@ jobs:
           python-version: '3.12'
       - run: python -u scripts/prepare-diagnostics.py --output work/diagnostics
       - name: Publish compact diagnostic series
-        if: hashFiles('work/diagnostics/*.json') != ''
+        # Publish independently validated models even if another source fails.
+        if: always() && !cancelled() && hashFiles('work/diagnostics/*.json') != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -38,3 +40,8 @@ jobs:
             git commit -m 'Update complete northern diagnostic series'
             git push origin HEAD:forecast-data-diagnostics
           fi
+      - name: Recheck publication health after this attempt
+        if: always() && !cancelled() && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run check-pipelines.yml --ref main

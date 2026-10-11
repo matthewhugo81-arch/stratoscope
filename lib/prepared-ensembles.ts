@@ -6,7 +6,7 @@ type Manifest={version:number;model:EnsembleModel;run:string;maxHour:number;leve
 const manifests=new Map<EnsembleModel,Manifest>();
 export function clearPreparedManifest(model:string){manifests.delete(model as EnsembleModel);}
 export async function preparedMeta(model:EnsembleModel,signal:AbortSignal):Promise<ForecastMeta>{
- const response=await fetch(root(model)+'latest.json',{signal,cache:'no-cache'});
+ const response=await fetch(root(model)+'latest.json?check='+Date.now(),{signal,cache:'no-cache'});
  if(!response.ok)throw Error('Prepared ensemble maps are not available yet. Please retry shortly, or select an individual member.');
  const m=await response.json() as Manifest;
  if(m.version!==1||m.model!==model||!m.complete||m.count!==memberCount(model)||m.maxHour!==MODELS[model].maxHour||m.step!==6||!/^\d{4}-\d{2}-\d{2}T(00|06|12|18):00:00\.000Z$/.test(m.run)||!Number.isFinite(Date.parse(m.run))||!Number.isFinite(Date.parse(m.preparedAt))||JSON.stringify(m.levels)!==JSON.stringify(MODELS[model].levels))throw Error('The prepared ensemble catalogue is incomplete. Please retry later.');

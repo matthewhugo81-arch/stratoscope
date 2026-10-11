@@ -1,9 +1,17 @@
 import importlib.util,unittest
 from pathlib import Path
 import numpy as np
+import urllib.error
+from unittest.mock import patch
 spec=importlib.util.spec_from_file_location('icon',Path(__file__).resolve().parents[1]/'scripts/prepare-icon.py')
 icon=importlib.util.module_from_spec(spec);spec.loader.exec_module(icon)
 class IconTests(unittest.TestCase):
+    def test_provider_outage_cannot_silently_select_an_older_run(self):
+        for error in [TimeoutError('offline'),urllib.error.HTTPError('https://test.invalid',503,'offline',{},None)]:
+            with patch.object(icon,'request',side_effect=error) as read:
+                with self.assertRaises(type(error)):icon.discover()
+                read.assert_called_once()
+
     def test_temperature_and_geopotential_conversions(self):
         idx=np.array([1,0])
         np.testing.assert_allclose(icon.convert(np.array([273.15,253.15]),'t',idx),[-20,0])

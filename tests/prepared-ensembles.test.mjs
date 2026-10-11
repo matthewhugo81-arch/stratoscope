@@ -38,9 +38,15 @@ test('catalogue requires every forecast and a complete member count',async()=>{
   const m=manifest(fixture);alter(m);globalThis.fetch=async()=>Response.json(m);await assert.rejects(preparedMeta('ifs_ens',signal()));
  }
 });
+
+test('refresh can advance past a stale shared-CDN catalogue',async()=>{
+ const stale=manifest(preparedFixture()),latest={...stale,preparedAt:'2026-10-07T11:00:00Z'};
+ globalThis.fetch=async url=>Response.json(new URL(url).searchParams.has('check')?latest:stale);
+ assert.equal((await preparedMeta('ifs_ens',signal())).fetchedAt,latest.preparedAt);
+});
 test('catalogue checksum binds the one compressed download to its prepared content',async()=>{
  const fixture=preparedFixture(),m=manifest(fixture);let calls=0;
- globalThis.fetch=async url=>{calls++;return String(url).endsWith('latest.json')?Response.json(m):new Response(fixture.packed);};
+ globalThis.fetch=async url=>{calls++;return new URL(url).pathname.endsWith('latest.json')?Response.json(m):new Response(fixture.packed);};
  const meta=await preparedMeta('ifs_ens',signal());assert.equal(meta.run,run);
  assert.equal((await preparedPair('ifs_ens',run,0,10,signal())).mean.temperature[0],-60);assert.equal(calls,2);
  globalThis.fetch=async()=>new Response(preparedFixture('ifs_ens',6).packed);

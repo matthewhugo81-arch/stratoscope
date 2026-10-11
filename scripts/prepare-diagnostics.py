@@ -98,6 +98,16 @@ def prepare(model, output):
     (output/(model+'.json')).write_text(json.dumps(data,separators=(',',':'),allow_nan=False))
     print('COMPLETE',model,m['run'],len(points),flush=True)
 
+def prepare_models(models, output):
+    failed=[]
+    for model in models:
+        try:prepare(model,output)
+        except Exception as error:
+            failed.append(model)
+            print('FAILED',model,type(error).__name__,str(error),flush=True)
+    return failed
+
+
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--model',choices=MODELS);a=p.parse_args()
-    for model in [a.model] if a.model else MODELS: prepare(model,a.output)
+    if prepare_models([a.model] if a.model else MODELS,a.output):raise SystemExit(1)

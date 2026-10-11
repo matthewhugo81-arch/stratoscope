@@ -260,7 +260,7 @@ their complete advertised horizon is available.
 
 `check-pipelines.yml` audits terminal provider inventories, complete public
 catalogues, all member-panel entries, diagnostics and the GEFS 3D timeline every
-20 minutes and after preparation. It recovers idle stale jobs with a 15-minute
+three hours and after preparation. It recovers idle stale jobs with a 15-minute
 retry cooldown, never dispatching duplicate active model jobs. A small public
 `forecast-status/latest.json` drives the site's source freshness notice. The
 notice offers a new published run without unexpectedly changing the user's
@@ -268,3 +268,27 @@ current analysis or deleting cached frames. Status older than 90 minutes is
 labelled overdue. The desktop ingest monitor also checks for missed GitHub
 schedules; GitHub scheduled events can be delayed or dropped, so this is a
 recovery mechanism rather than a guaranteed publication deadline.
+
+### Release pickup and catalogue freshness
+
+The release watcher checks the four prepared model feeds every five minutes for
+up to 330 minutes per standard public runner job (350-minute timeout). Its hourly
+schedule and single concurrency group retain at most one active job and one
+pending successor. This covers gaps caused by missed hourly starts, while
+keeping executions bounded. The three-hour health audit remains separate; an
+active watcher also refreshes it after three hours even if model state is
+unchanged. GitHub scheduling still has no guaranteed deadline.
+
+Mutable catalogue reads use a fresh query key in the browser, health audit,
+preparation skip checks and vortex checkpoints. Cache-Control alone did not
+prevent GitHub's CDN serving a previous run immediately after publication.
+Hash-addressed forecast assets remain cacheable. Northern diagnostic memory
+caches expire after five minutes; explicit Refresh always fetches again.
+
+A damaged published catalogue is eligible for recovery and cannot suppress
+preparation just by declaring itself complete. ICON source outages fail visibly
+instead of being interpreted as proof that an older cycle is latest. Diagnostic
+models prepare independently: a failure preserves that model's prior chart and
+still allows other complete charts to publish. ICON, vortex and diagnostic jobs
+explicitly request a health check after completion, including when a recovery
+job's GitHub token does not trigger downstream workflow events.

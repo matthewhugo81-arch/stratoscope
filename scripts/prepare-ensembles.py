@@ -56,9 +56,16 @@ def retry_delay(error, attempt):
 
 
 def request(url, start=None, length=None, attempts=4):
+    # Every consumer of a mutable generated catalogue (including ICON skip and
+    # vortex checkpoints) must see the branch's current publication.
+    fresh = url.startswith('https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/') and url.endswith('/latest.json')
+    if fresh:
+        url += '?_fresh='+str(time.time_ns())
     for attempt in range(attempts):
         try:
             headers = {'User-Agent': 'Stratoscope-public-ensemble-preparation/1'}
+            if fresh:
+                headers['Cache-Control'] = 'no-cache'
             if start is not None:
                 headers['Range'] = f'bytes={start}-{start+length-1}'
             with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=60) as response:
@@ -304,7 +311,16 @@ def already_published(model,run):
     except urllib.error.HTTPError as e:
         if e.code==404:return False
         raise
-    return previous.get('complete') is True and datetime.fromisoformat(previous['run'].replace('Z','+00:00'))>=run
+    except (ValueError, UnicodeError):
+        return False
+    # A complete flag alone must not suppress repair of a damaged catalogue.
+    try:
+        spec=importlib.util.spec_from_file_location('publication_validation',Path(__file__).with_name('check-pipelines.py'))
+        audit=importlib.util.module_from_spec(spec);spec.loader.exec_module(audit)
+        audit.validate_catalogue(model,previous)
+        return datetime.fromisoformat(previous['run'].replace('Z','+00:00'))>=run
+    except (AssertionError, KeyError, TypeError, ValueError):
+        return False
 
 
 def prepare_hour(task):

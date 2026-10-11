@@ -157,7 +157,7 @@ def main():
             if args.context_only:continue
             fields={}
             for level in [10,20,30,50,70,100]:
-                e=m['files'][f'{level}/{hour}'];b=prep.request(base+e['path'])
+                e=m['files'][f'{level}/{hour}'];b=prep.request(base+e['path']+'?sha='+e['sha256'])
                 assert len(b)==e['bytes'] and hashlib.sha256(b).hexdigest()==e['sha256']
                 fields[level]=mean_frame(b,run,hour,level)
             extra=prep.calculate('gefs',when,hour,EXTRA,6)

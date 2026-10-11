@@ -48,10 +48,13 @@ def check_once(audit, prep, now, recover=True):
 
 
 def should_refresh(previous_signature, reports, last_refresh, now_seconds):
-    return signature(reports) != previous_signature and now_seconds-last_refresh >= 120
+    elapsed = now_seconds-last_refresh
+    # A longer live watcher must also keep the audit fresh if cron is delayed
+    # and no model happens to change during its normal three-hour interval.
+    return elapsed >= 10800 or (signature(reports) != previous_signature and elapsed >= 120)
 
 
-def run_watch(audit, prep, minutes=50, interval=300, recover=True, clock=time.monotonic, sleep=time.sleep):
+def run_watch(audit, prep, minutes=330, interval=300, recover=True, clock=time.monotonic, sleep=time.sleep):
     started = clock()
     last_refresh = float('-inf')
     previous_signature = None
@@ -82,12 +85,12 @@ def run_watch(audit, prep, minutes=50, interval=300, recover=True, clock=time.mo
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--minutes', type=int, default=50)
+    parser.add_argument('--minutes', type=int, default=330)
     parser.add_argument('--interval', type=int, default=300)
     parser.add_argument('--dry-run', action='store_true')
     args = parser.parse_args()
-    if not 0 <= args.minutes <= 50 or not 60 <= args.interval <= 900:
-        parser.error('Watcher is bounded to 50 minutes and 60–900 second polling')
+    if not 0 <= args.minutes <= 330 or not 60 <= args.interval <= 900:
+        parser.error('Watcher is bounded to 330 minutes and 60–900 second polling')
     if os.environ.get('GITHUB_REPOSITORY', REPO) != REPO:
         raise RuntimeError('Unexpected repository')
     if not args.dry_run and (not os.environ.get('GH_TOKEN') or os.environ.get('GITHUB_REF') != 'refs/heads/main'):

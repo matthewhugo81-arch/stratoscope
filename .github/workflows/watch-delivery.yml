@@ -20,7 +20,9 @@ jobs:
   pickup:
     if: github.repository == 'matthewhugo81-arch/stratoscope' && github.event.repository.private == false && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Keep checking across missed hourly schedules. Concurrency allows one
+    # active watcher and one pending successor, without restarting active work.
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
@@ -32,4 +34,4 @@ jobs:
       - name: Pick up available runs every five minutes within this bounded execution
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python -u scripts/watch-delivery.py --minutes 50 --interval 300
+        run: python -u scripts/watch-delivery.py --minutes 330 --interval 300

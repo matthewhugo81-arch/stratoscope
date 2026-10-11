@@ -12,7 +12,7 @@ export function validateIconManifest(m:Manifest){
  return m;
 }
 export async function iconMeta(signal:AbortSignal):Promise<ForecastMeta>{
- const response=await fetch(ROOT+'latest.json',{signal,cache:'no-cache'});
+ const response=await fetch(ROOT+'latest.json?check='+Date.now(),{signal,cache:'no-cache'});
  if(!response.ok)throw Error('Prepared DWD ICON maps are unavailable. Please retry shortly.');
  manifest=validateIconManifest(await response.json());
  return {model:'icon',run:manifest.run,maxHour:180,levels:LEVELS,step:6,runKind:'cycle',fetchedAt:manifest.preparedAt};

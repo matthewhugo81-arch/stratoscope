@@ -95,8 +95,17 @@ class PreparationTests(unittest.TestCase):
             self.assertEqual(p.discover('gefs',now),datetime(2026,10,7,18,tzinfo=timezone.utc))
     def test_existing_complete_run_skips_download_and_cannot_regress(self):
         for stamp,complete,expected in [('2026-10-07T00:00:00.000Z',True,True),('2026-10-07T12:00:00.000Z',True,True),('2026-10-06T18:00:00.000Z',True,False),('2026-10-07T00:00:00.000Z',False,False)]:
-            with patch.object(p,'request',return_value=json.dumps({'run':stamp,'complete':complete}).encode()):
+            key=stamp[:10].replace('-','')+stamp[11:13]
+            def entry(path):return dict(path=path,bytes=123,sha256='a'*64)
+            m=dict(model='gefs',run=stamp,complete=complete,count=31,maxHour=384,step=6,levels=p.CONFIG['gefs']['levels'],
+                   files={f'{l}/{h}':entry(f'{key}/{l}/{h}.bin.gz') for l in p.CONFIG['gefs']['levels'] for h in range(0,385,6)},
+                   panels={str(h):entry(f'{key}/10/{h}.members.bin.gz') for h in range(0,385,6)})
+            with patch.object(p,'request',return_value=json.dumps(m).encode()):
                 self.assertEqual(p.already_published('gefs',RUN),expected)
+            if complete:
+                del m['files']['100/384']
+                with patch.object(p,'request',return_value=json.dumps(m).encode()):
+                    self.assertFalse(p.already_published('gefs',RUN))
     def test_panel_encoding_preserves_each_native_diagnostic(self):
         values=np.zeros((51,3,46,180));values[:,0]=-60;values[:,1]=31000;values[:,2]=25
         diagnostics=[dict(value=-.00001 if i==0 else float(i),samples=1440,longitudeStep=.25,basis='native') for i in range(51)]

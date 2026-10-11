@@ -36,7 +36,10 @@ def discover():
                 names=set(re.findall(r'href="([^"]+)"',listing))
                 assert all(filename(run,h,l,key) in names for h in range(0,181,6) for l in LEVELS)
             return run
-        except Exception: pass
+        except urllib.error.HTTPError as error:
+            if error.code not in {404,410}:raise
+        except AssertionError:
+            continue
     raise RuntimeError('No complete DWD ICON 180-hour run is available')
 
 def decode(data,run,key,hour=None,level=None,identity=None):

@@ -21,6 +21,11 @@ def panel():
     return gzip.compress(b'STRATP01'+struct.pack('<I',len(h))+h+b)
 
 class DiagnosticsTests(unittest.TestCase):
+    def test_one_failed_model_does_not_prevent_other_complete_series(self):
+        with patch.object(d,'prepare',side_effect=[TimeoutError('GEFS unavailable'),None,None]) as prepare:
+            self.assertEqual(d.prepare_models(d.MODELS,Path('unused')),['gefs'])
+        self.assertEqual([c.args[0] for c in prepare.call_args_list],list(d.MODELS))
+
     def test_mutable_catalogues_bypass_cdn_cache(self):
         response = MagicMock()
         response.__enter__.return_value.read.return_value = b'current'
