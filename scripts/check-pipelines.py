@@ -97,7 +97,13 @@ def preparation():
     mod=importlib.util.module_from_spec(spec);spec.loader.exec_module(mod)
     return mod
 
+def delivery_state():
+    spec=importlib.util.spec_from_file_location('delivery_state',Path(__file__).with_name('delivery_state.py'))
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    return module
+
 def direct_latest(model, now):
+    if model=='ecmwf_direct':return delivery_state().latest_direct_ifs(fetch,now)
     interval=6 if model=='gfs' else 12
     start=datetime.fromtimestamp(int(now.timestamp())//(interval*3600)*(interval*3600),timezone.utc)
     for back in range(5):
@@ -107,10 +113,6 @@ def direct_latest(model, now):
                 base=f'https://noaa-gfs-bdp-pds.s3.amazonaws.com/gfs.{day}/{cycle}/atmos/gfs.t{cycle}z.pgrb2.1p00.f240.idx'
                 entries=[line.split(':') for line in fetch(base).decode().splitlines()]
                 assert all(any(p[3]==field and p[4]==f'{level} mb' for p in entries) for level in [10,20,30,50,70,100] for field in ['TMP','HGT','UGRD','VGRD'])
-            elif model=='ecmwf_direct':
-                base=f'https://data.ecmwf.int/forecasts/{day}/{cycle}z/ifs/0p25/oper/{day}{cycle}0000-240h-oper-fc.index'
-                entries=[json.loads(line) for line in fetch(base).decode().splitlines()]
-                assert all(any(p.get('levtype')=='pl' and str(p.get('levelist'))==str(level) and p['param']==field and p['date']==day and int(p['step'])==240 for p in entries) for level in [10,50,100] for field in ['t','gh','u','v'])
             else:
                 for field in ['t','fi','u','v']:
                     listing=fetch(f'https://opendata.dwd.de/weather/nwp/icon/grib/{cycle}/{field}/').decode()
@@ -305,6 +307,7 @@ def main():
     if os.environ.get('GH_TOKEN'):
         recover_results(results,args.recover,now)
     health.record_health(results,previous,now,github if os.environ.get('GH_TOKEN') else None,WORKFLOWS)
+    delivery_state().annotate(results,now)
     seasonal=health.seasonal_health(public,now)
     reference=era_reference(args.recover,now) if os.environ.get('GH_TOKEN') else None
     data=dict(version=1,checkedAt=stamp(datetime.now(timezone.utc)),models=results,era5=reference,seasonal=seasonal,scheduledIntervalHours=3)
