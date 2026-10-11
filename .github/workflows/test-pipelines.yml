@@ -24,6 +24,7 @@ jobs:
           python -m unittest discover -s tests -p test_pipeline_reliability.py -v
           python -m unittest discover -s tests -p test_ecmwf_feed_recovery.py -v
           python -m unittest discover -s tests -p test_ensemble_preparation.py -v
+          python -m unittest discover -s tests -p test_northern_diagnostics.py -v
           python -m unittest discover -s tests -p test_delivery_watch.py -v
           python -m unittest discover -s tests -p 'test_seasonal*.py' -v
           python -m unittest discover -s tests -p test_source_security.py -v

@@ -13,13 +13,19 @@ import json
 import math
 from pathlib import Path
 import struct
+import time
 import urllib.request
 
 ROOT = 'https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/'
 MODELS = {'gefs': (31, 384), 'ifs_ens': (51, 360), 'aifs_ens': (51, 360)}
 
-def fetch(url):
-    with urllib.request.urlopen(url, timeout=60) as r:
+def fetch(url, fresh=False):
+    # Completion-triggered jobs must not mistake a CDN-cached previous
+    # catalogue for the model snapshot that has just been published.
+    if fresh:
+        url += ('&' if '?' in url else '?') + '_fresh=' + str(time.time_ns())
+    request = urllib.request.Request(url, headers={'Cache-Control': 'no-cache'} if fresh else {})
+    with urllib.request.urlopen(request, timeout=60) as r:
         return r.read()
 
 def cap_weights(step=2):
@@ -71,17 +77,17 @@ def validate_manifest(m, model):
 
 def prepare(model, output):
     base=ROOT+'forecast-data-'+model.replace('_','-')+'/'
-    manifest_bytes=fetch(base+'latest.json')
+    manifest_bytes=fetch(base+'latest.json', fresh=True)
     m=json.loads(manifest_bytes); run=validate_manifest(m,model)
     fingerprint=hashlib.sha256(manifest_bytes).hexdigest()
     try:
-        previous=json.loads(fetch(ROOT+'forecast-data-diagnostics/'+model+'.json'))
+        previous=json.loads(fetch(ROOT+'forecast-data-diagnostics/'+model+'.json', fresh=True))
         if previous.get('inputSha256')==fingerprint and previous.get('complete') is True:
             print('UNCHANGED',model,m['run'],flush=True);return
     except urllib.error.HTTPError as e:
         if e.code!=404: raise
     def one(hour):
-        e=m['panels'][str(hour)]; packed=fetch(base+e['path'])
+        e=m['panels'][str(hour)]; packed=fetch(base+e['path']+'?sha='+e['sha256'])
         assert len(packed)==e['bytes'] and hashlib.sha256(packed).hexdigest()==e['sha256'], 'Panel integrity failure'
         return decode_panel(packed,model,m['run'],hour)
     with ThreadPoolExecutor(max_workers=4) as pool:
