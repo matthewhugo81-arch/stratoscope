@@ -281,7 +281,8 @@ def discover(model, now=None):
                             if ('b' if level in [20,30,70] else 'a') != part:continue
                             assert all((key,f'{level} mb') in fields for key in ['TMP','HGT','UGRD','VGRD'])
             else:
-                entries = transport.complete_inventory(ec_entries,model,run,cfg['maxHour'],cfg['levels'],cfg['count'],KEYS,origins=EC_DOWNLOAD_SOURCES)
+                origins = tuple(o for o in EC_DOWNLOAD_SOURCES if o in transport.INVENTORY_ORIGINS)
+                entries = transport.complete_inventory(ec_entries,model,run,cfg['maxHour'],cfg['levels'],cfg['count'],KEYS,origins=origins)
                 identities = {(m,l,k) for _,_,_,m,l,k in entries}
                 assert len(entries)==cfg['count']*len(cfg['levels'])*4
                 assert all((m,l,k) in identities for m in range(cfg['count']) for l in cfg['levels'] for k in KEYS)
