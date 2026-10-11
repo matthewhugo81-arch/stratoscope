@@ -23,6 +23,7 @@ jobs:
           python -m py_compile scripts/check-pipelines.py scripts/prepare-ensembles.py scripts/ecmwf_transport.py scripts/pipeline_freshness.py scripts/seasonal_config.py scripts/prepare-seasonal.py scripts/watch-delivery.py scripts/delivery_state.py
           python -m unittest discover -s tests -p test_pipeline_reliability.py -v
           python -m unittest discover -s tests -p test_ecmwf_feed_recovery.py -v
+          python -m unittest discover -s tests -p test_ensemble_preparation.py -v
           python -m unittest discover -s tests -p test_delivery_watch.py -v
           python -m unittest discover -s tests -p 'test_seasonal*.py' -v
           python -m unittest discover -s tests -p test_source_security.py -v

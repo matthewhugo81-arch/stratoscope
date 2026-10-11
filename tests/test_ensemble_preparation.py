@@ -9,6 +9,7 @@ import tempfile
 import unittest
 import pickle
 import urllib.error
+from concurrent.futures import Future
 from email.utils import format_datetime
 from datetime import timedelta
 from unittest.mock import patch, MagicMock
@@ -22,6 +23,22 @@ RUN = datetime(2026, 10, 7, tzinfo=timezone.utc)
 
 
 class PreparationTests(unittest.TestCase):
+    def test_failed_transfer_cancels_queued_downloads_before_mirror_failover(self):
+        entries = [('https://test.invalid/data', (m*4+k)*40, 20, m, 10, key)
+                   for m in range(51) for k,key in enumerate(p.KEYS)]
+        # A later completion fails before an earlier slow transfer finishes.
+        # Ordered map would keep waiting; the failed origin must be abandoned.
+        pending = Future()
+        failed = Future()
+        failed.set_exception(urllib.error.HTTPError('https://test.invalid/data',429,'Limited',{},None))
+        queued = [Future() for _ in range(len(entries)-2)]
+        with patch.object(p,'ec_entries',return_value=entries), patch.object(p,'ThreadPoolExecutor') as executor:
+            executor.return_value.__enter__.return_value.submit.side_effect = [pending,failed,*queued]
+            with self.assertRaises(urllib.error.HTTPError):
+                p.calculate('ifs_ens',RUN,0,[10],2)
+        self.assertTrue(pending.cancelled())
+        self.assertTrue(all(f.cancelled() for f in queued))
+
     def test_gefs_ingest_saves_member_heat_flux_without_additional_downloads(self):
         entries=[('https://test.invalid/data',(m*4+k)*20,20,m,100,key) for m in range(31) for k,key in enumerate(p.KEYS)]
         wave=np.sin(np.arange(360)*np.pi/180)
@@ -70,7 +87,7 @@ class PreparationTests(unittest.TestCase):
     def test_gefs_18z_is_selected_when_newer_00z_is_incomplete(self):
         now=datetime(2026,10,8,5,tzinfo=timezone.utc)
         def inventory(url,**kwargs):
-            if 'gefs.20261008/00/' in url:raise FileNotFoundError('cycle still publishing')
+            if 'gefs.20261008/00/' in url:raise urllib.error.HTTPError(url,404,'cycle still publishing',{},None)
             self.assertIn('gefs.20261007/18/',url)
             levels=[20,30,70] if 'pgrb2bp5' in url else [10,50,100]
             return '\n'.join(f'1:0:d=2026100718:{key}:{level} mb:384 hour fcst:' for level in levels for key in ['TMP','HGT','UGRD','VGRD']).encode()

@@ -34,6 +34,20 @@ class Mirrors(unittest.TestCase):
         self.assertEqual(prep.EC_ORIGIN,'https://data.ecmwf.int/forecasts')
     def test_non_official_source_rejected(self):
         with self.assertRaises(ValueError): transport.validate_origin('https://example.invalid')
+    def test_missing_google_hour_uses_official_aws_before_throttled_portal(self):
+        self.assertEqual(transport.ORIGINS[1], 'https://d2zvc0wgha4k2l.cloudfront.net')
+        self.assertEqual(transport.ORIGINS[-1], 'https://data.ecmwf.int/forecasts')
+        calculate = Mock(side_effect=[error(404), {'verified': True}, error(429)])
+        result = transport.calculate_hour(calculate, 'ifs_ens', RUN, 24, [10,50,100], 2)
+        self.assertEqual(result, {'verified': True})
+        self.assertEqual(calculate.call_count, 2)
+        self.assertEqual([c.kwargs['origin'] for c in calculate.call_args_list], list(transport.ORIGINS[:2]))
+        self.assertTrue(all(c.args[1:4] == (RUN,24,[10,50,100]) for c in calculate.call_args_list))
+    def test_terminal_inventory_uses_aws_when_google_cycle_has_holes(self):
+        read = Mock(side_effect=[error(404), entries(), error(429)])
+        self.assertEqual(len(self.inventory(read)), 612)
+        self.assertEqual(read.call_count, 2)
+        self.assertEqual(read.call_args_list[1].kwargs['origin'], transport.ORIGINS[1])
     def test_inventory_error_uses_another_source_for_the_same_cycle(self):
         read=Mock(side_effect=[error(429),entries()])
         self.assertEqual(len(self.inventory(read)),612)

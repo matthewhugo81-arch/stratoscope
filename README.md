@@ -222,6 +222,15 @@ Wind maps include an optional, default-enabled arrow overlay. Screen-spaced arro
 
 ### Forecast delivery reliability
 
+ECMWF ensemble ingestion tries the official Google replica, then ECMWF's
+[AWS CloudFront replica](https://registry.opendata.aws/ecmwf-forecasts/), then
+the main ECMWF portal. A mirror may have gaps within an otherwise available
+cycle. Each forecast hour is re-indexed on its replacement mirror, keeping
+GRIB ranges and inventories on the same origin. Failed transfers cancel queued
+requests before failover, so a throttled origin cannot keep draining the entire
+hour's download queue. All member, field, level and run validation remains
+required before publication.
+
 ECMWF ENS and AIFS preparation now has a separate concurrency lock per model,
 checks twice an hour, and processes two forecast hours in separate native-decoder
 processes on the public runner. Only a fully validated run is published. IFS ENS

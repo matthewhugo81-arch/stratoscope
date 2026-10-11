@@ -4,7 +4,7 @@ Only compact sampled statistics are published; raw fields stay in runner memory.
 No credentials, paid APIs, Actions artifacts, caches or cloud resources are used.
 """
 import argparse
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 from email.utils import parsedate_to_datetime
 import gzip
@@ -206,8 +206,17 @@ def calculate(model, run, hour, levels, workers, panel_writer=None, heat_writer=
         return result
     downloaded = {}
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        for decoded in pool.map(read_group, groups(entries)):
-            downloaded.update(decoded)
+        transfers = [pool.submit(read_group, batch) for batch in groups(entries)]
+        try:
+            for transfer in as_completed(transfers):
+                downloaded.update(transfer.result())
+        except BaseException:
+            # Do not drain hundreds of queued requests to a failed/throttled
+            # origin before calculate_hour can try another official replica.
+            # The executor still joins active transfers before the next origin.
+            for transfer in transfers:
+                transfer.cancel()
+            raise
     results = {}
     for level in levels:
         values = {key: np.stack([downloaded[m, level, key][0] for m in range(CONFIG[model]['count'])]) for key in KEYS}
