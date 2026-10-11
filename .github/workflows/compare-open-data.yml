@@ -1,0 +1,41 @@
+name: Compare official feed availability
+on:
+  push:
+    branches: [ops/compare-open-data-20261011]
+    paths: [.github/workflows/compare-open-data.yml]
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Compare initialization metadata and a small pressure-level sample
+        run: |
+          python -u - <<'PY'
+          import json,urllib.request,urllib.error
+          from datetime import datetime,timezone
+          def stamp(n):return datetime.fromtimestamp(n,timezone.utc).isoformat() if isinstance(n,(int,float)) else n
+          def read(url):
+              with urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'Stratoscope-source-comparison','Cache-Control':'no-cache'}),timeout=20) as r:return json.load(r)
+          print('CHECK_TIME',datetime.now(timezone.utc).isoformat(),flush=True)
+          for model in ['ecmwf_ifs','ecmwf_ifs025','ecmwf_ifs025_ensemble','ncep_gefs025','ncep_gfs013']:
+              url='https://api.open-meteo.com/data/'+model+'/static/meta.json'
+              try:
+                  d=read(url)
+                  print('OPEN_METEO_META',model,json.dumps({k:stamp(d.get(k)) for k in ['last_run_initialisation_time','last_run_modification_time','last_run_availability_time']}),flush=True)
+              except Exception as e:print('OPEN_METEO_META_ERROR',model,type(e).__name__,str(e)[:160],flush=True)
+          url='https://api.open-meteo.com/v1/forecast?latitude=60&longitude=0&hourly=temperature_50hPa,wind_speed_50hPa&models=ecmwf_ifs025&forecast_hours=3&timezone=UTC&wind_speed_unit=ms'
+          try:
+              d=read(url);print('OPEN_METEO_50HPA_SAMPLE',json.dumps({'units':d.get('hourly_units'),'hourly':d.get('hourly')}),flush=True)
+          except Exception as e:print('OPEN_METEO_SAMPLE_ERROR',type(e).__name__,str(e)[:160],flush=True)
+          for root in ['https://storage.googleapis.com/ecmwf-open-data','https://data.ecmwf.int/forecasts']:
+              for kind,stream in [('fc','oper'),('ef','enfo')]:
+                  url=root+'/20261011/00z/ifs/0p25/'+stream+'/20261011000000-360h-'+stream+'-'+kind+'.index'
+                  try:
+                      with urllib.request.urlopen(url,timeout=20) as r:lines=r.read().decode().splitlines()
+                      selected=[json.loads(l) for l in lines]
+                      selected=[x for x in selected if x.get('levtype')=='pl' and str(x.get('levelist')) in ['10','50','100'] and x.get('param') in ['t','gh','u','v']]
+                      print('IFS_00Z_INVENTORY',root,kind,'entries',len(selected),flush=True)
+                  except Exception as e:print('IFS_00Z_NOT_AVAILABLE',root,kind,type(e).__name__,str(e)[:160],flush=True)
+          PY
