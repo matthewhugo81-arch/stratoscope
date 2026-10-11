@@ -35,8 +35,29 @@ function select(entries:Entry[],run:string,hour:number,level:number){
   return {entry:e,key:key as 'temperature'|'height'|'u'|'v'};
  });
 }
+async function independentlyAuditedRun():Promise<string|undefined>{
+ // Some official 404 responses omit CORS headers, so a browser sees a generic
+ // network error rather than the actual HTTP status. Use our bounded, successful
+ // server-side inventory audit in that case; never infer a run from the clock.
+ try{
+  const r=await fetch('https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/forecast-status/latest.json',{cache:'no-store',signal:AbortSignal.timeout(10000)});
+  if(!r.ok)return;
+  const text=await r.text();if(text.length>100000)return;
+  const d=JSON.parse(text),checked=Date.parse(d.checkedAt),age=Date.now()-checked;
+  if(d.version!==1||!Number.isFinite(checked)||age< -300000||age>12600000||!Array.isArray(d.models))return;
+  const f=d.models.find((x:{model?:string})=>x?.model==='ecmwf_direct');
+  if(f?.sourceStatus!=='verified'||f?.status!=='direct'||typeof f.availableRun!=='string')return;
+  const time=Date.parse(f.availableRun),date=new Date(time);
+  if(!Number.isFinite(time)||time>Date.now()||Date.now()-time>172800000||![0,12].includes(date.getUTCHours())||date.getUTCMinutes()||date.getUTCSeconds())return;
+  const run=date.toISOString();
+  // Recheck the reported run's terminal fields before returning it. The visible
+  // pipeline notice retains the audit time and any source-pending warning.
+  for(const origin of origins){
+   try{const entries=await inventory(run,240,origin);for(const level of [10,50,100])select(entries,run,240,level);return run;}catch{}
+  }
+ }catch{}
+}
 export async function latestEcmwfRun(){
- // Cache discovery briefly, never the previous run for a quarter of an hour.
  if(latest&&Date.now()-latest.at<60000)return latest.run;
  const start=Math.floor(Date.now()/(12*3600000))*12*3600000;
  for(let back=0;back<4;back++){
@@ -52,9 +73,11 @@ export async function latestEcmwfRun(){
     else if(!(e instanceof MissingInventory)&&!(e instanceof IncompleteInventory))throw e;
    }
   }
-  // Missing on every replica permits an older complete cycle. A failed source
-  // check does not prove that the newer run is absent.
-  if(outage)throw new Error('Unable to verify the newest ECMWF run on the official feeds. Please retry; an older run was not silently substituted.');
+  if(outage){
+   const audited=await independentlyAuditedRun();
+   if(audited){latest={at:Date.now(),run:audited};return audited;}
+   throw new Error('Unable to verify the newest ECMWF run on the official feeds. Please retry; an older run was not silently substituted.');
+  }
  }
  throw Error('ECMWF is not returning a complete ten-day IFS run. Please try again shortly.');
 }
@@ -71,7 +94,6 @@ export function northernGrid(values:number[],g:Grid){
 async function fromOrigin(run:string,hour:number,level:number,origin:string):Promise<Frame>{
  const selected=select(await inventory(run,hour,origin),run,hour,level),fields:Partial<Record<'temperature'|'height'|'u'|'v',number[]>>={};
  let zonalWind60N:ZonalWind|undefined;
- // Index and all corresponding byte ranges come from the same official host.
  for(const {entry:e,key} of selected){
   const end=e._offset+e._length-1,response=await get(baseUrl(run,hour,origin)+'.grib2',{headers:{Range:`bytes=${e._offset}-${end}`},signal:AbortSignal.timeout(30000)});
   const range=response.headers.get('Content-Range');
