@@ -12,9 +12,10 @@ export async function forecastRequest(query:string,signal:AbortSignal):Promise<F
 }
 const metadata=new Map<string,{at:number;value:ForecastMeta}>();
 export function clearForecastMeta(model:ModelId){for(const key of metadata.keys())if(key.startsWith(model+'/'))metadata.delete(key)}
-export async function forecastMeta(model:ModelId,signal:AbortSignal,summary=true){
- signal.throwIfAborted();const key=model+'/'+summary,hit=metadata.get(key);
+export async function forecastMeta(model:ModelId,signal:AbortSignal){
+ signal.throwIfAborted();const key=model+'/cycle',hit=metadata.get(key);
  if(hit&&Date.now()-hit.at<300000)return hit.value;
- const value=await (isEnsemble(model)&&summary?preparedMeta(model,signal):forecastRequest(`meta=1&model=${model}`,signal) as Promise<ForecastMeta>);
+ // Mean, spread and members must stay on the same verified complete cycle.
+ const value=await (isEnsemble(model)?preparedMeta(model,signal):forecastRequest(`meta=1&model=${model}`,signal) as Promise<ForecastMeta>);
  signal.throwIfAborted();metadata.set(key,{at:Date.now(),value});return value;
 }

@@ -4,6 +4,20 @@ Interactive Northern Hemisphere stratosphere globe, hosted on **GitHub Pages**. 
 
 [Live viewer](https://matthewhugo81-arch.github.io/stratoscope/)
 
+Prepared ensemble timelines load up to four compact frames concurrently, with no
+artificial pause between frames. The selected time takes priority; newly free
+slots follow the current direction along the timeline. Failed background times
+retry twice while the other times continue. Hidden tabs, data saver and slow 2G
+connections pause preloading. Direct-member preloading keeps one background job
+so the other weather worker remains available for the selected map.
+
+Mean, spread and individual-member views share the same complete published run.
+Member selection does not rediscover a different provider cycle. ECMWF member
+downloads try Google's official mirror, the official AWS CloudFront mirror, then
+the main ECMWF portal. Each mirror supplies its own index and byte ranges; two
+fields download concurrently, with strict run, lead, level and member checks.
+The 1-degree display grid and native 60N wind calculation are unchanged.
+
 ## Run and publish
 
 Use Node.js 22.13 or newer and npm:
