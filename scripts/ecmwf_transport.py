@@ -11,6 +11,11 @@ import urllib.error
 
 ORIGINS = (
     'https://storage.googleapis.com/ecmwf-open-data',
+    # ECMWF's public AWS replica, through its documented CloudFront endpoint.
+    # Google can have holes in a cycle even when earlier hours are available.
+    # Try the independent cloud replica before the rate-limited main portal.
+    # https://registry.opendata.aws/ecmwf-forecasts/
+    'https://d2zvc0wgha4k2l.cloudfront.net',
     'https://data.ecmwf.int/forecasts',
 )
 TRANSIENT_CODES = {408, 429, 500, 502, 503, 504}
