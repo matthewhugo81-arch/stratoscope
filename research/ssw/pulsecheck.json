@@ -1,0 +1,899 @@
+{
+  "version": 1,
+  "issuedAt": "2026-10-09T07:31:17.876057Z",
+  "status": "limited_operational_data_example",
+  "runAgeHours": {
+    "gfs": 7.521632238055556,
+    "ifs": 19.521632238055556,
+    "icon": 7.521632238055556,
+    "gefs": 7.521632238055556,
+    "ifs_ens": 19.521632238055556,
+    "aifs_ens": 7.521632238055556
+  },
+  "scope": "Verified initial/day-five snapshots; not a complete forecast timeline or calibrated early-warning system",
+  "comparisons": [
+    {
+      "validTime": "2026-10-09T00:00:00Z",
+      "models": {
+        "gfs": {
+          "run": "2026-10-09T00:00:00Z",
+          "leadHours": 0,
+          "count": 1,
+          "wind": {
+            "count": 1,
+            "mean": 15.395850151909723,
+            "minimum": 15.395850151909723,
+            "maximum": 15.395850151909723,
+            "p10": 15.395850151909723,
+            "p90": 15.395850151909723
+          },
+          "temperature10K": {
+            "count": 1,
+            "mean": 217.99220061934562,
+            "minimum": 217.99220061934562,
+            "maximum": 217.99220061934562,
+            "p10": 217.99220061934562,
+            "p90": 217.99220061934562
+          },
+          "heatFlux100": {
+            "total": {
+              "count": 1,
+              "mean": 5.281582063674371,
+              "minimum": 5.281582063674371,
+              "maximum": 5.281582063674371,
+              "p10": 5.281582063674371,
+              "p90": 5.281582063674371
+            },
+            "wave1": {
+              "count": 1,
+              "mean": 1.1654688732347553,
+              "minimum": 1.1654688732347553,
+              "maximum": 1.1654688732347553,
+              "p10": 1.1654688732347553,
+              "p90": 1.1654688732347553
+            },
+            "wave2": {
+              "count": 1,
+              "mean": 1.022352317804074,
+              "minimum": 1.022352317804074,
+              "maximum": 1.022352317804074,
+              "p10": 1.022352317804074,
+              "p90": 1.022352317804074
+            },
+            "residual": {
+              "count": 1,
+              "mean": 3.0937608726355412,
+              "minimum": 3.0937608726355412,
+              "maximum": 3.0937608726355412,
+              "p10": 3.0937608726355412,
+              "p90": 3.0937608726355412
+            }
+          },
+          "h500": {
+            "northAtlantic": 27.91295275241869,
+            "europe": -31.490035266653642,
+            "asia": -5.023805987782391,
+            "northPacific": -12.231539308837894,
+            "northAmerica": -26.48797870688015,
+            "polarCap": -53.903775901981376
+          }
+        },
+        "ifs": {
+          "run": "2026-10-08T12:00:00Z",
+          "leadHours": 12,
+          "count": 1,
+          "wind": {
+            "count": 1,
+            "mean": 15.102387152777778,
+            "minimum": 15.102387152777778,
+            "maximum": 15.102387152777778,
+            "p10": 15.102387152777778,
+            "p90": 15.102387152777778
+          },
+          "temperature10K": {
+            "count": 1,
+            "mean": 217.71177931371543,
+            "minimum": 217.71177931371543,
+            "maximum": 217.71177931371543,
+            "p10": 217.71177931371543,
+            "p90": 217.71177931371543
+          },
+          "heatFlux100": {
+            "total": {
+              "count": 1,
+              "mean": 5.10312432116483,
+              "minimum": 5.10312432116483,
+              "maximum": 5.10312432116483,
+              "p10": 5.10312432116483,
+              "p90": 5.10312432116483
+            },
+            "wave1": {
+              "count": 1,
+              "mean": 1.375286403781354,
+              "minimum": 1.375286403781354,
+              "maximum": 1.375286403781354,
+              "p10": 1.375286403781354,
+              "p90": 1.375286403781354
+            },
+            "wave2": {
+              "count": 1,
+              "mean": 1.0897400148511664,
+              "minimum": 1.0897400148511664,
+              "maximum": 1.0897400148511664,
+              "p10": 1.0897400148511664,
+              "p90": 1.0897400148511664
+            },
+            "residual": {
+              "count": 1,
+              "mean": 2.6380979025323095,
+              "minimum": 2.6380979025323095,
+              "maximum": 2.6380979025323095,
+              "p10": 2.6380979025323095,
+              "p90": 2.6380979025323095
+            }
+          },
+          "h500": {
+            "northAtlantic": 34.792368406611125,
+            "europe": -28.284262732829735,
+            "asia": -2.4296562454152664,
+            "northPacific": -9.385856370627716,
+            "northAmerica": -22.86067522329306,
+            "polarCap": -52.02369265743617
+          }
+        },
+        "icon": {
+          "run": "2026-10-09T00:00:00Z",
+          "leadHours": 0,
+          "count": 1,
+          "wind": null,
+          "temperature10K": null,
+          "heatFlux100": {
+            "total": {
+              "count": 1,
+              "mean": 5.055335869592468,
+              "minimum": 5.055335869592468,
+              "maximum": 5.055335869592468,
+              "p10": 5.055335869592468,
+              "p90": 5.055335869592468
+            },
+            "wave1": {
+              "count": 1,
+              "mean": 1.1508772764445896,
+              "minimum": 1.1508772764445896,
+              "maximum": 1.1508772764445896,
+              "p10": 1.1508772764445896,
+              "p90": 1.1508772764445896
+            },
+            "wave2": {
+              "count": 1,
+              "mean": 1.0212715117980777,
+              "minimum": 1.0212715117980777,
+              "maximum": 1.0212715117980777,
+              "p10": 1.0212715117980777,
+              "p90": 1.0212715117980777
+            },
+            "residual": {
+              "count": 1,
+              "mean": 2.8831870813498006,
+              "minimum": 2.8831870813498006,
+              "maximum": 2.8831870813498006,
+              "p10": 2.8831870813498006,
+              "p90": 2.8831870813498006
+            }
+          },
+          "h500": {
+            "northAtlantic": 32.77600363546274,
+            "europe": -30.256937667043392,
+            "asia": -4.887076064395233,
+            "northPacific": -11.501138785306965,
+            "northAmerica": -23.404581249698495,
+            "polarCap": -54.56140800609655
+          }
+        },
+        "gefs": {
+          "run": "2026-10-09T00:00:00Z",
+          "leadHours": 0,
+          "count": 31,
+          "wind": {
+            "count": 31,
+            "mean": 15.348207335769487,
+            "minimum": 15.130139268663196,
+            "maximum": 15.664097222222225,
+            "p10": 15.230925184461805,
+            "p90": 15.496441080729166,
+            "easterlyMembers": 0,
+            "fraction": 0.0,
+            "interpretation": "raw instantaneous member fraction; not calibrated SSW probability"
+          },
+          "temperature10K": {
+            "count": 31,
+            "mean": 217.90075155572598,
+            "minimum": 217.86349064593855,
+            "maximum": 217.92884316975008,
+            "p10": 217.88430108547465,
+            "p90": 217.91813232435533
+          },
+          "heatFlux100": {
+            "total": {
+              "count": 31,
+              "mean": 5.757517901315446,
+              "minimum": 5.532390336779786,
+              "maximum": 6.097890551194333,
+              "p10": 5.564610282012127,
+              "p90": 6.024540145210294
+            },
+            "wave1": {
+              "count": 31,
+              "mean": 1.1424491808927069,
+              "minimum": 0.9858119484698499,
+              "maximum": 1.271250328465458,
+              "p10": 1.0761543145279289,
+              "p90": 1.209825485991697
+            },
+            "wave2": {
+              "count": 31,
+              "mean": 1.1464745695986,
+              "minimum": 1.0536249006858462,
+              "maximum": 1.2412593144943291,
+              "p10": 1.0842206547290483,
+              "p90": 1.2255194698231984
+            },
+            "residual": {
+              "count": 31,
+              "mean": 3.4685941508241376,
+              "minimum": 3.259857350924274,
+              "maximum": 3.713447808073247,
+              "p10": 3.281749218726964,
+              "p90": 3.667212782061564
+            }
+          },
+          "h500": {
+            "northAtlantic": 27.701406263375,
+            "europe": -32.553133467584814,
+            "asia": -5.501708632617061,
+            "northPacific": -13.762939330554852,
+            "northAmerica": -26.443764074757976,
+            "polarCap": -53.33527443999622
+          }
+        },
+        "ifs_ens": {
+          "run": "2026-10-08T12:00:00Z",
+          "leadHours": 12,
+          "count": 51,
+          "wind": {
+            "count": 51,
+            "mean": 15.110829637980409,
+            "minimum": 14.897967529296874,
+            "maximum": 15.302540418836806,
+            "p10": 14.961784193250868,
+            "p90": 15.230382283528646,
+            "easterlyMembers": 0,
+            "fraction": 0.0,
+            "interpretation": "raw instantaneous member fraction; not calibrated SSW probability"
+          },
+          "temperature10K": {
+            "count": 51,
+            "mean": 217.70575212005872,
+            "minimum": 217.65711192653637,
+            "maximum": 217.7327012670379,
+            "p10": 217.6883216215468,
+            "p90": 217.72314453510313
+          },
+          "heatFlux100": {
+            "total": {
+              "count": 51,
+              "mean": 5.151926529996433,
+              "minimum": 4.888408714206522,
+              "maximum": 5.502046360590708,
+              "p10": 4.993002859773086,
+              "p90": 5.33662710388947
+            },
+            "wave1": {
+              "count": 51,
+              "mean": 1.3917999193896267,
+              "minimum": 1.2310996842012119,
+              "maximum": 1.5203694841339215,
+              "p10": 1.321299039512664,
+              "p90": 1.4606179033741837
+            },
+            "wave2": {
+              "count": 51,
+              "mean": 1.0895969395106,
+              "minimum": 0.9307272438728945,
+              "maximum": 1.208750627346951,
+              "p10": 1.0121950065309502,
+              "p90": 1.157063280671244
+            },
+            "residual": {
+              "count": 51,
+              "mean": 2.670529671096206,
+              "minimum": 2.471971574484645,
+              "maximum": 2.988325437586089,
+              "p10": 2.5121774838733844,
+              "p90": 2.8087396612088753
+            }
+          },
+          "h500": {
+            "northAtlantic": 34.21514053501595,
+            "europe": -28.416014279894757,
+            "asia": -2.346425509698304,
+            "northPacific": -9.259463541454055,
+            "northAmerica": -23.087925904308726,
+            "polarCap": -51.8399781924012
+          }
+        },
+        "aifs_ens": {
+          "run": "2026-10-09T00:00:00Z",
+          "leadHours": 0,
+          "count": 51,
+          "wind": {
+            "count": 51,
+            "mean": 15.22814933594016,
+            "minimum": 14.995691765679254,
+            "maximum": 15.496371629503038,
+            "p10": 15.10264909532335,
+            "p90": 15.346366288926866,
+            "easterlyMembers": 0,
+            "fraction": 0.0,
+            "interpretation": "raw instantaneous member fraction; not calibrated SSW probability"
+          },
+          "temperature10K": {
+            "count": 51,
+            "mean": 217.86018880520808,
+            "minimum": 217.82912956246702,
+            "maximum": 217.90299494533312,
+            "p10": 217.8326493865275,
+            "p90": 217.8823744643072
+          },
+          "heatFlux100": {
+            "total": {
+              "count": 51,
+              "mean": 5.432472935602479,
+              "minimum": 5.152769896818282,
+              "maximum": 5.74776806387021,
+              "p10": 5.246007725683359,
+              "p90": 5.597734736522374
+            },
+            "wave1": {
+              "count": 51,
+              "mean": 1.2113130045046359,
+              "minimum": 1.0794759810500953,
+              "maximum": 1.3475927907971677,
+              "p10": 1.1449757817571817,
+              "p90": 1.2771354399982568
+            },
+            "wave2": {
+              "count": 51,
+              "mean": 1.1092715720212412,
+              "minimum": 1.01739309217847,
+              "maximum": 1.2339393023819558,
+              "p10": 1.0397289474823779,
+              "p90": 1.164963777743473
+            },
+            "residual": {
+              "count": 51,
+              "mean": 3.1118883590766004,
+              "minimum": 2.8550918486905665,
+              "maximum": 3.3941555113729445,
+              "p10": 2.9314596830839856,
+              "p90": 3.292184403988775
+            }
+          },
+          "h500": {
+            "northAtlantic": 34.19903757373635,
+            "europe": -28.17743886463105,
+            "asia": -3.901348002835894,
+            "northPacific": -8.307035958254183,
+            "northAmerica": -23.165663110686534,
+            "polarCap": -52.40330185043948
+          }
+        }
+      },
+      "rangeOfModelMeanWindsMps": [
+        15.102387152777778,
+        15.395850151909723
+      ],
+      "note": "Models are dependent; deterministic IFS duplicates IFS ENS control"
+    },
+    {
+      "validTime": "2026-10-14T00:00:00Z",
+      "models": {
+        "gfs": {
+          "run": "2026-10-09T00:00:00Z",
+          "leadHours": 120,
+          "count": 1,
+          "wind": {
+            "count": 1,
+            "mean": 17.514722330729168,
+            "minimum": 17.514722330729168,
+            "maximum": 17.514722330729168,
+            "p10": 17.514722330729168,
+            "p90": 17.514722330729168
+          },
+          "temperature10K": {
+            "count": 1,
+            "mean": 216.4244345739602,
+            "minimum": 216.4244345739602,
+            "maximum": 216.4244345739602,
+            "p10": 216.4244345739602,
+            "p90": 216.4244345739602
+          },
+          "heatFlux100": {
+            "total": {
+              "count": 1,
+              "mean": 6.345222881704914,
+              "minimum": 6.345222881704914,
+              "maximum": 6.345222881704914,
+              "p10": 6.345222881704914,
+              "p90": 6.345222881704914
+            },
+            "wave1": {
+              "count": 1,
+              "mean": 2.5776825297841204,
+              "minimum": 2.5776825297841204,
+              "maximum": 2.5776825297841204,
+              "p10": 2.5776825297841204,
+              "p90": 2.5776825297841204
+            },
+            "wave2": {
+              "count": 1,
+              "mean": 0.15704724790849056,
+              "minimum": 0.15704724790849056,
+              "maximum": 0.15704724790849056,
+              "p10": 0.15704724790849056,
+              "p90": 0.15704724790849056
+            },
+            "residual": {
+              "count": 1,
+              "mean": 3.610493104012303,
+              "minimum": 3.610493104012303,
+              "maximum": 3.610493104012303,
+              "p10": 3.610493104012303,
+              "p90": 3.610493104012303
+            }
+          },
+          "h500": {
+            "northAtlantic": -112.80050611505625,
+            "europe": 87.20003709565029,
+            "asia": 48.45473221485963,
+            "northPacific": -14.01482437925769,
+            "northAmerica": -1.9618853010507398,
+            "polarCap": -96.99515835477486
+          }
+        },
+        "ifs": {
+          "run": "2026-10-08T12:00:00Z",
+          "leadHours": 132,
+          "count": 1,
+          "wind": {
+            "count": 1,
+            "mean": 17.11945326063368,
+            "minimum": 17.11945326063368,
+            "maximum": 17.11945326063368,
+            "p10": 17.11945326063368,
+            "p90": 17.11945326063368
+          },
+          "temperature10K": {
+            "count": 1,
+            "mean": 215.20044192765883,
+            "minimum": 215.20044192765883,
+            "maximum": 215.20044192765883,
+            "p10": 215.20044192765883,
+            "p90": 215.20044192765883
+          },
+          "heatFlux100": {
+            "total": {
+              "count": 1,
+              "mean": 5.25499785536814,
+              "minimum": 5.25499785536814,
+              "maximum": 5.25499785536814,
+              "p10": 5.25499785536814,
+              "p90": 5.25499785536814
+            },
+            "wave1": {
+              "count": 1,
+              "mean": 2.3782946674650733,
+              "minimum": 2.3782946674650733,
+              "maximum": 2.3782946674650733,
+              "p10": 2.3782946674650733,
+              "p90": 2.3782946674650733
+            },
+            "wave2": {
+              "count": 1,
+              "mean": 0.2542811660666514,
+              "minimum": 0.2542811660666514,
+              "maximum": 0.2542811660666514,
+              "p10": 0.2542811660666514,
+              "p90": 0.2542811660666514
+            },
+            "residual": {
+              "count": 1,
+              "mean": 2.6224220218364156,
+              "minimum": 2.6224220218364156,
+              "maximum": 2.6224220218364156,
+              "p10": 2.6224220218364156,
+              "p90": 2.6224220218364156
+            }
+          },
+          "h500": {
+            "northAtlantic": -90.77077941312511,
+            "europe": 91.49193167006031,
+            "asia": 43.39713516557866,
+            "northPacific": -17.72114291327301,
+            "northAmerica": 16.40405668773655,
+            "polarCap": -105.17654694474176
+          }
+        },
+        "icon": {
+          "run": "2026-10-09T00:00:00Z",
+          "leadHours": 120,
+          "count": 1,
+          "wind": null,
+          "temperature10K": null,
+          "heatFlux100": {
+            "total": {
+              "count": 1,
+              "mean": 4.576146243532292,
+              "minimum": 4.576146243532292,
+              "maximum": 4.576146243532292,
+              "p10": 4.576146243532292,
+              "p90": 4.576146243532292
+            },
+            "wave1": {
+              "count": 1,
+              "mean": 3.2208312455928425,
+              "minimum": 3.2208312455928425,
+              "maximum": 3.2208312455928425,
+              "p10": 3.2208312455928425,
+              "p90": 3.2208312455928425
+            },
+            "wave2": {
+              "count": 1,
+              "mean": -0.9177031547438033,
+              "minimum": -0.9177031547438033,
+              "maximum": -0.9177031547438033,
+              "p10": -0.9177031547438033,
+              "p90": -0.9177031547438033
+            },
+            "residual": {
+              "count": 1,
+              "mean": 2.2730181526832522,
+              "minimum": 2.2730181526832522,
+              "maximum": 2.2730181526832522,
+              "p10": 2.2730181526832522,
+              "p90": 2.2730181526832522
+            }
+          },
+          "h500": {
+            "northAtlantic": -90.83809676180275,
+            "europe": 104.69300964121085,
+            "asia": 34.053914321899505,
+            "northPacific": -22.009092048835747,
+            "northAmerica": 20.322505535386853,
+            "polarCap": -128.10250258014833
+          }
+        },
+        "gefs": {
+          "run": "2026-10-09T00:00:00Z",
+          "leadHours": 120,
+          "count": 31,
+          "wind": {
+            "count": 31,
+            "mean": 18.40390473265289,
+            "minimum": 17.491221137152777,
+            "maximum": 19.19554730902778,
+            "p10": 17.902894856770835,
+            "p90": 19.026703450520834,
+            "easterlyMembers": 0,
+            "fraction": 0.0,
+            "interpretation": "raw instantaneous member fraction; not calibrated SSW probability"
+          },
+          "temperature10K": {
+            "count": 31,
+            "mean": 216.0868466684975,
+            "minimum": 215.9674076609197,
+            "maximum": 216.2172551918584,
+            "p10": 216.00751469186304,
+            "p90": 216.18918528701116
+          },
+          "heatFlux100": {
+            "total": {
+              "count": 31,
+              "mean": 6.987789850107579,
+              "minimum": 5.794071816022982,
+              "maximum": 8.554455704900437,
+              "p10": 6.020349554264355,
+              "p90": 8.073737315462026
+            },
+            "wave1": {
+              "count": 31,
+              "mean": 2.3224326641927373,
+              "minimum": 1.5590304363975402,
+              "maximum": 3.0385139954103857,
+              "p10": 1.677627784926131,
+              "p90": 2.803977642234732
+            },
+            "wave2": {
+              "count": 31,
+              "mean": 0.999225051779523,
+              "minimum": -0.21582001726180078,
+              "maximum": 3.2857900231657475,
+              "p10": 0.18058439292139694,
+              "p90": 1.9933641921296261
+            },
+            "residual": {
+              "count": 31,
+              "mean": 3.66613213413532,
+              "minimum": 2.400000202844887,
+              "maximum": 5.561029276329634,
+              "p10": 2.8035900854451286,
+              "p90": 4.59188678424301
+            }
+          },
+          "h500": {
+            "northAtlantic": -112.94805762591321,
+            "europe": 62.5330045043513,
+            "asia": 46.40143715080744,
+            "northPacific": -24.975029753222454,
+            "northAmerica": 4.739693301375379,
+            "polarCap": -107.11600656813846
+          }
+        },
+        "ifs_ens": {
+          "run": "2026-10-08T12:00:00Z",
+          "leadHours": 132,
+          "count": 51,
+          "wind": {
+            "count": 51,
+            "mean": 17.08633265277139,
+            "minimum": 15.814221869574652,
+            "maximum": 17.922264607747397,
+            "p10": 16.19322068956163,
+            "p90": 17.79148966471354,
+            "easterlyMembers": 0,
+            "fraction": 0.0,
+            "interpretation": "raw instantaneous member fraction; not calibrated SSW probability"
+          },
+          "temperature10K": {
+            "count": 51,
+            "mean": 215.1489124218921,
+            "minimum": 214.94857452376104,
+            "maximum": 215.32369976523395,
+            "p10": 215.0383965780094,
+            "p90": 215.2261177953902
+          },
+          "heatFlux100": {
+            "total": {
+              "count": 51,
+              "mean": 6.651594368040741,
+              "minimum": 3.803241937593154,
+              "maximum": 9.285746075012119,
+              "p10": 5.047323313097611,
+              "p90": 8.24850444419295
+            },
+            "wave1": {
+              "count": 51,
+              "mean": 2.7067336729868345,
+              "minimum": 0.9231655810714402,
+              "maximum": 3.9202620183368864,
+              "p10": 2.0891109334292275,
+              "p90": 3.1775604208360835
+            },
+            "wave2": {
+              "count": 51,
+              "mean": 0.5219354230627488,
+              "minimum": -1.5871343884487976,
+              "maximum": 3.3395445209852497,
+              "p10": -0.2951639333237266,
+              "p90": 1.6940566311999352
+            },
+            "residual": {
+              "count": 51,
+              "mean": 3.4229252719911574,
+              "minimum": 0.04752823395837891,
+              "maximum": 5.427855494101966,
+              "p10": 2.169780525057618,
+              "p90": 4.689996346721024
+            }
+          },
+          "h500": {
+            "northAtlantic": -86.76612525907076,
+            "europe": 94.26953848239044,
+            "asia": 47.285816567865076,
+            "northPacific": -22.45062371092465,
+            "northAmerica": 10.945683338417433,
+            "polarCap": -105.20805623331898
+          }
+        },
+        "aifs_ens": {
+          "run": "2026-10-09T00:00:00Z",
+          "leadHours": 120,
+          "count": 51,
+          "wind": {
+            "count": 51,
+            "mean": 17.82541941973119,
+            "minimum": 16.328983306884766,
+            "maximum": 19.594129604763456,
+            "p10": 16.96022432115343,
+            "p90": 18.822482681274415,
+            "easterlyMembers": 0,
+            "fraction": 0.0,
+            "interpretation": "raw instantaneous member fraction; not calibrated SSW probability"
+          },
+          "temperature10K": {
+            "count": 51,
+            "mean": 214.968349400619,
+            "minimum": 214.52094579938387,
+            "maximum": 215.47612703211828,
+            "p10": 214.63393723525047,
+            "p90": 215.31904984409152
+          },
+          "heatFlux100": {
+            "total": {
+              "count": 51,
+              "mean": 6.408949292535194,
+              "minimum": 2.932092104369676,
+              "maximum": 9.63001762784073,
+              "p10": 4.599218270609605,
+              "p90": 8.256560518747817
+            },
+            "wave1": {
+              "count": 51,
+              "mean": 3.1529563334654567,
+              "minimum": 2.237000096885125,
+              "maximum": 4.54283198615918,
+              "p10": 2.608636908309641,
+              "p90": 3.549507884772712
+            },
+            "wave2": {
+              "count": 51,
+              "mean": -0.32418610477284343,
+              "minimum": -1.7940745400243328,
+              "maximum": 2.0265323637951984,
+              "p10": -1.2360007667756796,
+              "p90": 0.5635735096960984
+            },
+            "residual": {
+              "count": 51,
+              "mean": 3.58017906384258,
+              "minimum": 0.7257560872071891,
+              "maximum": 7.376169975056539,
+              "p10": 2.19678133091543,
+              "p90": 5.144480861603071
+            }
+          },
+          "h500": {
+            "northAtlantic": -105.59394373805051,
+            "europe": 92.18025478546772,
+            "asia": 38.20619308879945,
+            "northPacific": -13.614259582238576,
+            "northAmerica": -13.89761560998227,
+            "polarCap": -109.5169083161951
+          }
+        }
+      },
+      "rangeOfModelMeanWindsMps": [
+        17.08633265277139,
+        18.40390473265289
+      ],
+      "note": "Models are dependent; deterministic IFS duplicates IFS ENS control"
+    }
+  ],
+  "sourceFiles": [
+    {
+      "model": "gfs",
+      "file": "gfs.json",
+      "sha256": "abf6b1ec36f75f8d5726073cc06d2d6ecfd3dcdd669030cfaffc99a7e9e82708"
+    },
+    {
+      "model": "ifs",
+      "file": "ifs.json",
+      "sha256": "63079bfa1f945c8e2f02886b69324e6da4b22a5489181d915bee705d695c91da"
+    },
+    {
+      "model": "icon",
+      "file": "icon.json",
+      "sha256": "91b9a980658d38e6e722e13a820206c04415c0d759721bc9ae07a827b1ae92d5"
+    },
+    {
+      "model": "gefs",
+      "file": "gefs.json",
+      "sha256": "c807afa481e5d6ce8d32398814048052c80d768f6da8f0a052952ef252c944cf"
+    },
+    {
+      "model": "ifs_ens",
+      "file": "ifs_ens.json",
+      "sha256": "7b17b12ca2f9354dd1551b518edbb0055ec75b1640872dd7e18ccf23d9bb5a9c"
+    },
+    {
+      "model": "aifs_ens",
+      "file": "aifs_ens.json",
+      "sha256": "eecb1266bf66a46f4cd9e849526bfc632a4e41f8ef955d925817300c325912b6"
+    }
+  ],
+  "historySha256": "b62366775cdc734b37a988c796dde35538fe30e7b1c7caa535b821add0ccf554",
+  "runChanges": {
+    "gefs": {
+      "previousRun": "2026-10-08T18:00:00Z",
+      "variable": "10-hPa 60N wind ensemble mean",
+      "units": "m s-1",
+      "points": [
+        {
+          "validTime": "2026-10-09T00:00:00Z",
+          "previousLead": 6,
+          "currentLead": 0,
+          "meanChange": -0.0587248473902342
+        },
+        {
+          "validTime": "2026-10-14T00:00:00Z",
+          "previousLead": 126,
+          "currentLead": 120,
+          "meanChange": 0.2327603151601707
+        }
+      ],
+      "interpretation": "Matched valid times; member IDs are not paired trajectories across cycles"
+    },
+    "ifs_ens": {
+      "previousRun": "2026-10-08T00:00:00Z",
+      "variable": "10-hPa 60N wind ensemble mean",
+      "units": "m s-1",
+      "points": [
+        {
+          "validTime": "2026-10-08T12:00:00Z",
+          "previousLead": 12,
+          "currentLead": 0,
+          "meanChange": 0.14904885551768032
+        },
+        {
+          "validTime": "2026-10-09T00:00:00Z",
+          "previousLead": 24,
+          "currentLead": 12,
+          "meanChange": -0.12485050375944873
+        },
+        {
+          "validTime": "2026-10-13T12:00:00Z",
+          "previousLead": 132,
+          "currentLead": 120,
+          "meanChange": -0.32896150077869635
+        },
+        {
+          "validTime": "2026-10-14T00:00:00Z",
+          "previousLead": 144,
+          "currentLead": 132,
+          "meanChange": -0.4553594718052203
+        }
+      ],
+      "interpretation": "Matched valid times; member IDs are not paired trajectories across cycles"
+    },
+    "aifs_ens": {
+      "previousRun": "2026-10-08T18:00:00Z",
+      "variable": "10-hPa 60N wind ensemble mean",
+      "units": "m s-1",
+      "points": [
+        {
+          "validTime": "2026-10-09T00:00:00Z",
+          "previousLead": 6,
+          "currentLead": 0,
+          "meanChange": -0.005009204473891415
+        },
+        {
+          "validTime": "2026-10-14T00:00:00Z",
+          "previousLead": 126,
+          "currentLead": 120,
+          "meanChange": 0.2748410983283023
+        }
+      ],
+      "interpretation": "Matched valid times; member IDs are not paired trajectories across cycles"
+    }
+  },
+  "watchStage": "insufficient_evidence",
+  "sswDeclared": false,
+  "limits": [
+    "Independent ERA5/ERA5T verification has not been included",
+    "No validated/persistent cyclonic or anticyclonic breaking event diagnosis",
+    "No EP-flux propagation or seasonal calibration verified",
+    "Raw member fractions refer only to stated instantaneous valid times",
+    "EC46 official chart is separate extended-range context; seasonal suites remain separate",
+    "Only the explicitly dated cycles and fields below are verified; this report does not discover the latest provider cycles"
+  ]
+}
