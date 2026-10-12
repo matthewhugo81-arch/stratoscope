@@ -6,7 +6,11 @@ GRIB identity checks are never relaxed. Canonical ECMWF attribution is retained.
 
 https://www.ecmwf.int/en/forecasts/datasets/open-data
 """
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 import http.client
+import math
+import time
 import urllib.error
 
 ORIGINS = (
@@ -23,6 +27,10 @@ ORIGINS = (
 INVENTORY_ORIGINS = (ORIGINS[0], ORIGINS[-1])
 TRANSIENT_CODES = {408, 429, 500, 502, 503, 504}
 TRANSPORT_ERRORS = (urllib.error.URLError, TimeoutError, ConnectionError, http.client.IncompleteRead)
+# Only IFS ENS gets additional whole-hour passes. A missing early-hour object
+# on Google must be revisited after AWS/main-portal outages, rather than losing
+# every other completed hour immediately. Keep concurrency and other feeds as-is.
+IFS_HOUR_RETRY_DELAYS = (120, 300)
 
 
 def retryable(error):
@@ -70,21 +78,54 @@ all replicas allow the caller to inspect the preceding cycle.
     raise incomplete_error or ValueError('No official inventory source configured')
 
 
+def _retry_after_seconds(error):
+    """Never shorten a provider's Retry-After when starting another pass."""
+    if not isinstance(error, urllib.error.HTTPError) or not error.headers:
+        return 0
+    value = error.headers.get('Retry-After', '')
+    try:
+        delay = float(value)
+    except (TypeError, ValueError):
+        try:
+            delay = (parsedate_to_datetime(value) - datetime.now(timezone.utc)).total_seconds()
+        except (TypeError, ValueError, OverflowError):
+            return 0
+    return max(0, delay) if math.isfinite(delay) else 0
+
+
 def calculate_hour(calculate, model, run, hour, levels, workers, panel_writer=None, heat_writer=None, origins=ORIGINS):
     if model == 'gefs':
         return calculate(model, run, hour, levels, workers, panel_writer, heat_writer)
+    # Retry this exact hour/run only, within its existing worker. Successful
+    # hours elsewhere in the preparation job are not downloaded again. All
+    # providers are re-indexed; no offsets or member arrays cross replicas.
+    delays = IFS_HOUR_RETRY_DELAYS if model == 'ifs_ens' else ()
     last = None
-    for origin in origins:
-        validate_origin(origin)
-        try:
-            # calculate obtains this origin's own control and perturbed indexes,
-            # then verifies every native GRIB before invoking output writers.
-            result = calculate(model, run, hour, levels, workers, panel_writer, heat_writer, origin=origin)
-            print('HOUR_SOURCE', model, hour, origin, flush=True)
-            return result
-        except TRANSPORT_ERRORS as error:
-            if not retryable(error):
-                raise
-            last = error
-            print('Retrying complete hour on next official replica:', model, hour, origin, str(error), flush=True)
+    retry_not_before = 0
+    for attempt in range(1 + len(delays)):
+        if attempt:
+            delay = max(delays[attempt - 1], retry_not_before - time.monotonic())
+            print('Retrying same IFS ENS forecast hour after replica failures:',
+                  hour, f'pass {attempt + 1}/{1 + len(delays)}',
+                  f'waiting {delay:g} seconds', flush=True)
+            time.sleep(delay)
+        for origin in origins:
+            validate_origin(origin)
+            try:
+                # calculate obtains this origin's own control and perturbed indexes,
+                # then verifies every native GRIB before invoking output writers.
+                result = calculate(model, run, hour, levels, workers, panel_writer, heat_writer, origin=origin)
+                print('HOUR_SOURCE', model, hour, origin, flush=True)
+                return result
+            except TRANSPORT_ERRORS as error:
+                if not retryable(error):
+                    raise
+                last = error
+                if model == 'ifs_ens':
+                    retry_not_before = max(retry_not_before, time.monotonic() + _retry_after_seconds(error))
+                    if isinstance(error, urllib.error.HTTPError):
+                        error.close()
+                print('Retrying complete hour on next official replica:', model, hour, origin, str(error), flush=True)
+        if last is None:
+            break
     raise last or ValueError('No official download source configured')
