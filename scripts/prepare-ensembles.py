@@ -363,7 +363,7 @@ def main():
     parser.add_argument('--hours', type=int, nargs='+')
     parser.add_argument('--levels', type=int, nargs='+')
     parser.add_argument('--workers', type=int, default=6)
-    parser.add_argument('--hour-workers', type=int, choices=[1, 2], default=1)
+    parser.add_argument('--hour-workers', type=int, choices=[1, 2, 3], default=1)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--skip-published', action='store_true')
     args = parser.parse_args()
