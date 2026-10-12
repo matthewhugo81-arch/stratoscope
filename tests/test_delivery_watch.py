@@ -114,7 +114,8 @@ class DirectIFS(unittest.TestCase):
 class WorkflowTests(unittest.TestCase):
     def test_gefs_connections_have_not_increased(self):
         text=(ROOT/'.github/workflows/prepare-gefs.yml').read_text()
-        self.assertIn('--workers 3 --hour-workers 2',text)
+        self.assertIn('--workers 2 --hour-workers 3',text)
+        self.assertIn('Three isolated decoders x two transfers',text)
         self.assertIn('gh workflow run prepare-diagnostics.yml',text)
         self.assertIn('gh workflow run prepare-vortex.yml',text)
     def test_three_hour_audit_remains_and_watcher_is_bounded(self):
