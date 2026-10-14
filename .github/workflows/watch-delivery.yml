@@ -14,7 +14,9 @@ permissions:
   actions: write
 concurrency:
   group: bounded-model-release-watch
-  cancel-in-progress: false
+  # Cancel a lingering obsolete watcher at cutover. Normal hourly runs are
+  # bounded to 55 minutes, so they should finish before the next starts.
+  cancel-in-progress: true
 jobs:
   pickup:
     if: github.repository == 'matthewhugo81-arch/stratoscope' && github.event.repository.private == false && github.ref == 'refs/heads/main'

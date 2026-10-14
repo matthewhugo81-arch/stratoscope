@@ -118,7 +118,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn("cron: '11 */3 * * *'",(ROOT/'.github/workflows/check-pipelines.yml').read_text())
         text=(ROOT/'.github/workflows/watch-delivery.yml').read_text()
         self.assertIn('--minutes 55 --interval 300',text)
-        self.assertIn('cancel-in-progress: false',text)
+        self.assertIn('cancel-in-progress: true',text)
         self.assertNotIn('CDSAPI_KEY',text)
         # The watcher does not trigger itself through its health refresh.
         self.assertNotIn('workflows: [Check forecast pipeline freshness',text)
