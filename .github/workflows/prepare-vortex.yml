@@ -30,8 +30,3 @@ jobs:
         run: |
           gh auth setup-git --hostname github.com
           python -u scripts/prepare-vortex.py --output work/vortex --publish
-      - name: Recheck publication health after this attempt
-        if: always() && !cancelled() && github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh workflow run check-pipelines.yml --ref main

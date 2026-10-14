@@ -41,14 +41,10 @@ class WatchTests(unittest.TestCase):
     def test_dry_run_never_dispatches(self):
         audit=self.audit();watch.run_watch(audit,None,minutes=0,recover=False)
         audit.recover_results.assert_not_called();audit.github.assert_not_called()
-    def test_unchanged_job_urls_do_not_repeat_health_dispatch(self):
-        a=[dict(model='gefs',publishedRun=OLD,availableRun=RUN,workflowUrl='one')]
-        b=[dict(model='gefs',publishedRun=OLD,availableRun=RUN,workflowUrl='two')]
-        self.assertFalse(watch.should_refresh(watch.signature(a),b,0,1000))
-        b[0]['publishedRun']=RUN
-        self.assertTrue(watch.should_refresh(watch.signature(a),b,0,1000))
-        self.assertFalse(watch.should_refresh(watch.signature(a),b,950,1000))
-        self.assertTrue(watch.should_refresh(watch.signature(a),a,0,10800))
+    def test_delivery_changes_never_launch_duplicate_full_health_audits(self):
+        audit=self.audit()
+        self.assertEqual(watch.run_watch(audit,None,minutes=0),0)
+        audit.github.assert_not_called()
     def test_bounded_watch_does_not_loop_forever_or_dispatch_every_tick(self):
         audit=self.audit();t=[0.]
         def clock():return t[0]
@@ -56,7 +52,7 @@ class WatchTests(unittest.TestCase):
         result=watch.run_watch(audit,None,minutes=10,interval=300,clock=clock,sleep=sleep)
         self.assertEqual(result,0);self.assertEqual(t[0],600)
         self.assertEqual(audit.audit.call_count,12)
-        audit.github.assert_called_once_with('/actions/workflows/check-pipelines.yml/dispatches',{'ref':'main'})
+        audit.github.assert_not_called()
 
 class StatusTests(unittest.TestCase):
     def test_not_yet_available_is_labelled_but_not_invented(self):
@@ -121,7 +117,7 @@ class WorkflowTests(unittest.TestCase):
     def test_three_hour_audit_remains_and_watcher_is_bounded(self):
         self.assertIn("cron: '11 */3 * * *'",(ROOT/'.github/workflows/check-pipelines.yml').read_text())
         text=(ROOT/'.github/workflows/watch-delivery.yml').read_text()
-        self.assertIn('--minutes 330 --interval 300',text)
+        self.assertIn('--minutes 55 --interval 300',text)
         self.assertIn('cancel-in-progress: false',text)
         self.assertNotIn('CDSAPI_KEY',text)
         # The watcher does not trigger itself through its health refresh.

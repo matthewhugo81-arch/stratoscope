@@ -24,11 +24,6 @@ def load_audit():
     return audit
 
 
-def signature(reports):
-    # Do not cause repeated dispatches merely because an updating job URL changed.
-    return tuple((r['model'], r.get('publishedRun'), r.get('availableRun'),
-                  r.get('sourceStatus'), r.get('catalogueStatus')) for r in reports)
-
 
 def check_once(audit, prep, now, recover=True):
     """One failed source must not stop pickup from unrelated working providers."""
@@ -47,40 +42,24 @@ def check_once(audit, prep, now, recover=True):
     return reports
 
 
-def should_refresh(previous_signature, reports, last_refresh, now_seconds):
-    elapsed = now_seconds-last_refresh
-    # A longer live watcher must also keep the audit fresh if cron is delayed
-    # and no model happens to change during its normal three-hour interval.
-    return elapsed >= 10800 or (signature(reports) != previous_signature and elapsed >= 120)
 
-
-def run_watch(audit, prep, minutes=330, interval=300, recover=True, clock=time.monotonic, sleep=time.sleep):
+def run_watch(audit, prep, minutes=55, interval=300, recover=True, clock=time.monotonic, sleep=time.sleep):
     started = clock()
-    last_refresh = float('-inf')
-    previous_signature = None
-    had_errors = False
     while True:
         now = datetime.now(timezone.utc)
         reports = check_once(audit, prep, now, recover)
-        had_errors = any(r['status'] == 'error' for r in reports)
+        # Keep source/provider faults in the logged report. The independent
+        # three-hour pipeline audit owns the publication health status and
+        # actionable failure notifications. Never dispatch that audit at
+        # five-minute intervals or fail this pickup job on temporary 429s.
         print(json.dumps(dict(checkedAt=audit.stamp(now), models=reports), separators=(',', ':')), flush=True)
-        if recover and should_refresh(previous_signature, reports, last_refresh, clock()):
-            try:
-                audit.github('/actions/workflows/check-pipelines.yml/dispatches', {'ref': 'main'})
-                previous_signature = signature(reports)
-                last_refresh = clock()
-                print('Requested publication-health refresh after changed delivery state', flush=True)
-            except Exception as error:
-                # No immediate POST retry: GitHub might have accepted a lost response.
-                previous_signature = signature(reports)
-                last_refresh = clock()
-                had_errors = True
-                print('Health refresh dispatch not confirmed:', type(error).__name__, flush=True)
+        if any(r['status'] == 'error' for r in reports):
+            print('::notice::Source delivery issue recorded; pipeline health will assess publication impact.', flush=True)
         remaining = minutes*60-(clock()-started)
         if minutes == 0 or remaining < interval:
             break
         sleep(interval)
-    return 1 if had_errors else 0
+    return 0
 
 
 def main():

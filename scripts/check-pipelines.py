@@ -326,6 +326,7 @@ def main():
     if last:data['previousCheckGapMinutes']=round(max(0,(now-last).total_seconds()/60),1)
     print(json.dumps(data,indent=2),flush=True)
     if args.publish:publish(data)
-    if any(d['status']=='error' for d in results+seasonal) or reference and reference['status']=='error':raise SystemExit(1)
+    if health.requires_alert(results,seasonal,reference,now):
+        raise SystemExit(1)
 
 if __name__=='__main__':main()

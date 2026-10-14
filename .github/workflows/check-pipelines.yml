@@ -14,10 +14,8 @@ on:
       - '.github/workflows/check-pipelines.yml'
   schedule:
     - cron: '11 */3 * * *'
-  workflow_run:
-    workflows: [Prepare public ensemble maps, Prepare GEFS model maps, Prepare public DWD ICON maps, Prepare GEFS vortex geometry, Prepare ERA5 daily wind climatology, Prepare native seasonal wind charts, Prepare northern diagnostic charts]
-    branches: [main]
-    types: [completed]
+  # Do not launch another provider audit after every preparation job.
+  # The three-hour schedule provides the authoritative published-data check.
 permissions:
   contents: write
   actions: write

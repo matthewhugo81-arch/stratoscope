@@ -152,4 +152,35 @@ class RecoveryHealth(unittest.TestCase):
         text=(ROOT/'.github/workflows/check-pipelines.yml').read_text()
         self.assertIn("cron: '11 */3 * * *'",text)
 
+
+class AlertGating(unittest.TestCase):
+    def provider429(self, model='aifs_ens', published=RUN):
+        return dict(model=model, status='error', failureStage='provider',
+                    sourceStatus='unavailable', catalogueStatus='valid',
+                    publishedRun=health.iso(published),
+                    message='HTTPError: HTTP Error 429: Too Many Requests')
+    def test_recent_valid_ensemble_remains_reported_but_does_not_email(self):
+        report=self.provider429()
+        self.assertFalse(health.requires_alert([report], [], None, NOW))
+        self.assertEqual(report['status'], 'error')
+    def test_persistent_429_with_stale_publication_still_alerts(self):
+        self.assertTrue(health.requires_alert([self.provider429(published=OLD)], [], None, NOW))
+    def test_ifs_ens_has_its_own_publication_lag_tolerance(self):
+        self.assertFalse(health.requires_alert([self.provider429('ifs_ens', OLD)], [], None, NOW))
+        self.assertTrue(health.requires_alert([self.provider429('ifs_ens', OLD-timedelta(hours=12))], [], None, NOW))
+    def test_missing_verified_publication_or_other_provider_failure_alerts(self):
+        row=self.provider429();row.pop('publishedRun')
+        self.assertTrue(health.requires_alert([row], [], None, NOW))
+        row=self.provider429();row['message']='Invalid native GRIB inventory'
+        self.assertTrue(health.requires_alert([row], [], None, NOW))
+    def test_existing_true_backlog_failure_still_alerts(self):
+        self.assertTrue(health.requires_alert([dict(model='gefs',status='error',failureStage='freshness')], [], None, NOW))
+    def test_aligned_diagnostic_inherits_parent_error_without_second_alert(self):
+        parent=self.provider429()
+        child=dict(model='diagnostics', sourceModel='aifs_ens', status='error',
+                   failureStage='upstream', alignedWithPublishedInputs=True)
+        self.assertFalse(health.requires_alert([parent,child], [], None, NOW))
+    def test_seasonal_error_still_alerts(self):
+        self.assertTrue(health.requires_alert([], [dict(model='ecmf',status='error')], None, NOW))
+
 if __name__=='__main__':unittest.main()

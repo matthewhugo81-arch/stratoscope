@@ -55,8 +55,3 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run prepare-diagnostics.yml --ref main
-      - name: Recheck feed health after this attempt
-        if: always() && !cancelled() && github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh workflow run check-pipelines.yml --ref main

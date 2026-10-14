@@ -93,6 +93,38 @@ def record_health(results, previous, now, github=None, workflows=None):
                           message='Aligned with the last published model; a newer upstream run is still being prepared.')
 
 
+
+def requires_alert(results, seasonal, era5, now):
+    """Failure mail is for actionable outages, not each temporary source 429.
+
+    A 429 never counts as successful source verification; the published data
+    and source health report retain their truthful error status. Only the
+    *workflow conclusion* is deferred while a recent, validated forecast is
+    still available. Other errors and persistent provider outages still fail.
+    """
+    for row in results:
+        if row.get('status') != 'error':
+            continue
+        if (row.get('model') == 'diagnostics' and
+                row.get('failureStage') == 'upstream' and
+                row.get('alignedWithPublishedInputs')):
+            # Derived chart failure is inherited from its parent; do not
+            # generate a second failure for the same rate-limited model.
+            continue
+        if (row.get('failureStage') == 'provider' and
+                row.get('sourceStatus') == 'unavailable' and
+                row.get('catalogueStatus') == 'valid' and
+                '429' in str(row.get('message', ''))):
+            published = parsed(row.get('publishedRun'))
+            allowed_hours = {'gefs': 18, 'ifs_ens': 30, 'aifs_ens': 18, 'icon': 18}
+            grace = allowed_hours.get(row.get('model'))
+            if published and grace is not None and now - published < timedelta(hours=grace):
+                continue
+        return True
+    return (any(row.get('status') == 'error' for row in seasonal) or
+            bool(era5 and era5.get('status') == 'error'))
+
+
 def seasonal_health(public, now):
     spec = importlib.util.spec_from_file_location('seasonal_release_config', Path(__file__).with_name('seasonal_config.py'))
     config = importlib.util.module_from_spec(spec)

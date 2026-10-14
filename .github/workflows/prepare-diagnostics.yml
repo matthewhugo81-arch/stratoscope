@@ -40,8 +40,3 @@ jobs:
             git commit -m 'Update complete northern diagnostic series'
             git push origin HEAD:forecast-data-diagnostics
           fi
-      - name: Recheck publication health after this attempt
-        if: always() && !cancelled() && github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh workflow run check-pipelines.yml --ref main
