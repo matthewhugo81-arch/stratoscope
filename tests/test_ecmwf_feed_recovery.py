@@ -106,6 +106,31 @@ class Mirrors(unittest.TestCase):
         self.assertTrue(all(e[0].startswith(transport.ORIGINS[1]+'/') for e in values))
         self.assertTrue(all(c.args[0].startswith(transport.ORIGINS[1]+'/') for c in request.call_args_list))
 
+class DeferredSourceRateLimit(unittest.TestCase):
+    def test_recent_valid_aifs_publication_defers_transient_429(self):
+        with patch.object(prep,'verified_published_run',return_value=NOW-timedelta(hours=10)):
+            self.assertTrue(prep.defer_rate_limited_discovery('aifs_ens',error(429),True,NOW))
+    def test_recent_valid_ifs_publication_defers_transient_429(self):
+        with patch.object(prep,'verified_published_run',return_value=NOW-timedelta(hours=20)):
+            self.assertTrue(prep.defer_rate_limited_discovery('ifs_ens',error(429),True,NOW))
+    def test_old_or_invalid_publication_does_not_hide_provider_failure(self):
+        for prior in (None,NOW-timedelta(hours=19)):
+            with self.subTest(prior=prior),patch.object(prep,'verified_published_run',return_value=prior):
+                self.assertFalse(prep.defer_rate_limited_discovery('aifs_ens',error(429),True,NOW))
+    def test_a_real_validation_or_different_source_error_is_not_deferred(self):
+        with patch.object(prep,'verified_published_run',return_value=NOW):
+            for code in (403,404,503):
+                self.assertFalse(prep.defer_rate_limited_discovery('aifs_ens',error(code),True,NOW))
+            self.assertFalse(prep.defer_rate_limited_discovery('aifs_ens',error(429),False,NOW))
+            self.assertFalse(prep.defer_rate_limited_discovery('gefs',error(429),True,NOW))
+    def test_provider_rate_limit_does_not_select_unverified_old_cycle(self):
+        with patch.object(prep,'ec_entries',side_effect=error(429)):
+            with self.assertRaises(urllib.error.HTTPError):
+                prep.discover('aifs_ens',NOW)
+    def test_bad_catalogue_never_becomes_a_safe_fallback(self):
+        with patch.object(prep,'request',return_value=b'{"model":"aifs_ens","complete":false}'):
+            self.assertIsNone(prep.verified_published_run('aifs_ens'))
+
 class RecoveryHealth(unittest.TestCase):
     def report(self, model='ifs_ens'):
         return dict(model=model,publishedRun=health.iso(OLD),availableRun=health.iso(RUN),

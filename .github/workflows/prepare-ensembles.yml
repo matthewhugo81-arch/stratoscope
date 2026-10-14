@@ -10,7 +10,9 @@ on:
     branches: [main]
     paths: ['scripts/prepare-ensembles.py', 'scripts/ecmwf_transport.py', '.github/workflows/prepare-ensembles.yml']
   schedule:
-    - cron: '17,47 * * * *'
+    # One hourly backstop; the independent release watcher picks up new
+    # validated cycles between scheduled runs without an extra 30-min storm.
+    - cron: '17 * * * *'
 
 permissions:
   contents: write

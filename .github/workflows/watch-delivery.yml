@@ -35,4 +35,4 @@ jobs:
       - name: Pick up available runs every five minutes within this bounded execution
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python -u scripts/watch-delivery.py --minutes 55 --interval 300
+        run: python -u scripts/watch-delivery.py --minutes 55 --interval 900

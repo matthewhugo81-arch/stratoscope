@@ -117,7 +117,7 @@ class WorkflowTests(unittest.TestCase):
     def test_three_hour_audit_remains_and_watcher_is_bounded(self):
         self.assertIn("cron: '11 */3 * * *'",(ROOT/'.github/workflows/check-pipelines.yml').read_text())
         text=(ROOT/'.github/workflows/watch-delivery.yml').read_text()
-        self.assertIn('--minutes 55 --interval 300',text)
+        self.assertIn('--minutes 55 --interval 900',text)
         self.assertIn('cancel-in-progress: true',text)
         self.assertNotIn('CDSAPI_KEY',text)
         # The watcher does not trigger itself through its health refresh.

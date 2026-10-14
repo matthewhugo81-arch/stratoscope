@@ -305,22 +305,56 @@ def discover(model, now=None):
             print('Cycle not complete:',model,run.isoformat(),str(error) or 'Incomplete inventory',flush=True)
     raise RuntimeError('No complete provider cycle found for '+model)
 
-def already_published(model,run):
+def verified_published_run(model):
+    """Return the initialized run only when its complete catalogue validates.
+
+    Transient GitHub transport errors propagate: they are not proof a safe
+    fallback exists. A broken catalogue is never accepted as protection.
+    """
     url=f"https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/forecast-data-{model.replace('_','-')}/latest.json"
-    try:previous=json.loads(request(url,attempts=2))
-    except urllib.error.HTTPError as e:
-        if e.code==404:return False
+    try:
+        previous=json.loads(request(url,attempts=2))
+    except urllib.error.HTTPError as error:
+        if error.code==404:return None
         raise
     except (ValueError, UnicodeError):
-        return False
-    # A complete flag alone must not suppress repair of a damaged catalogue.
+        return None
     try:
         spec=importlib.util.spec_from_file_location('publication_validation',Path(__file__).with_name('check-pipelines.py'))
         audit=importlib.util.module_from_spec(spec);spec.loader.exec_module(audit)
         audit.validate_catalogue(model,previous)
-        return datetime.fromisoformat(previous['run'].replace('Z','+00:00'))>=run
+        published=datetime.fromisoformat(previous['run'].replace('Z','+00:00'))
+        return published if published.tzinfo is not None else None
     except (AssertionError, KeyError, TypeError, ValueError):
+        return None
+
+
+def already_published(model,run):
+    published=verified_published_run(model)
+    return published is not None and published>=run
+
+
+def defer_rate_limited_discovery(model,error,skip_published,now=None):
+    """Defer only transient ECMWF 429 when a recent valid run is preserved.
+
+    No new data or 'current' claim is published. The separate three-hour
+    health audit still reports provider failure and actionable staleness.
+    All GRIB validation, missing publications and other exceptions fail.
+    """
+    if not (skip_published and model in {'ifs_ens','aifs_ens'} and
+            isinstance(error,urllib.error.HTTPError) and error.code==429):
         return False
+    published=verified_published_run(model)
+    if published is None:
+        return False
+    now=now or datetime.now(timezone.utc)
+    max_age=timedelta(hours=30 if model=='ifs_ens' else 18)
+    if not timedelta(0)<=now-published<max_age:
+        return False
+    print('::notice::ECMWF HTTP 429 deferred '+model+
+          '; retained fully validated published run '+published.isoformat()+
+          '. No new run was verified or published; freshness audit remains authoritative.',flush=True)
+    return True
 
 
 def prepare_hour(task):
@@ -368,7 +402,15 @@ def main():
     parser.add_argument('--skip-published', action='store_true')
     args = parser.parse_args()
     config = CONFIG[args.model]
-    run = datetime.fromisoformat(args.run.replace('Z', '+00:00')) if args.run else discover(args.model)
+    if args.run:
+        run=datetime.fromisoformat(args.run.replace('Z', '+00:00'))
+    else:
+        try:
+            run=discover(args.model)
+        except urllib.error.HTTPError as error:
+            if defer_rate_limited_discovery(args.model,error,args.skip_published):
+                return
+            raise
     hours, levels = args.hours or list(range(0, config['maxHour']+1, 6)), args.levels or config['levels']
     assert run.hour in [0,6,12,18] and run.minute == 0
     if args.skip_published and already_published(args.model,run):
