@@ -28,7 +28,7 @@ class WatchTests(unittest.TestCase):
         def inspect(model,now,prep):
             if model==fail:raise TimeoutError('offline')
             return dict(model=model,status='behind',publishedRun=OLD,availableRun=RUN)
-        return SimpleNamespace(audit=Mock(side_effect=inspect),recover_results=Mock(),github=Mock(),stamp=state.stamp)
+        return SimpleNamespace(reset_publications=Mock(),audit=Mock(side_effect=inspect),recover_results=Mock(),github=Mock(),stamp=state.stamp)
     def test_all_four_independent_pipelines_are_checked(self):
         audit=self.audit();reports=watch.check_once(audit,object(),NOW)
         self.assertEqual({r['model'] for r in reports},set(watch.MODELS))
@@ -118,7 +118,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn("cron: '11 */3 * * *'",(ROOT/'.github/workflows/check-pipelines.yml').read_text())
         text=(ROOT/'.github/workflows/watch-delivery.yml').read_text()
         self.assertIn('--minutes 55 --interval 900',text)
-        self.assertIn('cancel-in-progress: true',text)
+        self.assertIn('cancel-in-progress: false',text)
         self.assertNotIn('CDSAPI_KEY',text)
         # The watcher does not trigger itself through its health refresh.
         self.assertNotIn('workflows: [Check forecast pipeline freshness',text)

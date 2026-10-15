@@ -17,6 +17,7 @@ import {PipelineStatus} from '@/components/pipeline-status';
 import {MODELS,isModel,isCycle,isEnsemble,memberCount,supports,type ModelId,type ForecastMeta,type EnsembleView} from '@/lib/models';
 import {loadForecast,peekForecast,clearForecastCache,activateForecastSequence} from '@/lib/forecast-client';
 import {forecastMeta,clearForecastMeta} from '@/lib/forecast-transport';
+import {startVisibleRefresh} from '@/lib/visible-refresh';
 import {preloadTimeline} from '@/lib/forecast-preload';
 import {temperatureGradient,temperaturePosition,temperatureTicks} from '@/lib/temperature-scale';
 import {windGradient,windMax,windTicks} from '@/lib/globe';
@@ -31,6 +32,8 @@ export default function Home(){
  const direction=useRef(1);
  const preloadSelection=useRef({hour:0,loading:true});preloadSelection.current={hour,loading};
  const [backgroundLoading,setBackgroundLoading]=useState(false);
+ const [updateError,setUpdateError]=useState('');
+ const failedFrame=useRef(false);failedFrame.current=!!error;
  const [showMembers,setShowMembers]=useState(false);
  const config=MODELS[model],maxHour=config.maxHour,run=meta?.model===model?meta.run:'',cyclic=isCycle(model),ensemble=isEnsemble(model),count=ensemble?memberCount(model):0,selectionMember=ensemble&&view==='member'?member:-1;
  const prepared=ensemble&&selectionMember<0;
@@ -46,9 +49,13 @@ export default function Home(){
  useEffect(()=>{setPlaying(false);},[view]);
  useEffect(()=>{const hidden=()=>{if(document.hidden)setPlaying(false);};document.addEventListener('visibilitychange',hidden);return()=>document.removeEventListener('visibilitychange',hidden);},[]);
  useEffect(()=>{
-  const c=new AbortController();setMeta(null);setLoading(true);setError('');setRetryAt(0);
-  forecastMeta(model,AbortSignal.any([c.signal,AbortSignal.timeout(55000)])).then(setMeta).catch(e=>{if(!c.signal.aborted){setError(e.name==='TimeoutError'?'Finding the latest forecast took too long. Please retry.':e.message);setLoading(false)}});
-  return()=>c.abort();
+  let received=false;setMeta(null);setLoading(true);setError('');setUpdateError('');setRetryAt(0);
+  return startVisibleRefresh(async signal=>{
+   try{
+    clearForecastMeta(model);const next=await forecastMeta(model,signal);if(signal.aborted)return;
+    if(received&&failedFrame.current)setAttempt(v=>v+1);received=true;setUpdateError('');setMeta(old=>old?.model===model&&Date.parse(old.run)>Date.parse(next.run)?old:next);
+   }catch(e){if(signal.aborted&&signal.reason?.name!=='TimeoutError')return;setUpdateError('Automatic update check failed; retrying in five minutes.');if(!received){setError((e as Error).message);setLoading(false)}}
+  });
  },[model,refresh]);
  useEffect(()=>{
   if(!run||!supports(model,level))return;const c=new AbortController();setError('');setRetryAt(0);setProgress(0);setLoading(true);
@@ -125,7 +132,7 @@ export default function Home(){
      <p className="muted footnote">{ecSource?'Direct ECMWF supplies 10, 50 and 100 hPa. Its open feed does not include 20, 30 or 70 hPa.':model==='ecmwf'?'Open-Meteo ECMWF supplies 50 and 100 hPa. Select ECMWF IFS · direct for 10 hPa.':noaaSource?'Lower pressure, higher altitude. Altitudes are approximate.':'DWD’s public ICON pressure-level feed supplies 30, 50, 70 and 100 hPa. Use NOAA or ECMWF for 10 hPa.'}</p>
     </div>
     <div className="control-section overlay-controls"><span className="section-label">Map layers</span><label className="toggle-row">Height contours <Switch checked={contours} onCheckedChange={setContours} aria-label="Height contours"/></label><label className="toggle-row">Latitude & longitude <Switch checked={grid} onCheckedChange={setGrid} aria-label="Latitude and longitude"/></label><label className="toggle-row">Wind arrows <Switch checked={windArrows} onCheckedChange={setWindArrows} disabled={field!=='wind'||view==='spread'} aria-label="Wind arrows"/></label>{field==='wind'&&view!=='spread'&&windArrows&&<small>Arrows point along the flow; longer means faster.{ensemble&&view==='mean'?' Ensemble-mean direction.':''}</small>}</div>
-    <div className="source-card"><span className="source-label">DATA SOURCE</span><strong>{config.resolution}</strong><span className="muted">{config.provider}</span><div className="run-meta">{run?`${cyclic?'Run: ':'Timeline: '}${date(run)} UTC`:'Finding latest forecast'}</div>{!cyclic&&<span className="rolling-note">Rolling forecast, not a fixed model run</span>}<button className="text-button" onClick={refreshData}><RefreshCw size={13}/> Refresh data</button><PipelineStatus model={model} run={run} onUpdate={loadUpdatedRun}/></div>
+    <div className="source-card"><span className="source-label">DATA SOURCE</span><strong>{config.resolution}</strong><span className="muted">{config.provider}</span><div className="run-meta">{run?`${cyclic?'Run: ':'Timeline: '}${date(run)} UTC`:'Finding latest forecast'}</div>{!cyclic&&<span className="rolling-note">Rolling forecast, not a fixed model run</span>}<button className="text-button" onClick={refreshData}><RefreshCw size={13}/> Refresh data</button><PipelineStatus model={model} run={run} onUpdate={loadUpdatedRun}/><small className="muted">Auto-update · checks every 5 minutes</small>{updateError&&<small role="status">{updateError}</small>}</div>
    </aside>
    <div className="plot-area">
     {ensemble&&<div className="ensemble-panel"><div className="ensemble-topline"><span className="eyebrow">ENSEMBLE EXPLORER</span><span>{count} members · control included</span></div><div className="ensemble-actions"><Tabs value={view} onValueChange={v=>setView(v as EnsembleView)}><TabsList className="field-tabs ensemble-tabs" aria-label="Ensemble view" aria-describedby="ensemble-description"><TabsTrigger value="mean" title={`Average of all ${count} members, including the control`}>Mean</TabsTrigger><TabsTrigger value="spread" title="One standard deviation: warmer colours show more disagreement">Spread</TabsTrigger><TabsTrigger value="member" title="View the control or an individual perturbed forecast">Member</TabsTrigger></TabsList></Tabs><button className="all-members-button" disabled={!run} onClick={()=>{setPlaying(false);setShowMembers(true)}}>All members</button>{view==='member'&&<Select value={String(member)} onValueChange={v=>setMember(Number(v))}><SelectTrigger aria-label="Ensemble member" className="member-trigger"><SelectValue/></SelectTrigger><SelectContent className="model-options">{Array.from({length:count},(_,i)=><SelectItem value={String(i)} key={i}>{i===0?'Control':`Member ${String(i).padStart(2,'0')}`}</SelectItem>)}</SelectContent></Select>}</div><p id="ensemble-description" className="ensemble-description">{view==='spread'?'One standard deviation · warmer colours show more disagreement.':view==='mean'?`Average of all ${count} members · a view of the shared pattern.`:member===0?'The unperturbed control forecast.':`One possible forecast scenario · perturbed member ${member}.`}</p></div>}

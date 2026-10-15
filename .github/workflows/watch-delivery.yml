@@ -3,10 +3,8 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['scripts/watch-delivery.py', '.github/workflows/watch-delivery.yml']
-  # One short independent watcher each hour, not a fresh watcher for every
-  # successful publication. The watcher checks new releases without starting
-  # additional full health audits.
+    paths: ['scripts/watch-delivery.py', 'scripts/renew-delivery-watch.py', '.github/workflows/watch-delivery.yml']
+  # Cron backs up the bounded watcher's self-renewal if a dispatch is delayed.
   schedule:
     - cron: '23 * * * *'
 permissions:
@@ -14,15 +12,13 @@ permissions:
   actions: write
 concurrency:
   group: bounded-model-release-watch
-  # Cancel a lingering obsolete watcher at cutover. Normal hourly runs are
-  # bounded to 55 minutes, so they should finish before the next starts.
-  cancel-in-progress: true
+  # Keep one active watcher and at most one queued successor.
+  cancel-in-progress: false
 jobs:
   pickup:
     if: github.repository == 'matthewhugo81-arch/stratoscope' && github.event.repository.private == false && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    # Poll for up to 55 minutes, then allow the next hourly watcher to take over.
-    # This avoids five-hour jobs and repeated pending-run cancellations.
+    # Poll for 55 minutes, then hand over to one queued or newly dispatched job.
     timeout-minutes: 70
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -32,7 +28,12 @@ jobs:
       - run: python -m pip install --disable-pip-version-check -r scripts/ensemble-requirements.txt
       - name: Check release-watcher regressions
         run: python -m unittest discover -s tests -p test_delivery_watch.py -v
-      - name: Pick up available runs every five minutes within this bounded execution
+      - name: Pick up available runs every fifteen minutes within this bounded execution
         env:
           GH_TOKEN: ${{ github.token }}
         run: python -u scripts/watch-delivery.py --minutes 55 --interval 900
+      - name: Arrange the next bounded watcher without waiting for cron
+        if: success() && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/renew-delivery-watch.py --successor

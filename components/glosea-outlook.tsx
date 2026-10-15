@@ -4,6 +4,7 @@ import {fetchGloSea,type GloSea} from '@/lib/glosea';
 import {SEASONAL_MODELS,fetchSeasonal,fetchEra,fetchEraProgress,type SeasonalId,type SeasonalForecast,type EraClimate,type EraProgress} from '@/lib/seasonal';
 import {Ec46Chart} from '@/components/ec46-chart';
 import {SeasonalChart} from '@/components/seasonal-chart';
+import {startVisibleRefresh} from '@/lib/visible-refresh';
 export function GloSeaOutlook(){
  const chartContent=useRef<HTMLDivElement>(null),[chartHeight,setChartHeight]=useState(0);
  // Keep the chart slot tall while a different model loads; otherwise the browser
@@ -12,7 +13,7 @@ export function GloSeaOutlook(){
  const [data,setData]=useState<GloSea|null>(null),[open,setOpen]=useState(false),[model,setModel]=useState<SeasonalId|'ec46'>('egrr');
  useLayoutEffect(()=>{if(!chartContent.current)return;const content=chartContent.current;const measure=()=>setChartHeight(h=>Math.max(h,Math.ceil(content.getBoundingClientRect().height)));measure();const observer=new ResizeObserver(measure);observer.observe(content);return()=>observer.disconnect()},[open]);
  const [forecast,setForecast]=useState<SeasonalForecast|null>(null),[era,setEra]=useState<EraClimate|null>(null),[loading,setLoading]=useState(false),[error,setError]=useState(''),[referenceError,setReferenceError]=useState(false),[eraProgress,setEraProgress]=useState<EraProgress|null>(null),[refresh,setRefresh]=useState(0);
- useEffect(()=>{const c=new AbortController();void fetchGloSea(AbortSignal.any([c.signal,AbortSignal.timeout(15000)])).then(d=>{if(!c.signal.aborted)setData(d)}).catch(()=>{});return()=>c.abort()},[]);
+ useEffect(()=>{if(!open)return;return startVisibleRefresh(async signal=>{const d=await fetchGloSea(signal);if(!signal.aborted)setData(d)},900000)},[open,refresh]);
  // The ERA5 calendar-day baseline is shared by every seasonal model.
  useEffect(()=>{
   if(!open)return;const c=new AbortController();let timer:ReturnType<typeof setTimeout>|undefined;
@@ -29,17 +30,13 @@ export function GloSeaOutlook(){
  },[open,refresh]);
  useEffect(()=>{
   if(!open||model==='ec46')return;
-  const c=new AbortController();let timer:ReturnType<typeof setTimeout>|undefined;
-  setForecast(null);setError('');setLoading(true);
-  const check=async()=>{
-   const signal=AbortSignal.any([c.signal,AbortSignal.timeout(25000)]);let f:SeasonalForecast|null=null;
-   try{f=await fetchSeasonal(model,signal);if(!c.signal.aborted)setForecast(f)}catch{if(!c.signal.aborted)setError('The selected forecast could not be loaded. Please retry.')}
-   finally{if(!c.signal.aborted)setLoading(false)}
-
-   if(!c.signal.aborted&&!f)timer=setTimeout(check,60000);
-  };
-  void check();return()=>{c.abort();clearTimeout(timer)};
- },[open,model,refresh,data?.nominal]);
+  setError('');setLoading(true);
+  return startVisibleRefresh(async signal=>{
+   try{const f=await fetchSeasonal(model,signal);if(signal.aborted)return;if(f){setForecast(old=>old?.model===model&&old.nominal>f.nominal?old:f);setError('')}else setError('The latest complete issue is not available yet. Automatic checks will continue.')}
+   catch{if(!signal.aborted||signal.reason?.name==='TimeoutError')setError('The outlook could not be refreshed. Automatic checks will continue.')}
+   finally{if(!signal.aborted||signal.reason?.name==='TimeoutError')setLoading(false)}
+  },900000);
+ },[open,model,refresh]);
  const selected=model==='ec46'?{name:'ECMWF EC46'}:SEASONAL_MODELS.find(m=>m.id===model)!;
  const source=model==='ec46'?'https://charts.ecmwf.int/products/extended-zonal-mean-zonal-wind?area=nh':'https://climate.copernicus.eu/charts/packages/c3s_seasonal/products/c3s_seasonal_stratots_'+model+'?area=60N&type=plumemembers';
  const plot=(forecast?.model===model?forecast:null)??(model==='egrr'&&data?{...data,name:selected.name}:null);
@@ -52,8 +49,8 @@ export function GloSeaOutlook(){
    {!loading&&<iframe key={model} className="seasonal-embed" title={selected.name+' official seasonal wind chart while native data are pending'} src={'https://climate.copernicus.eu/charts/embed/c3s_seasonal/c3s_seasonal_stratots_'+model+'?area=60N&controls_overlay=1&player_dimension=base_time&type=plumemembers'} allowFullScreen referrerPolicy="strict-origin-when-cross-origin"/>}
   </>}
   </div></div>
-  {error&&plot&&<p role="status">{error} Showing the previously prepared GloSea issue.</p>}
+  {error&&plot&&<p role="status">{error} Showing the last valid {selected.name} issue.</p>}
   <div className="seasonal-source"><button className="seasonal-refresh" onClick={()=>setRefresh(n=>n+1)} disabled={model!=='ec46'&&loading}>Refresh outlook</button><a href={source} target="_blank" rel="noreferrer">Compare with the official {selected.name} chart ↗</a></div>
-  <p>Wind outlooks are independent of the globe’s model and timeline. EC46 runs daily; seasonal forecasts update monthly; the ERA5 daily climatology for 1993–2016 provides the shared historical baseline.</p>
+  <p>Open outlooks check for updates every 15 minutes. Wind outlooks are independent of the globe’s model and timeline. EC46 runs daily; seasonal forecasts update monthly; the ERA5 daily climatology for 1993–2016 provides the shared historical baseline.</p>
  </section>}</div>;
 }

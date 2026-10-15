@@ -76,6 +76,10 @@ def error_description(error):
 
 _publication_commits = {}
 
+def reset_publications():
+    """Start a new audit snapshot when a long-lived watcher checks again."""
+    _publication_commits.clear()
+
 def public(branch, file='latest.json'):
     # Resolve each branch once per audit. Even cache-busted raw branch URLs
     # can lag publication; commit URLs also keep related files consistent.
@@ -206,7 +210,7 @@ def matching_jobs(model, run, active_only=True):
                for job in jobs)
 
 def recovery(model, recover, now):
-    workflow=WORKFLOWS[model]
+    workflow='prepare-seasonal.yml' if model=='seasonal' else WORKFLOWS[model]
     # A long preparation can be older than the last twelve scheduled dispatches.
     runs=github('/actions/workflows/'+workflow+'/runs?per_page=100&branch=main')['workflow_runs']
     if model=='era5':
@@ -223,12 +227,13 @@ def recovery(model, recover, now):
     # Apply cooldown to this model, not a different member of the shared matrix.
     # Measure completed attempts from completion/update, not their start time.
     recent=next((r for r in runs if
-        (now-datetime.fromisoformat(r.get('updated_at',r['created_at']).replace('Z','+00:00'))).total_seconds()<900
+        (now-datetime.fromisoformat(r.get('updated_at',r['created_at']).replace('Z','+00:00'))).total_seconds()<(10800 if model=='seasonal' else 900)
         and matching_jobs(model,r,active_only=False)),None)
     if recent:return 'behind',recent['html_url']
     if recover:
         payload={'ref':'main'}
         if model in ['ifs_ens','aifs_ens']:payload['inputs']={'model':model}
+        if model=='seasonal':payload['inputs']={'phase':'forecast','model':'all','missing_only':True}
         github('/actions/workflows/'+workflow+'/dispatches',payload)
         return 'updating',f'https://github.com/{REPO}/actions/workflows/{workflow}'
     return 'behind',f'https://github.com/{REPO}/actions/workflows/{workflow}'
@@ -281,7 +286,7 @@ def derived(results):
         heat_complete=bool(re.fullmatch(r'[a-f0-9]{64}',heat.get('sha256',''))) and heat.get('path')==f"{key}/gefs/heat-flux-{heat.get('sha256')}.json" and 0<heat.get('bytes',0)<100000
         current=v['run']==expected and v['timelineComplete'] and v['count']==31 and len(v['files'])==33 and context_complete and heat_complete
         out.append(dict(model='vortex',status='current' if current else 'behind',publishedRun=v['run'],availableRun=expected,frames=len(v['files']),anomalyFrames=len(context_hours)))
-    except Exception:out.append(dict(model='vortex',status='error'))
+    except Exception:out.append(dict(model='vortex',status='error',availableRun=next((d.get('publishedRun') for d in results if d['model']=='gefs'),None)))
     return out
 
 def publish(data):
@@ -299,7 +304,8 @@ def recover_results(results, recover, now):
     for result in results:
         repair_catalogue = (result.get('failureStage') == 'catalogue' and
                             result.get('sourceStatus') == 'verified' and result.get('availableRun'))
-        if result['status']!='behind' and not repair_catalogue:continue
+        repair_derived = result['model'] in {'diagnostics','vortex'} and result.get('status')=='error' and result.get('availableRun')
+        if result['status']!='behind' and not repair_catalogue and not repair_derived:continue
         model=result['model']
         if model not in recovered:
             try:
@@ -310,11 +316,20 @@ def recover_results(results, recover, now):
         if isinstance(outcome, Exception):
             result.update(status='error', failureStage='recovery', message=error_description(outcome))
         else:
-            if repair_catalogue:
+            if repair_catalogue or repair_derived:
                 # The catalogue is still invalid until the replacement passes.
                 result['recoveryStatus'],result['workflowUrl']=outcome
             else:
                 result['status'],result['workflowUrl']=outcome
+
+def recover_seasonal(results, recover, now):
+    missing=[row for row in results if row['status']!='current']
+    if not missing:return
+    try:
+        status,url=recovery('seasonal',recover,now)
+        for row in missing:row.update(recoveryStatus=status,workflowUrl=url)
+    except Exception as error:
+        for row in missing:row.update(recoveryStatus='error',recoveryError=error_description(error))
 
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--recover',action='store_true');parser.add_argument('--publish',action='store_true');args=parser.parse_args()
@@ -331,6 +346,7 @@ def main():
     health.record_health(results,previous,now,github if os.environ.get('GH_TOKEN') else None,WORKFLOWS)
     delivery_state().annotate(results,now)
     seasonal=health.seasonal_health(public,now)
+    if os.environ.get('GH_TOKEN'):recover_seasonal(seasonal,args.recover,now)
     reference=era_reference(args.recover,now) if os.environ.get('GH_TOKEN') else None
     data=dict(version=1,checkedAt=stamp(datetime.now(timezone.utc)),models=results,era5=reference,seasonal=seasonal,scheduledIntervalHours=3)
     last=health.parsed(previous.get('checkedAt')) if isinstance(previous,dict) else None

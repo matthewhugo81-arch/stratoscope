@@ -3,11 +3,11 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['scripts/ensure-pipeline-audit.py', '.github/workflows/ensure-pipeline-audit.yml']
+    paths: ['scripts/ensure-pipeline-audit.py', 'scripts/renew-delivery-watch.py', '.github/workflows/ensure-pipeline-audit.yml']
   schedule:
     - cron: '41 * * * *'
   workflow_run:
-    workflows: [Prepare public ensemble maps, Prepare GEFS model maps, Prepare public DWD ICON maps, Prepare northern diagnostic charts, Prepare GEFS vortex geometry]
+    workflows: [Prepare public ensemble maps, Prepare GEFS model maps, Prepare public DWD ICON maps, Prepare northern diagnostic charts, Prepare GEFS vortex geometry, Prepare native seasonal wind charts, Watch newly released model data]
     types: [completed]
 permissions:
   contents: read
@@ -30,3 +30,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python scripts/ensure-pipeline-audit.py
+      - name: Recover an idle release watcher
+        if: always() && !cancelled()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/renew-delivery-watch.py

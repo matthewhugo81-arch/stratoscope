@@ -19,6 +19,7 @@ import subprocess
 import sys
 import urllib.error
 import numpy as np
+from publication_snapshot import snapshot_base
 context_spec=importlib.util.spec_from_file_location('vortex_context',Path(__file__).with_name('vortex_context.py'))
 context=importlib.util.module_from_spec(context_spec);context_spec.loader.exec_module(context)
 load_reference,prepare_context=context.load_reference,context.prepare_context
@@ -119,26 +120,27 @@ def publish(output,hour):
 
 def main():
     p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--hours',nargs='+',type=int);p.add_argument('--publish',action='store_true');p.add_argument('--context-only',action='store_true',help='Enrich the published vortex run without recalculating PV');args=p.parse_args()
-    base=ROOT+'forecast-data-gefs/'
+    base=snapshot_base('forecast-data-gefs')
+    vortex_base=snapshot_base('forecast-data-vortex')
     m=json.loads(prep.request(base+'latest.json'));assert m['complete'] and m['count']==31 and m['maxHour']==384
     if args.context_only:
-        m=json.loads(prep.request(ROOT+'forecast-data-vortex/latest.json'))
+        m=json.loads(prep.request(vortex_base+'latest.json'))
         assert m['count']==31 and m['complete']
     run=m['run'];when=datetime.fromisoformat(run.replace('Z','+00:00'));key=when.strftime('%Y%m%d%H')
     reference,reference_meta=load_reference()
     catalogue=dict(version=1,model='vortex',run=run,count=31,complete=True,timelineComplete=False,targetHour=384,step=12,method='mean-field-pv-equivalent-area-70N',files={})
     output=args.output;output.mkdir(parents=True,exist_ok=True)
     try:
-        previous=json.loads(prep.request(ROOT+'forecast-data-vortex/latest.json',attempts=1))
+        previous=json.loads(prep.request(vortex_base+'latest.json',attempts=1))
         if previous['run']==run and previous.get('method')==catalogue['method']:
             for h,e in previous['files'].items():
-                b=prep.request(ROOT+'forecast-data-vortex/'+e['path']);assert len(b)==e['bytes'] and hashlib.sha256(b).hexdigest()==e['sha256']
+                b=prep.request(vortex_base+e['path']);assert len(b)==e['bytes'] and hashlib.sha256(b).hexdigest()==e['sha256']
                 f=output/e['path'];f.parent.mkdir(parents=True,exist_ok=True);f.write_bytes(b)
             catalogue['files']=previous['files']
             if previous.get('heatFlux'):
                 e=previous['heatFlux'];assert len(e['sha256'])==64 and all(c in '0123456789abcdef' for c in e['sha256'])
                 assert e['path']==f"{key}/gefs/heat-flux-{e['sha256']}.json" and 0<e['bytes']<100000
-                b=prep.request(ROOT+'forecast-data-vortex/'+e['path']);assert len(b)==e['bytes'] and hashlib.sha256(b).hexdigest()==e['sha256']
+                b=prep.request(vortex_base+e['path']);assert len(b)==e['bytes'] and hashlib.sha256(b).hexdigest()==e['sha256']
                 series=json.loads(b)
                 assert series['run']==run and series['complete'] is True and len(series['points'])==33
                 assert [p['hour'] for p in series['points']]==list(range(0,385,12))

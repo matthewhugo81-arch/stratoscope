@@ -1,5 +1,6 @@
 'use client';
 import {useEffect,useMemo,useRef,useState} from 'react';
+import {startVisibleRefresh} from '@/lib/visible-refresh';
 import {vortexCatalogue,loadVortex,type VortexGeometry,type VortexCatalogue} from '@/lib/vortex';
 import {projectVortexPoint,vortexScreenOrigin} from '@/lib/vortex-projection';
 import {heightAnomalyColour,sampleHeightAnomaly} from '@/lib/vortex-context';
@@ -58,16 +59,17 @@ export function VortexView(){
  useEffect(()=>{if(!expanded)return;const overflow=document.body.style.overflow;document.body.style.overflow='hidden';const key=(e:KeyboardEvent)=>{if(e.key==='Escape'&&!document.fullscreenElement)setExpanded(false)};document.addEventListener('keydown',key);return()=>{document.body.style.overflow=overflow;document.removeEventListener('keydown',key);fullButton.current?.focus({preventScroll:true})}},[expanded]);
  async function fullscreen(){if(expanded){if(document.fullscreenElement)await document.exitFullscreen();setExpanded(false)}else{setExpanded(true);try{await section.current?.requestFullscreen()}catch{/* Keep the full-window view when browser fullscreen is unavailable. */}}}
  const [open,setOpen]=useState(false),[catalogue,setCatalogue]=useState<VortexCatalogue|null>(null),[run,setRun]=useState(''),[hour,setHour]=useState(0),[data,setData]=useState<VortexGeometry|null>(null),[loading,setLoading]=useState(false),[error,setError]=useState(''),[refresh,setRefresh]=useState(0),[playing,setPlaying]=useState(false);
+ const [frameRetry,setFrameRetry]=useState(0),frameFailed=useRef(false);
  const times=catalogue?Object.keys(catalogue.files).map(Number).sort((a,b)=>a-b):[0];
  useEffect(()=>{
-  if(!open)return;const c=new AbortController();let timer:ReturnType<typeof setTimeout>;setRun('');setData(null);setError('');setLoading(true);setPlaying(false);
-    const check=async()=>{try{const m=await vortexCatalogue(AbortSignal.any([c.signal,AbortSignal.timeout(30000)]));if(c.signal.aborted)return;setCatalogue(m);setRun(m.run);setHour(h=>m.files[String(h)]?h:0);if(!m.timelineComplete||!m.contextComplete||!m.heatFlux)timer=setTimeout(check,60000);}catch(e){if(!c.signal.aborted){setError((e as Error).message);setLoading(false);timer=setTimeout(check,60000);}}};void check();return()=>{c.abort();clearTimeout(timer)};
+  if(!open)return;let latest=run;setError('');if(!data)setLoading(true);
+  return startVisibleRefresh(async signal=>{try{const m=await vortexCatalogue(signal);if(signal.aborted||latest&&Date.parse(m.run)<Date.parse(latest))return;if(m.run!==latest)setPlaying(false);latest=m.run;setCatalogue(m);setRun(m.run);setHour(h=>m.files[String(h)]?h:0);if(frameFailed.current)setFrameRetry(v=>v+1);setError('');}catch(e){if(!signal.aborted||signal.reason?.name==='TimeoutError'){setError((e as Error).message+' Automatic checks will continue.');setLoading(false);}}});
  },[open,refresh]);
  useEffect(()=>{
-  if(!open||!run)return;const c=new AbortController();setLoading(true);setError('');
-  const p=catalogue?loadVortex(catalogue,hour,c.signal):Promise.reject(Error('Awaiting GEFS geometry'));
-  void p.then(d=>{if(!c.signal.aborted){setData(d);setLoading(false)}}).catch(e=>{if(!c.signal.aborted){setError(e.message);setLoading(false);setPlaying(false)}});return()=>c.abort();
- },[open,run,hour,catalogue?.files[String(hour)]?.sha256,refresh]);
+  if(!open||!run)return;const c=new AbortController();frameFailed.current=false;setLoading(true);setError('');
+  const p=catalogue?loadVortex(catalogue,hour,AbortSignal.any([c.signal,AbortSignal.timeout(60000)])):Promise.reject(Error('Awaiting GEFS geometry'));
+  void p.then(d=>{if(!c.signal.aborted){setData(d);setLoading(false)}}).catch(e=>{if(!c.signal.aborted){frameFailed.current=true;setError(e.message+' Retrying automatically.');setLoading(false);setPlaying(false)}});return()=>c.abort();
+ },[open,run,hour,catalogue?.files[String(hour)]?.sha256,refresh,frameRetry]);
  useEffect(()=>{if(!playing||loading||!data)return;const timer=setTimeout(()=>{const i=times.indexOf(hour);setHour(times[(i+1)%times.length]);},1100);return()=>clearTimeout(timer)},[playing,loading,data,hour,times.join(',')]);
  const changeHour=(h:number)=>{setPlaying(false);setHour(h)};
  return <div className="glosea-section"><button className="glosea-toggle" onClick={()=>{setOpen(v=>!v);setPlaying(false)}} aria-expanded={open} aria-controls="vortex-3d">{open?'Hide':'Show'} 3D vortex structure <span>GEFS · 31-member mean</span></button>{open&&<section ref={section} id="vortex-3d" className={`glosea-outlook vortex-outlook${expanded?' vortex-expanded':''}`} aria-label="3D vortex structure"><div className="vortex-heading"><h2>GEFS 3D PV structure</h2><button ref={fullButton} className="seasonal-refresh vortex-fullscreen" onClick={()=>void fullscreen()} aria-pressed={expanded}>{expanded?'Exit full screen':'Full screen'}</button>

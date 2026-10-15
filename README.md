@@ -251,44 +251,50 @@ Diagnostics request fresh catalogues after publication and hash-addressed member
 panels, preventing a cached previous catalogue from incorrectly skipping the
 new run's diagnostic charts.
 
-ECMWF ENS and AIFS preparation now has a separate concurrency lock per model,
-checks twice an hour, and processes two forecast hours in separate native-decoder
-processes on the public runner. Only a fully validated run is published. IFS ENS
-uses complete 15-day 00/12 UTC cycles; the shorter 06/18 UTC IFS cycles are not
-substituted into the 15-day timeline. AIFS and GEFS accept all four cycles when
-their complete advertised horizon is available.
+ECMWF ENS and AIFS preparation has a separate concurrency lock per model.
+IFS ENS uses complete 15-day 00/12 UTC cycles; AIFS and GEFS accept all four
+cycles when the complete advertised horizon is available. The provider's run
+time is never inferred from the clock or substituted with a partial ensemble.
 
-`check-pipelines.yml` audits terminal provider inventories, complete public
-catalogues, all member-panel entries, diagnostics and the GEFS 3D timeline every
-three hours and after preparation. It recovers idle stale jobs with a 15-minute
-retry cooldown, never dispatching duplicate active model jobs. A small public
-`forecast-status/latest.json` drives the site's source freshness notice. The
-notice offers a new published run without unexpectedly changing the user's
-current analysis or deleting cached frames. Status older than 90 minutes is
-labelled overdue. The desktop ingest monitor also checks for missed GitHub
-schedules; GitHub scheduled events can be delayed or dropped, so this is a
-recovery mechanism rather than a guaranteed publication deadline.
+### Automatic updates and recovery
 
-### Release pickup and catalogue freshness
+The release watcher checks GEFS, IFS ENS, AIFS ENS and ICON every 15 minutes
+within a 55-minute public-runner execution. A successful execution arranges one
+successor if none is queued; the hourly schedule and the independent recovery
+workflow remain backstops. One concurrency group prevents overlapping watchers.
+Early failures and recent completions have cooldowns to prevent dispatch loops.
+Each check resolves new publication snapshots rather than retaining the preceding
+check's branch head. Provider connection limits are unchanged.
 
-The release watcher checks the four prepared model feeds every five minutes for
-up to 330 minutes per standard public runner job (350-minute timeout). Its hourly
-schedule and single concurrency group retain at most one active job and one
-pending successor. This covers gaps caused by missed hourly starts, while
-keeping executions bounded. The three-hour health audit remains separate; an
-active watcher also refreshes it after three hours even if model state is
-unchanged. GitHub scheduling still has no guaranteed deadline.
+The watcher also checks whether the full health audit is overdue. That audit
+runs every three hours and validates provider inventories, complete model
+catalogues, northern diagnostics, the GEFS 3D/anomaly/heat-flux timeline, all
+seven seasonal issues, and the fixed ERA5 reference. It restarts idle missing or
+invalid publications with active-job checks and cooldowns. Seasonal recovery
+uses the missing-only planner, respects each system's release date, resumes
+saved CDS requests, and never schedules historical imports for a new issue.
+Model/derived retries have a 15-minute cooldown; seasonal retries have a
+three-hour cooldown. Failure remains visible until valid data are published.
 
-Mutable catalogue reads use a fresh query key in the browser, health audit,
-preparation skip checks and vortex checkpoints. Cache-Control alone did not
-prevent GitHub's CDN serving a previous run immediately after publication.
-Hash-addressed forecast assets remain cacheable. Northern diagnostic memory
-caches expire after five minutes; explicit Refresh always fetches again.
+Diagnostics and vortex/anomaly preparation read their parent model using an
+immutable Git commit. Seasonal planning and health checks do the same. This
+prevents a cached older catalogue from silently suppressing a required update.
+The existing parent-completion triggers update diagnostics and 3D products;
+their own schedules and health recovery provide independent fallback paths.
 
-A damaged published catalogue is eligible for recovery and cannot suppress
-preparation just by declaring itself complete. ICON source outages fail visibly
-instead of being interpreted as proof that an older cycle is latest. Diagnostic
-models prepare independently: a failure preserves that model's prior chart and
-still allows other complete charts to publish. ICON, vortex and diagnostic jobs
-explicitly request a health check after completion, including when a recovery
-job's GitHub token does not trigger downstream workflow events.
+Open, visible globe and 3D views check every five minutes, as do northern
+comparison charts. A newly validated model cycle automatically replaces the
+previous cycle, retaining the selected forecast lead and display controls.
+EC46 and seasonal outlooks check every 15 minutes. Hidden tabs pause checks;
+returning to the tab checks promptly. Only one refresh per view can be in
+flight, and temporary failures retain the last valid display and retry.
+The completed 1993–2016 ERA5 reference is historical and does not require new
+monthly downloads. Hash-addressed forecast assets remain cacheable.
+
+The public `forecast-status/latest.json` drives the freshness notice. Checks
+older than 3.5 hours are labelled overdue; starting recovery does not mean the
+new data have been published. All recurring jobs run on GitHub and do not need
+an open desktop session. GitHub scheduling, raw-file cache propagation and
+upstream availability can still delay publication; this is automatic recovery,
+not a guaranteed delivery deadline. The native GitHub failure status remains
+the alert path for unresolved outages.

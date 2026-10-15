@@ -11,12 +11,17 @@ import time
 import urllib.error
 import urllib.request
 from seasonal_config import MODELS, current_forecast, iso, latest
+from publication_snapshot import snapshot_base
+from functools import cache
 
 ROOT = 'https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/forecast-data-seasonal/'
 
+@cache
+def publication_root():return snapshot_base('forecast-data-seasonal')
+
 
 def read_forecast(model):
-    url = ROOT + 'forecast/' + model + '.json'
+    url = publication_root() + 'forecast/' + model + '.json'
     for attempt in range(3):
         try:
             request = urllib.request.Request(url, headers={'User-Agent': 'Stratoscope-seasonal-release-check', 'Cache-Control': 'no-cache'})

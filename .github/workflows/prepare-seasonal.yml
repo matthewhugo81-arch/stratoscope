@@ -2,6 +2,10 @@ name: Prepare native seasonal wind charts
 on:
   workflow_dispatch:
     inputs:
+      missing_only:
+        description: Prepare only released issues that are missing or invalid
+        type: boolean
+        default: false
       phase:
         type: choice
         options: [forecast, climate, era5]
@@ -42,8 +46,9 @@ jobs:
           REQUESTED_MODEL: ${{ inputs.model || 'all' }}
           REQUESTED_PHASE: ${{ inputs.phase || 'update' }}
           EVENT_NAME: ${{ github.event_name }}
+          MISSING_ONLY: ${{ inputs.missing_only || false }}
         run: |
-          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+          if [ "$EVENT_NAME" = workflow_dispatch ] && [ "$MISSING_ONLY" != true ]; then
             python -u scripts/plan-seasonal-update.py --manual --model "$REQUESTED_MODEL" --phase "$REQUESTED_PHASE"
           else
             python -u scripts/plan-seasonal-update.py --model "$REQUESTED_MODEL" --phase "$REQUESTED_PHASE"
@@ -70,7 +75,7 @@ jobs:
           GITHUB_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
           SEASONAL_MODEL: ${{ matrix.model }}
           SEASONAL_PHASE: ${{ inputs.phase || 'update' }}
-          SCHEDULED: ${{ github.event_name == 'schedule' }}
+          SCHEDULED: ${{ github.event_name == 'schedule' || inputs.missing_only == true }}
         run: |
           gh auth setup-git --hostname github.com
           if [ "$SEASONAL_MODEL" = era5 ]; then

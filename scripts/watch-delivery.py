@@ -27,6 +27,7 @@ def load_audit():
 
 def check_once(audit, prep, now, recover=True):
     """One failed source must not stop pickup from unrelated working providers."""
+    audit.reset_publications()
     def inspect(model):
         try:
             return audit.audit(model, now, prep)
@@ -43,11 +44,14 @@ def check_once(audit, prep, now, recover=True):
 
 
 
-def run_watch(audit, prep, minutes=55, interval=300, recover=True, clock=time.monotonic, sleep=time.sleep):
+def run_watch(audit, prep, minutes=55, interval=300, recover=True, clock=time.monotonic, sleep=time.sleep, maintenance=None):
     started = clock()
     while True:
         now = datetime.now(timezone.utc)
         reports = check_once(audit, prep, now, recover)
+        if maintenance is not None:
+            try:maintenance(now)
+            except Exception as error:print('::warning::Audit recovery check failed: '+type(error).__name__,flush=True)
         # Keep source/provider faults in the logged report. The independent
         # three-hour pipeline audit owns the publication health status and
         # actionable failure notifications. Never dispatch that audit at
@@ -57,6 +61,7 @@ def run_watch(audit, prep, minutes=55, interval=300, recover=True, clock=time.mo
             print('::notice::Source delivery issue recorded; pipeline health will assess publication impact.', flush=True)
         remaining = minutes*60-(clock()-started)
         if minutes == 0 or remaining < interval:
+            if minutes and remaining>0:sleep(remaining)
             break
         sleep(interval)
     return 0
@@ -75,7 +80,10 @@ def main():
     if not args.dry_run and (not os.environ.get('GH_TOKEN') or os.environ.get('GITHUB_REF') != 'refs/heads/main'):
         raise RuntimeError('Recovery is restricted to authenticated main-branch execution')
     audit = load_audit()
-    raise SystemExit(run_watch(audit, audit.preparation(), args.minutes, args.interval, not args.dry_run))
+    spec=importlib.util.spec_from_file_location('watchdog',Path(__file__).with_name('ensure-pipeline-audit.py'))
+    watchdog=importlib.util.module_from_spec(spec);spec.loader.exec_module(watchdog)
+    maintain=None if args.dry_run else lambda now:print('Health audit:',watchdog.ensure(audit,now),flush=True)
+    raise SystemExit(run_watch(audit, audit.preparation(), args.minutes, args.interval, not args.dry_run,maintenance=maintain))
 
 
 if __name__ == '__main__':
