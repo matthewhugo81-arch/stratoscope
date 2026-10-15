@@ -12,12 +12,31 @@ import hashlib
 import json
 import math
 from pathlib import Path
+import re
 import struct
+import subprocess
 import time
 import urllib.request
 
 ROOT = 'https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/'
 MODELS = {'gefs': (31, 384), 'ifs_ens': (51, 360), 'aifs_ens': (51, 360)}
+
+def snapshot_base(branch):
+    """Resolve the Git ref, then read only that immutable published snapshot.
+
+    Raw branch URLs can still serve the preceding catalogue immediately after
+    publication, even with a unique query string and Cache-Control: no-cache.
+    Git's ref advertisement and a commit URL avoid accepting that stale copy.
+    """
+    assert branch in {'forecast-data-gefs', 'forecast-data-ifs-ens',
+                      'forecast-data-aifs-ens', 'forecast-data-diagnostics'}
+    ref = 'refs/heads/' + branch
+    advertised = subprocess.check_output(
+        ['git', 'ls-remote', 'https://github.com/matthewhugo81-arch/stratoscope.git', ref],
+        text=True, timeout=45).strip().split()
+    if len(advertised) != 2 or advertised[1] != ref or not re.fullmatch(r'[a-f0-9]{40}', advertised[0]):
+        raise ValueError('Could not resolve the published snapshot for ' + branch)
+    return ROOT + advertised[0] + '/', advertised[0]
 
 def fetch(url, fresh=False):
     # Completion-triggered jobs must not mistake a CDN-cached previous
@@ -76,13 +95,14 @@ def validate_manifest(m, model):
     return run
 
 def prepare(model, output):
-    base=ROOT+'forecast-data-'+model.replace('_','-')+'/'
-    manifest_bytes=fetch(base+'latest.json', fresh=True)
+    base, commit=snapshot_base('forecast-data-'+model.replace('_','-'))
+    manifest_bytes=fetch(base+'latest.json')
     m=json.loads(manifest_bytes); run=validate_manifest(m,model)
     fingerprint=hashlib.sha256(manifest_bytes).hexdigest()
     try:
         previous=json.loads(fetch(ROOT+'forecast-data-diagnostics/'+model+'.json', fresh=True))
-        if previous.get('inputSha256')==fingerprint and previous.get('complete') is True:
+        if (previous.get('inputSha256')==fingerprint and previous.get('complete') is True
+                and previous.get('model')==model and previous.get('run')==m['run']):
             print('UNCHANGED',model,m['run'],flush=True);return
     except urllib.error.HTTPError as e:
         if e.code!=404: raise
@@ -92,7 +112,7 @@ def prepare(model, output):
         return decode_panel(packed,model,m['run'],hour)
     with ThreadPoolExecutor(max_workers=4) as pool:
         points=list(pool.map(one,range(0,MODELS[model][1]+1,6)))
-    data=dict(version=1,model=model,run=m['run'],level=10,count=MODELS[model][0],maxHour=MODELS[model][1],complete=True,inputSha256=fingerprint,
+    data=dict(version=1,model=model,run=m['run'],level=10,count=MODELS[model][0],maxHour=MODELS[model][1],complete=True,inputSha256=fingerprint,inputCommit=commit,
               preparedAt=datetime.now(timezone.utc).isoformat(),source=m['panels']['0']['path'],windBasis='native 60N full longitude circle',temperatureBasis='area-weighted 2 degree display grid, 60–90N',points=points)
     output.mkdir(parents=True,exist_ok=True)
     (output/(model+'.json')).write_text(json.dumps(data,separators=(',',':'),allow_nan=False))
@@ -108,6 +128,19 @@ def prepare_models(models, output):
     return failed
 
 
+def verify_publication(output):
+    files=list(output.glob('*.json'))
+    if not files:return
+    base, _=snapshot_base('forecast-data-diagnostics')
+    for file in files:
+        expected=json.loads(file.read_text())
+        actual=json.loads(fetch(base+file.name))
+        if actual != expected:
+            raise ValueError('Published diagnostics do not match the verified output: '+file.name)
+        print('VERIFIED',actual['model'],actual['run'],flush=True)
+
+
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--model',choices=MODELS);a=p.parse_args()
-    if prepare_models([a.model] if a.model else MODELS,a.output):raise SystemExit(1)
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--model',choices=MODELS);p.add_argument('--verify-published',action='store_true');a=p.parse_args()
+    if a.verify_published:verify_publication(a.output)
+    elif prepare_models([a.model] if a.model else MODELS,a.output):raise SystemExit(1)

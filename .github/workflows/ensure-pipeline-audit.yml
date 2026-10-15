@@ -1,0 +1,32 @@
+name: Recover overdue freshness audits
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['scripts/ensure-pipeline-audit.py', '.github/workflows/ensure-pipeline-audit.yml']
+  schedule:
+    - cron: '41 * * * *'
+  workflow_run:
+    workflows: [Prepare public ensemble maps, Prepare GEFS model maps, Prepare public DWD ICON maps, Prepare northern diagnostic charts, Prepare GEFS vortex geometry]
+    types: [completed]
+permissions:
+  contents: read
+  actions: write
+concurrency:
+  group: recover-overdue-freshness-audit
+  cancel-in-progress: false
+jobs:
+  recover:
+    if: github.repository == 'matthewhugo81-arch/stratoscope' && github.event.repository.private == false && (github.event_name != 'workflow_run' || github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+      - name: Test bounded recovery without network calls
+        run: python -m unittest discover -s tests -p test_audit_watchdog.py -v
+      - name: Dispatch only an overdue idle audit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/ensure-pipeline-audit.py

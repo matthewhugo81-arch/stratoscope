@@ -26,6 +26,7 @@ jobs:
           python -m unittest discover -s tests -p test_ensemble_preparation.py -v
           python -m unittest discover -s tests -p test_icon_preparation.py -v
           python -m unittest discover -s tests -p test_northern_diagnostics.py -v
+          python -m unittest discover -s tests -p test_audit_watchdog.py -v
           python -m unittest discover -s tests -p test_delivery_watch.py -v
           python -m unittest discover -s tests -p 'test_seasonal*.py' -v
           python -m unittest discover -s tests -p test_source_security.py -v

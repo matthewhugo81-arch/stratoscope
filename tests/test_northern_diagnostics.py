@@ -21,6 +21,15 @@ def panel():
     return gzip.compress(b'STRATP01'+struct.pack('<I',len(h))+h+b)
 
 class DiagnosticsTests(unittest.TestCase):
+    def test_parent_catalogue_uses_an_immutable_git_snapshot(self):
+        sha='a'*40
+        with patch.object(d.subprocess,'check_output',return_value=sha+'\trefs/heads/forecast-data-gefs\n') as git:
+            self.assertEqual(d.snapshot_base('forecast-data-gefs'),(d.ROOT+sha+'/',sha))
+        self.assertEqual(git.call_args.args[0][-1],'refs/heads/forecast-data-gefs')
+        for advertised in ['',sha+'\trefs/heads/wrong','invalid\trefs/heads/forecast-data-gefs']:
+            with patch.object(d.subprocess,'check_output',return_value=advertised):
+                with self.assertRaises(ValueError):d.snapshot_base('forecast-data-gefs')
+
     def test_one_failed_model_does_not_prevent_other_complete_series(self):
         with patch.object(d,'prepare',side_effect=[TimeoutError('GEFS unavailable'),None,None]) as prepare:
             self.assertEqual(d.prepare_models(d.MODELS,Path('unused')),['gefs'])
@@ -43,17 +52,29 @@ class DiagnosticsTests(unittest.TestCase):
         stale = b'cached old catalogue'
         def fetch(url, fresh=False):
             if url.endswith('latest.json'):
-                return json.dumps(manifest).encode() if fresh else stale
+                self.assertTrue(url.startswith(d.ROOT+'a'*40+'/'))
+                return json.dumps(manifest).encode()
             if 'forecast-data-diagnostics' in url:
                 self.assertTrue(fresh)
                 return json.dumps(dict(complete=True,inputSha256=hashlib.sha256(stale).hexdigest())).encode()
             self.assertTrue(url.endswith('?sha='+digest))
             return payload
-        with tempfile.TemporaryDirectory() as folder, patch.object(d,'fetch',side_effect=fetch), patch.object(d,'decode_panel',side_effect=lambda packed,model,run,hour:dict(hour=hour,wind=[1]*51,temperature=[-50]*51)):
+        with tempfile.TemporaryDirectory() as folder, patch.object(d,'snapshot_base',return_value=(d.ROOT+'a'*40+'/','a'*40)), patch.object(d,'fetch',side_effect=fetch), patch.object(d,'decode_panel',side_effect=lambda packed,model,run,hour:dict(hour=hour,wind=[1]*51,temperature=[-50]*51)):
             d.prepare('ifs_ens',Path(folder))
             result=json.loads((Path(folder)/'ifs_ens.json').read_text())
         self.assertEqual(result['run'],manifest['run'])
         self.assertEqual(len(result['points']),61)
+        self.assertEqual(result['inputCommit'],'a'*40)
+
+    def test_published_output_must_match_the_immutable_remote_snapshot(self):
+        data=dict(model='gefs',run='2026-10-15T00:00:00.000Z',complete=True)
+        with tempfile.TemporaryDirectory() as folder:
+            output=Path(folder);(output/'gefs.json').write_text(json.dumps(data))
+            with patch.object(d,'snapshot_base',return_value=(d.ROOT+'b'*40+'/','b'*40)), patch.object(d,'fetch',return_value=json.dumps(data).encode()) as read:
+                d.verify_publication(output)
+                self.assertEqual(read.call_args.args[0],d.ROOT+'b'*40+'/gefs.json')
+            with patch.object(d,'snapshot_base',return_value=(d.ROOT+'b'*40+'/','b'*40)), patch.object(d,'fetch',return_value=json.dumps({**data,'run':'2026-10-14T18:00:00.000Z'}).encode()):
+                with self.assertRaises(ValueError):d.verify_publication(output)
 
     def test_spherical_cap_area(self):
         self.assertAlmostEqual(sum(d.cap_weights()),1-math.sin(math.radians(60)),places=12)

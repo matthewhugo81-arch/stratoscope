@@ -1,6 +1,9 @@
 name: Prepare northern diagnostic charts
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['scripts/prepare-diagnostics.py', '.github/workflows/prepare-diagnostics.yml']
   workflow_run:
     workflows: [Prepare public ensemble maps, Prepare GEFS model maps]
     types: [completed]
@@ -40,3 +43,6 @@ jobs:
             git commit -m 'Update complete northern diagnostic series'
             git push origin HEAD:forecast-data-diagnostics
           fi
+      - name: Verify the published diagnostic snapshot
+        if: always() && !cancelled() && hashFiles('work/diagnostics/*.json') != ''
+        run: python scripts/prepare-diagnostics.py --output work/diagnostics --verify-published
