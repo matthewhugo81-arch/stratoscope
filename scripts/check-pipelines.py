@@ -74,13 +74,24 @@ def error_description(error):
         detail += f' [{url.netloc}{url.path}]'
     return detail
 
+_publication_commits = {}
+
 def public(branch, file='latest.json'):
-    # Branch URLs are mutable. Cache-Control alone does not bypass GitHub's
-    # shared CDN, including immediately after a successful publication.
-    url = RAW+branch+'/'+file
+    # Resolve each branch once per audit. Even cache-busted raw branch URLs
+    # can lag publication; commit URLs also keep related files consistent.
     if not re.fullmatch(r'[a-f0-9]{40}', branch):
-        url += '?_fresh='+str(time.time_ns())
-    return json.loads(fetch(url, headers={'Cache-Control': 'no-cache'}))
+        if not re.fullmatch(r'forecast-(?:status|data-[a-z0-9-]+)', branch):
+            raise ValueError('Invalid publication branch')
+        if branch not in _publication_commits:
+            ref='refs/heads/'+branch
+            advertised=subprocess.check_output(
+                ['git','ls-remote',f'https://github.com/{REPO}.git',ref],
+                text=True,timeout=45).strip().split()
+            if len(advertised)!=2 or advertised[1]!=ref or not re.fullmatch(r'[a-f0-9]{40}',advertised[0]):
+                raise ValueError('Could not resolve publication: '+branch)
+            _publication_commits[branch]=advertised[0]
+        branch=_publication_commits[branch]
+    return json.loads(fetch(RAW+branch+'/'+file, headers={'Cache-Control': 'no-cache'}))
 
 def github(endpoint, payload=None):
     token = os.environ['GH_TOKEN']

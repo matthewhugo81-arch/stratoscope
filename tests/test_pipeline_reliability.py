@@ -53,9 +53,11 @@ def entries(model):
 
 class HttpTests(unittest.TestCase):
     def test_published_branch_catalogues_bypass_shared_cdn_cache(self):
-        with patch.object(audit, 'fetch', return_value=b'{}') as read, patch('time.time_ns', return_value=123):
+        with patch.dict(audit._publication_commits,{},clear=True), patch.object(audit.subprocess,'check_output',return_value='a'*40+'\trefs/heads/forecast-data-gefs\n') as resolve, patch.object(audit, 'fetch', return_value=b'{}') as read:
             audit.public('forecast-data-gefs')
-        self.assertTrue(read.call_args.args[0].endswith('/latest.json?_fresh=123'))
+            audit.public('forecast-data-gefs','other.json')
+            self.assertEqual(resolve.call_count,1)
+        self.assertTrue(read.call_args.args[0].endswith('/'+'a'*40+'/other.json'))
         self.assertEqual(read.call_args.kwargs['headers']['Cache-Control'], 'no-cache')
         with patch.object(audit, 'fetch', return_value=b'{}') as read:
             audit.public('a'*40, 'climate/era5-1993-2016.json')

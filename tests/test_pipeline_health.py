@@ -9,6 +9,12 @@ h=importlib.util.module_from_spec(spec);spec.loader.exec_module(h)
 NOW=datetime(2026,10,8,10,tzinfo=timezone.utc)
 
 class HealthTests(unittest.TestCase):
+    def test_publication_resolution_rejects_wrong_refs_and_invalid_commits(self):
+        for advertised in ['', 'invalid\trefs/heads/forecast-data-gefs', 'a'*40+'\trefs/heads/wrong']:
+            with patch.dict(h._publication_commits,{},clear=True), patch.object(h.subprocess,'check_output',return_value=advertised), patch.object(h,'fetch') as fetch:
+                with self.assertRaises(ValueError):h.public('forecast-data-gefs')
+                fetch.assert_not_called()
+
     def test_vortex_context_must_cover_the_complete_matched_timeline(self):
         run='2026-10-08T06:00:00.000Z'
         data=dict(run=run,complete=True,timelineComplete=True,count=31,files={str(h):{} for h in range(0,385,12)})
