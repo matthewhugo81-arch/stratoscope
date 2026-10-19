@@ -285,3 +285,8 @@ button.image-save>span{display:inline;margin:0;padding:0;background:none;color:i
 .globe-save-actions{display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
 .globe-save-actions>button,.globe-save-actions>a{display:flex;align-items:center;justify-content:center;gap:7px;min-height:42px;padding:8px 12px;background:#19343e;border:1px solid #436771;border-radius:5px;color:#c1e8df;font:13px/1.3 Arial,sans-serif;cursor:pointer;text-decoration:none}
 @media(max-width:750px),(pointer:coarse){.globe-save-row>span:first-child{display:none}.globe-save-dialog{padding:12px}.globe-save-actions>button,.globe-save-actions>a{min-height:44px}}
+
+/* Keep the ownership credit beside the site identity at every viewport. */
+.atlas>footer .footer-identity{display:grid;gap:7px;min-width:0}
+.atlas>footer .footer-credit{margin:0;color:#8ca2b1;font:12px/1.6 Arial,Helvetica,sans-serif;letter-spacing:normal}
+.atlas>footer .footer-credit a{text-underline-offset:3px}

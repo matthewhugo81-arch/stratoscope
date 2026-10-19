@@ -158,7 +158,7 @@ export default function Home(){
   <GloSeaOutlook/>
   {ensemble&&showMembers&&run&&<MemberPanels model={model} run={run} hour={hour} field={field} onClose={()=>setShowMembers(false)} onInspect={(m,h,f)=>{setField(f);setShowMembers(false);setLevel(10);setView('member');setMember(m);chooseHour(h)}}/>}
 
-  <footer><span>STRATOSCOPE <b> / </b> NORTHERN HEMISPHERE</span><span>{noaaSource?'NOAA / NCEP':ecSource?<a href="https://www.ecmwf.int/en/forecasts/datasets/open-data" target="_blank" rel="noreferrer">ECMWF · CC BY 4.0</a>:<a href="https://www.dwd.de/EN/service/legal_notice/legal_notice_node.html" target="_blank" rel="noreferrer">DWD · CC BY 4.0</a>} <i>·</i> All times UTC</span></footer>
+  <footer><div className="footer-identity"><span>STRATOSCOPE <b> / </b> NORTHERN HEMISPHERE</span><p className="footer-credit">Owned and Developed by <a href="mailto:matthewhugo81@gmail.com">Mr M Hugo</a>. BSc, FRMetS, RMet.</p></div><span>{noaaSource?'NOAA / NCEP':ecSource?<a href="https://www.ecmwf.int/en/forecasts/datasets/open-data" target="_blank" rel="noreferrer">ECMWF · CC BY 4.0</a>:<a href="https://www.dwd.de/EN/service/legal_notice/legal_notice_node.html" target="_blank" rel="noreferrer">DWD · CC BY 4.0</a>} <i>·</i> All times UTC</span></footer>
  </main>
 }
 
