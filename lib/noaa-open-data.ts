@@ -8,11 +8,15 @@ export function noaaFile(model:'gfs'|'gefs',run:string,hour:number,level:number,
  const part=[20,30,70].includes(level)?'b':'a',name=member===0?'gec00':'gep'+String(member).padStart(2,'0');
  return `https://noaa-gefs-pds.s3.amazonaws.com/gefs.${day}/${cycle}/atmos/pgrb2${part}p5/${name}.t${cycle}z.pgrb2${part}.0p50.f${step}`;
 }
+export class NoaaRunUnavailable extends Error{}
 export async function noaaIndex(url:string){
  const r=await fetch(url+'.idx',{signal:AbortSignal.timeout(15000)});
- if(!r.ok)throw Error('This NOAA run is not available. Refresh for the latest complete run.');
+ if(r.status===404||r.status===410)throw new NoaaRunUnavailable('This NOAA run is not available. Refresh for the latest complete run.');
+ if(!r.ok)throw Error(`NOAA source check failed (HTTP ${r.status}). The latest run could not be verified. Please retry.`);
  const text=await r.text();if(text.length>2000000)throw Error('Unexpected NOAA index size');
- return text.trim().split('\n').map(line=>line.split(':'));
+ const entries=text.trim().split('\n').map(line=>line.split(':'));
+ if(entries.some((p,i)=>p.length<6||!/^\d+$/.test(p[0])||!/^\d+$/.test(p[1])||!Number.isSafeInteger(Number(p[1]))||!/^d=\d{10,12}$/.test(p[2])||!p[3]||!p[4]||i>0&&Number(p[1])<=Number(entries[i-1][1])))throw Error('NOAA returned an invalid inventory. The latest run could not be verified.');
+ return entries;
 }
 export function northField(values:number[],g:Grid){
  if(![.25,.5,1].includes(g.dx)||Math.abs(g.dy)!==g.dx||g.nx*g.dx!==360||values.length!==g.nx*g.ny)throw Error('Unexpected NOAA grid');

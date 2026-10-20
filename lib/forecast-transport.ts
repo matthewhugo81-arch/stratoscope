@@ -1,9 +1,13 @@
 import type {Frame} from './grib';
 import {isEnsemble,type ForecastMeta,type ModelId} from './models';
-import {iconMeta,iconFrame} from './dwd';
-import {preparedMeta} from './prepared-ensembles';
+import {iconMeta,iconFrame,iconFrameRevision} from './dwd';
+import {preparedMeta,preparedFrameRevision} from './prepared-ensembles';
 declare const __STRATOSCOPE_STATIC__:boolean;
 const browserData=typeof __STRATOSCOPE_STATIC__!=='undefined'&&__STRATOSCOPE_STATIC__;
+export function forecastFrameRevision(model:ModelId,run:string,hour:number,level:number,member:number){
+ if(model==='icon')return iconFrameRevision(run,hour,level);
+ if(isEnsemble(model)&&member<0)return preparedFrameRevision(model,run,hour,level);
+}
 export async function forecastRequest(query:string,signal:AbortSignal):Promise<Frame|ForecastMeta>{
  const q=new URLSearchParams(query);if(q.get('model')==='icon')return q.get('meta')==='1'?iconMeta(signal):iconFrame(q.get('run')??'',Number(q.get('hour')),Number(q.get('level')),signal);
  if(browserData){const {requestWeather}=await import('./weather-client');return requestWeather(query,signal);}

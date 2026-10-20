@@ -13,7 +13,8 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "dev:pages": "vite --config vite.pages.config.ts",
-    "build:pages": "vite build --config vite.pages.config.ts"
+    "build:pages": "vite build --config vite.pages.config.ts",
+    "check:pages": "node scripts/check-pages-build.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

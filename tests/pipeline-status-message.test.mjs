@@ -7,6 +7,17 @@ const {pipelineNotice}=await import('data:text/javascript;base64,'+Buffer.from(t
 const checkedAt='2026-10-10T21:38:00Z',run='2026-10-10T00:00:00Z',now=Date.parse(checkedAt);
 const report={version:1,checkedAt,models:[],scheduledIntervalHours:3};
 const current={model:'ifs_ens',publishedRun:run,availableRun:run,status:'current'};
+test('a displayed newer publication is not claimed to have passed an older source audit',()=>{
+ const checkedAt='2026-10-20T17:19:27Z',displayed='2026-10-20T12:00:00.000Z',audited='2026-10-20T06:00:00.000Z';
+ for(const feed of [{model:'gefs',status:'current',publishedRun:audited,availableRun:audited},{model:'gfs',status:'direct',availableRun:audited}]){
+  const notice=pipelineNotice({...report,checkedAt},feed,displayed,Date.parse('2026-10-20T19:02:00Z'));
+  assert.equal(notice.kind,'warning');assert.match(notice.text,/Showing newer run.*12:00.*last verified.*06:00.*awaiting/);assert.doesNotMatch(notice.text,/Latest complete source run/);
+ }
+});
+test('missing or invalid audited/displayed runs cannot claim a verified current publication',()=>{
+ for(const feed of [{...current,publishedRun:undefined},{...current,publishedRun:'invalid'}])assert.equal(pipelineNotice(report,feed,run,now).kind,'warning');
+ assert.equal(pipelineNotice(report,current,'invalid',now).kind,'warning');
+});
 test('three-hour checks are not falsely overdue after ninety minutes',()=>{
  for(const minutes of [0,91,179,180,210])assert.equal(pipelineNotice(report,current,run,now+minutes*60000).kind,'current');
 });

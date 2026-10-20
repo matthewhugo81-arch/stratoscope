@@ -2,10 +2,10 @@ name: Test forecast loading
 on:
   push:
     branches: [main]
-    paths: ['app/page.tsx', 'lib/*.ts', 'tests/*.test.mjs', 'tests/*fixture.mjs', 'package*.json', '.github/workflows/test-forecast-loading.yml']
+    paths: ['app/**', 'components/**', 'lib/**', 'public/**', 'vendor/**', 'docs/**', 'tests/**', 'scripts/check-pages-build.mjs', 'pages-main.tsx', 'index.html', 'vite.pages.config.ts', 'postcss.config.*', 'tsconfig.json', 'package*.json', '.github/workflows/test-forecast-loading.yml']
   pull_request:
     branches: [main]
-    paths: ['app/page.tsx', 'lib/*.ts', 'tests/*.test.mjs', 'tests/*fixture.mjs', 'package*.json', '.github/workflows/test-forecast-loading.yml']
+    paths: ['app/**', 'components/**', 'lib/**', 'public/**', 'vendor/**', 'docs/**', 'tests/**', 'scripts/check-pages-build.mjs', 'pages-main.tsx', 'index.html', 'vite.pages.config.ts', 'postcss.config.*', 'tsconfig.json', 'package*.json', '.github/workflows/test-forecast-loading.yml']
 permissions:
   contents: read
 jobs:
@@ -22,4 +22,4 @@ jobs:
         run: |
           npm exec -- tsc --noEmit
           node --test tests/*.test.mjs
-          npm run build:pages
+          npm run check:pages

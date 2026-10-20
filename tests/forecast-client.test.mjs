@@ -7,7 +7,7 @@ import {preparedResponse} from './prepared-fixture.mjs';
 // Load the browser modules without a browser, bundler, or upstream weather requests.
 async function moduleUrl(name){
  let source=await readFile(new URL(`../lib/${name}.ts`,import.meta.url),'utf8');
- for(const dependency of ['dwd','models','prepared-ensembles','shared-download','zonal-wind','forecast-transport','forecast-storage']){
+ for(const dependency of ['forecast-revision','forecast-memory','dwd','models','prepared-ensembles','shared-download','zonal-wind','forecast-transport','forecast-storage']){
   if(source.includes(`from './${dependency}'`))source=source.replace(`from './${dependency}'`,`from '${await moduleUrl(dependency)}'`);
  }
  const {outputText}=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}});
@@ -62,7 +62,7 @@ test('fixed-cycle cache lasts across navigation, rolling data still expires in 1
 });
 test('each complete ensemble mean and spread share one prepared download',async()=>{
  for(const model of ['gefs','ifs_ens','aifs_ens']){
-  let calls=0;globalThis.fetch=async url=>{calls++;return preparedResponse(url);};
+  let calls=0;globalThis.fetch=async url=>{if(!String(url).includes('latest.json'))calls++;return preparedResponse(url);};
   const first=await request(24,controller().signal,model);
   assert.equal(calls,1);assert.equal(first.pair.mean.ensemble.count,model==='gefs'?31:51);
   const cached=peekForecast(model,run,24,10,-1);assert.equal(cached.pair.spread.temperature[0],2);
@@ -71,11 +71,11 @@ test('each complete ensemble mean and spread share one prepared download',async(
 });
 test('unavailable prepared data never falls back to downloading members',async()=>{
  let calls=0;globalThis.fetch=async()=>{calls++;return new Response('missing',{status:404});};
- await assert.rejects(request(54,controller().signal,'ifs_ens'),/prepared ensemble forecast is unavailable/);
+ await assert.rejects(request(54,controller().signal,'ifs_ens'),/Prepared ensemble maps are not available/);
  assert.equal(calls,1);assert.equal(peekForecast('ifs_ens',run,54,10,-1),undefined);
 });
 test('a selected ensemble joins its preload, while Refresh cancels outstanding preparation downloads',async()=>{
- let calls=0,release;globalThis.fetch=async url=>{calls++;await new Promise(resolve=>release=resolve);return preparedResponse(url);};
+ let calls=0,release;globalThis.fetch=async url=>{if(String(url).includes('latest.json'))return preparedResponse(url);calls++;await new Promise(resolve=>release=resolve);return preparedResponse(url);};
  const c=controller(),preload=request(72,c.signal,'gefs');await pause();
  c.abort();const foreground=request(72,controller().signal,'gefs');release();
  await assert.rejects(preload,{name:'AbortError'});assert.equal((await foreground).frame.hour,72);assert.equal(calls,1);
@@ -102,7 +102,7 @@ test('a complete 41-frame loop replays without downloads beyond the 24-frame gen
 });
 
 test('selected ensemble loops retain mean and spread beyond the six-pair general cache',async()=>{
- let calls=0;globalThis.fetch=async url=>{calls++;return preparedResponse(url);};
+ let calls=0;globalThis.fetch=async url=>{if(!String(url).includes('latest.json'))calls++;return preparedResponse(url);};
  activateForecastSequence('ifs_ens',run,10,-1);
  for(let hour=0;hour<=42;hour+=6)await request(hour,controller().signal,'ifs_ens');
  assert.equal(calls,8);

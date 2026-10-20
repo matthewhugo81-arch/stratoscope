@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {gzipSync} from 'node:zlib';
 import {createHash} from 'node:crypto';
 import ts from 'typescript';
-async function load(name){const s=await readFile(new URL(`../lib/${name}.ts`,import.meta.url),'utf8');return import('data:text/javascript;base64,'+Buffer.from(ts.transpileModule(s,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText).toString('base64'));}
+async function load(name){let s=await readFile(new URL(`../lib/${name}.ts`,import.meta.url),'utf8');if(s.includes("from './forecast-revision'")){const revision=await readFile(new URL('../lib/forecast-revision.ts',import.meta.url),'utf8');const url='data:text/javascript;base64,'+Buffer.from(ts.transpileModule(revision,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText).toString('base64');s=s.replace("from './forecast-revision'",`from '${url}'`);}return import('data:text/javascript;base64,'+Buffer.from(ts.transpileModule(s,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText).toString('base64'));}
 const {validateIconFrame,validateIconManifest,iconMeta,iconFrame}=await load('dwd');
 const {isModel,isCycle,MODELS}=await load('models');
 const run='2026-10-07T00:00:00.000Z',originalFetch=globalThis.fetch;
