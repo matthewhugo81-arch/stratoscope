@@ -16,4 +16,4 @@ export function memberCount(model:EnsembleModel){return model==='gefs'?31:51}
 export function isCycle(model:ModelId){return model==='gfs'||model==='ecmwf_direct'||model==='icon'||isEnsemble(model)}
 export function isModel(value:string):value is ModelId{return Object.hasOwn(MODELS,value)&&value!=='gfs_om'&&value!=='ecmwf'}
 export function supports(model:ModelId,level:number){return (MODELS[model].levels as readonly number[]).includes(level)}
-export type ForecastMeta={model:ModelId;run:string;maxHour:number;levels:readonly number[];step:number;runKind:'cycle'|'rolling';fetchedAt:string};
+export type ForecastMeta={model:ModelId;run:string;maxHour:number;levels:readonly number[];step:number;runKind:'cycle'|'rolling';fetchedAt:string;revision?:string};

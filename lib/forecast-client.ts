@@ -1,70 +1,91 @@
-import {forecastRequest,clearForecastMeta} from './forecast-transport';
+import {forecastRequest,forecastMeta,clearForecastMeta,forecastFrameRevision} from './forecast-transport';
 import type {Frame} from './grib';
-import {MODELS,isCycle,isEnsemble,memberCount,type ModelId} from './models';
+import {isCycle,isEnsemble,memberCount,type ModelId} from './models';
 import {frameZonalWind,type ZonalWind} from './zonal-wind';
 import {preparedPair,clearPreparedManifest} from './prepared-ensembles';
+import {clearIconManifest} from './dwd';
 import {sharedDownloads} from './shared-download';
 import {hasForecastStorage,readStoredForecast,writeStoredForecast,clearStoredForecast} from './forecast-storage';
-const frames=new Map<string,{at:number;frame:Frame}>(),statistics=new Map<string,{at:number;mean:Frame;spread:Frame}>();
-const downloads=sharedDownloads<Frame>();
-const summaryDownloads=sharedDownloads<ForecastResult>();
-export type ForecastResult={frame:Frame;pair?:{mean:Frame;spread:Frame}};
-type Sequence={model:ModelId;run:string;level:number;member:number;results:Map<string,{at:number;result:ForecastResult}>};
+import {createForecastMemory} from './forecast-memory';
+export type ForecastResult={frame:Frame;pair?:{mean:Frame;spread:Frame};revision?:string};
+const memory=createForecastMemory(),downloads=sharedDownloads<ForecastResult>();
+type Sequence={model:ModelId;run:string;level:number;member:number};
 let sequence:Sequence|undefined;
-const diagnostics=new Map<string,{at:number;value:ZonalWind}>();
+const diagnostics=new Map<string,{at:number;value:ZonalWind;revision?:string}>();
 const diagnosticKey=(model:ModelId,run:string,hour:number,member:number)=>`${model}/${run}/${hour}/${member}`;
-// Keep one complete selected sequence (at most 65 six-hour frames), without
-// pinning the raw ensemble members. Changing selection releases the old sequence.
+const frameKey=(model:ModelId,run:string,hour:number,level:number,member:number)=>`${model}/${run}/${level}/${hour}/${member}`;
+const lifetime=(model:ModelId)=>isCycle(model)?6*3600000:900000;
+function inSequence(frame:Frame,member:number){return !!sequence&&sequence.model===frame.model&&sequence.run===frame.run&&sequence.level===frame.level&&sequence.member===member;}
+// There is one decoded cache. The selected timeline shares its byte budget with
+// auxiliary diagnostics and other selections; it never pins a whole large run.
+function trimGeneral(){
+ let frames=0,pairs=0;
+ for(const [key,entry] of Array.from(memory.entries()).reverse()){
+  const member=Number(key.slice(key.lastIndexOf('/')+1));
+  if(inSequence(entry.result.frame,member))continue;
+  if(entry.result.pair?++pairs>6:++frames>24)memory.delete(key);
+ }
+}
 export function activateForecastSequence(model:ModelId,run:string,level:number,member:number){
  if(sequence?.model===model&&sequence.run===run&&sequence.level===level&&sequence.member===member)return;
- sequence={model,run,level,member,results:new Map()};diagnostics.clear();
+ sequence={model,run,level,member};diagnostics.clear();memory.focus('');trimGeneral();
 }
-function inSequence(model:ModelId,run:string,level:number,member:number){return sequence?.model===model&&sequence.run===run&&sequence.level===level&&sequence.member===member;}
+export function focusForecast(model:ModelId,run:string,hour:number,level:number,member:number){memory.focus(frameKey(model,run,hour,level,member));}
+export function forecastCacheUsage(){return {bytes:memory.bytes,maxBytes:memory.maxBytes,frames:memory.size};}
 function retain(model:ModelId,run:string,hour:number,level:number,member:number,result:ForecastResult,at:number){
- if(inSequence(model,run,level,member)&&hour>=0&&hour<=MODELS[model].maxHour&&hour%6===0)sequence!.results.set(String(hour),{at,result});
  if(level===10&&sequence?.model===model&&sequence.run===run&&sequence.member===member){
-  try{diagnostics.set(diagnosticKey(model,run,hour,member),{at,value:frameZonalWind(result.frame)});if(diagnostics.size>65)diagnostics.delete(diagnostics.keys().next().value!);}catch{/* The wind card reports incomplete diagnostics. */}
+  try{diagnostics.set(diagnosticKey(model,run,hour,member),{at,value:frameZonalWind(result.frame),revision:result.revision});if(diagnostics.size>65)diagnostics.delete(diagnostics.keys().next().value!);}catch{/* The wind card reports incomplete diagnostics. */}
  }
  return result;
 }
-const lifetime=(model:ModelId)=>isCycle(model)?6*3600000:900000;
-function cached<T extends {at:number}>(cache:Map<string,T>,key:string,model:ModelId){const hit=cache.get(key);if(!hit)return;if(Date.now()-hit.at>=lifetime(model)){cache.delete(key);return;}cache.delete(key);cache.set(key,hit);return hit;}
-export function clearForecastCache(model:ModelId){downloads.clear(model+'/');summaryDownloads.clear(model+'/');clearPreparedManifest(model);clearForecastMeta(model);void clearStoredForecast(model);for(const cache of [frames,statistics,diagnostics])for(const key of cache.keys())if(key.startsWith(model+'/'))cache.delete(key);if(sequence?.model===model)sequence.results.clear();}
-export function peekForecastZonal(model:ModelId,run:string,hour:number,member:number){return cached(diagnostics,diagnosticKey(model,run,hour,member),model)?.value;}
+function cacheResult(model:ModelId,run:string,hour:number,level:number,member:number,result:ForecastResult){
+ const at=Date.now();memory.set(frameKey(model,run,hour,level,member),result,at);trimGeneral();return retain(model,run,hour,level,member,result,at);
+}
+export function clearForecastCache(model:ModelId){downloads.clear(model+'/');clearPreparedManifest(model);if(model==='icon')clearIconManifest();clearForecastMeta(model);void clearStoredForecast(model);for(const key of memory.keys())if(key.startsWith(model+'/'))memory.delete(key);for(const key of diagnostics.keys())if(key.startsWith(model+'/'))diagnostics.delete(key);}
+export function peekForecastZonal(model:ModelId,run:string,hour:number,member:number){
+ const key=diagnosticKey(model,run,hour,member),hit=diagnostics.get(key);
+ if(hit&&(Date.now()-hit.at>=lifetime(model)||hit.revision!==forecastFrameRevision(model,run,hour,10,member))){diagnostics.delete(key);return;}
+ return hit?.value;
+}
 export function peekForecast(model:ModelId,run:string,hour:number,level:number,member:number):ForecastResult|undefined{
- if(inSequence(model,run,level,member)){const held=cached(sequence!.results,String(hour),model);if(held)return held.result;}
- const id=`${model}/${run}/${level}/${hour}`;
- if(isEnsemble(model)&&member<0){const pair=cached(statistics,id,model);return pair?retain(model,run,hour,level,member,{frame:pair.mean,pair},pair.at):undefined;}
- const hit=cached(frames,`${id}/${member}`,model);return hit?retain(model,run,hour,level,member,{frame:hit.frame},hit.at):undefined;
+ if((model==='icon'||isEnsemble(model)&&member<0)&&!forecastFrameRevision(model,run,hour,level,member))return;
+ const key=frameKey(model,run,hour,level,member),hit=memory.peek(key);
+ if(hit&&(Date.now()-hit.at>=lifetime(model)||hit.result.revision!==forecastFrameRevision(model,run,hour,level,member))){memory.delete(key);return;}
+ return hit?.result;
 }
 export class ForecastError extends Error{constructor(message:string,public retryAfter?:number){super(message)}}
 export async function loadForecast(model:ModelId,run:string,hour:number,level:number,member:number,signal:AbortSignal,progress:(count:number)=>void):Promise<ForecastResult>{
- signal.throwIfAborted();const ready=peekForecast(model,run,hour,level,member);if(ready)return ready;
- const id=`${model}/${run}/${level}/${hour}`;
- async function one(m:number){
-  signal.throwIfAborted();const k=`${id}/${m}`,hit=cached(frames,k,model);if(hit)return hit.frame;
-  return downloads.get(k,signal,async downloadSignal=>{
-  if(isCycle(model)&&hasForecastStorage()){
-   const stored=await readStoredForecast(model,run,hour,level,m);downloadSignal.throwIfAborted();
-   if(stored){frames.set(k,{at:Date.now(),frame:stored.frame});if(frames.size>24)frames.delete(frames.keys().next().value!);return stored.frame;}
-  }
-  const j=await forecastRequest(`model=${model}&run=${encodeURIComponent(run)}&hour=${hour}&level=${level}&member=${Math.max(0,m)}&diagnostics=u60-v1`,AbortSignal.any([downloadSignal,AbortSignal.timeout(180000)])) as Frame;downloadSignal.throwIfAborted();
-  if(j.model!==model||j.run!==run||j.hour!==hour||j.level!==level)throw Error('Received a different forecast than requested');
-  frames.set(k,{at:Date.now(),frame:j});if(frames.size>24)frames.delete(frames.keys().next().value!);
-  if(isCycle(model)&&hasForecastStorage())await writeStoredForecast(model,run,hour,level,m,{frame:j});return j;
-  });
+ signal.throwIfAborted();
+ // Callers other than the main page may not have loaded metadata. Verify a
+ // prepared identity before consulting even a legacy persisted cache entry.
+ if((model==='icon'||isEnsemble(model)&&member<0)&&!forecastFrameRevision(model,run,hour,level,member)){
+  await forecastMeta(model,signal);signal.throwIfAborted();
+  if(!forecastFrameRevision(model,run,hour,level,member))throw new ForecastError('This prepared run is no longer advertised. Refresh for the latest complete run.');
  }
- if(!isEnsemble(model)||member>=0){const frame=await one(member);signal.throwIfAborted();return retain(model,run,hour,level,member,{frame},Date.now());}
- // Exactly one compact prepared file, never a silent fan-out to 31/51 members.
- const result=await summaryDownloads.get(id,signal,async downloadSignal=>{
-  if(hasForecastStorage()){
-   const stored=await readStoredForecast(model,run,hour,level,-1);downloadSignal.throwIfAborted();
-   if(stored?.pair){statistics.set(id,{at:Date.now(),...stored.pair});if(statistics.size>6)statistics.delete(statistics.keys().next().value!);return retain(model,run,hour,level,member,stored,Date.now());}
+ const key=frameKey(model,run,hour,level,member),ready=peekForecast(model,run,hour,level,member);
+ if(ready){const hit=memory.get(key)!;return retain(model,run,hour,level,member,ready,hit.at);}
+ const revision=forecastFrameRevision(model,run,hour,level,member);
+ const assertCurrent=()=>{if(revision!==forecastFrameRevision(model,run,hour,level,member))throw new ForecastError('The forecast publication changed during download. Please retry.');};
+ // Content identity also separates in-flight downloads. An old same-cycle
+ // preparation cannot satisfy a subscriber to its corrected replacement.
+ const result=await downloads.get(`${key}/${revision??'direct'}`,signal,async downloadSignal=>{
+  const summary=isEnsemble(model)&&member<0;
+  if(isCycle(model)&&hasForecastStorage()){
+   const stored=await readStoredForecast(model,run,hour,level,member,revision);downloadSignal.throwIfAborted();assertCurrent();
+   if(stored&&(!summary||stored.pair))return cacheResult(model,run,hour,level,member,stored);
   }
-  const pair=await preparedPair(model,run,hour,level,AbortSignal.any([downloadSignal,AbortSignal.timeout(30000)]));downloadSignal.throwIfAborted();
-  statistics.set(id,{at:Date.now(),...pair});if(statistics.size>6)statistics.delete(statistics.keys().next().value!);
-  if(hasForecastStorage())await writeStoredForecast(model,run,hour,level,-1,{frame:pair.mean,pair});
-  return retain(model,run,hour,level,member,{frame:pair.mean,pair},Date.now());
+  let result:ForecastResult;
+  if(summary){
+   // Exactly one compact prepared file, never a silent fan-out to members.
+   const pair=await preparedPair(model,run,hour,level,AbortSignal.any([downloadSignal,AbortSignal.timeout(30000)]));result={frame:pair.mean,pair,revision};
+  }else{
+   const frame=await forecastRequest(`model=${model}&run=${encodeURIComponent(run)}&hour=${hour}&level=${level}&member=${Math.max(0,member)}&diagnostics=u60-v1`,AbortSignal.any([downloadSignal,AbortSignal.timeout(180000)])) as Frame;
+   if(frame.model!==model||frame.run!==run||frame.hour!==hour||frame.level!==level)throw Error('Received a different forecast than requested');
+   result={frame,revision};
+  }
+  downloadSignal.throwIfAborted();assertCurrent();
+  if(isCycle(model)&&hasForecastStorage())await writeStoredForecast(model,run,hour,level,member,result);
+  downloadSignal.throwIfAborted();assertCurrent();return cacheResult(model,run,hour,level,member,result);
  });
- progress(memberCount(model));return result;
+ signal.throwIfAborted();assertCurrent();if(isEnsemble(model)&&member<0)progress(memberCount(model));return result;
 }

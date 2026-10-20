@@ -28,5 +28,7 @@ export function pipelineNotice(report:PipelineReport,feed:PipelineFeed,run:strin
   return {kind:'warning',text:`Waiting for ${stamp(feed.sourcePendingRun)} UTC at the provider · required source files were not yet available at the last check · showing ${stamp(run)} UTC.`};
  }
  if(feed.status!=='current'&&feed.status!=='direct')return {kind:'warning',text:'Model update not yet verified · showing the last complete run.'};
+ if(!Number.isFinite(displayed)||!published||!Number.isFinite(Date.parse(published)))return {kind:'warning',text:'Displayed run has not yet been verified by the source check.'};
+ if(displayed>Date.parse(published))return {kind:'warning',text:`Showing newer run ${stamp(run)} UTC · source check last verified ${stamp(published)} UTC; awaiting the next check.`};
  return {kind:'current',text:`Latest complete source run · checked ${stamp(report.checkedAt)} UTC`};
 }

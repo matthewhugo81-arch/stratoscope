@@ -1,4 +1,5 @@
 import {gzipSync} from 'node:zlib';
+import {createHash} from 'node:crypto';
 export const run='2026-10-07T00:00:00.000Z';
 // Deliberately different mean scalar speed (20) and vector-mean speed (5).
 export function preparedFixture(model='ifs_ens',hour=0,level=10,override={}){
@@ -12,8 +13,20 @@ export function preparedFixture(model='ifs_ens',hour=0,level=10,override={}){
  }
  return {bytes,packed:gzipSync(bytes),header};
 }
+const catalogues=new Map(),packedFiles=new Map();
+export function preparedCatalogue(model){
+ if(catalogues.has(model))return catalogues.get(model);
+ const levels=model==='gefs'?[10,20,30,50,70,100]:[10,50,100],maxHour=model==='gefs'?384:360,files={};
+ for(const level of levels)for(let hour=0;hour<=maxHour;hour+=6){
+  const packed=preparedFixture(model,hour,level).packed;packedFiles.set(`${model}/${level}/${hour}`,packed);
+  files[`${level}/${hour}`]={path:`2026100700/${level}/${hour}.bin.gz`,bytes:packed.length,sha256:createHash('sha256').update(packed).digest('hex')};
+ }
+ const catalogue={version:1,model,run,maxHour,step:6,count:model==='gefs'?31:51,levels,complete:true,preparedAt:'2026-10-07T10:00:00Z',files};catalogues.set(model,catalogue);return catalogue;
+}
 export function preparedResponse(url){
+ const latest=String(url).match(/forecast-data-(gefs|ifs-ens|aifs-ens)\/latest\.json/);
+ if(latest)return Response.json(preparedCatalogue(latest[1].replaceAll('-','_')));
  const match=String(url).match(/forecast-data-(gefs|ifs-ens|aifs-ens)\/\d{10}\/(\d+)\/(\d+)\.bin\.gz/);
  if(!match)throw Error('Unexpected request: '+url);
- return new Response(preparedFixture(match[1].replaceAll('-','_'),Number(match[3]),Number(match[2])).packed);
+ const model=match[1].replaceAll('-','_');return new Response(packedFiles.get(`${model}/${match[2]}/${match[3]}`)??preparedFixture(model,Number(match[3]),Number(match[2])).packed);
 }

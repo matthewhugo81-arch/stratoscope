@@ -1,4 +1,4 @@
-import {noaaFile,noaaIndex,noaaFields,northField} from './noaa-open-data';
+import {noaaFile,noaaIndex,noaaFields,northField,NoaaRunUnavailable} from './noaa-open-data';
 import {type Frame} from './grib';
 import {zonalMeanAt60} from './zonal-wind';
 export const LEVELS=[100,70,50,30,20,10];
@@ -8,8 +8,9 @@ export async function latestRun(){
  if(latest&&Date.now()-latest.at<900000)return latest.run;
  const base=Math.floor((Date.now())/(6*3600000))*6*3600000;
  for(let back=0;back<5;back++){
-  const run=new Date(base-back*6*3600000).toISOString(),day=run.slice(0,10).replaceAll('-',''),cycle=run.slice(11,13);
-  try{const entries=await noaaIndex(noaaFile('gfs',run,240,10));if(LEVELS.every(level=>['TMP','HGT','UGRD','VGRD'].every(field=>entries.some(p=>p[3]===field&&p[4]===`${level} mb`)))){latest={at:Date.now(),run};return run;}}catch{}
+  const run=new Date(base-back*6*3600000).toISOString();
+  try{const entries=await noaaIndex(noaaFile('gfs',run,240,10));if(LEVELS.every(level=>['TMP','HGT','UGRD','VGRD'].every(field=>entries.some(p=>p[3]===field&&p[4]===`${level} mb`)))){latest={at:Date.now(),run};return run;}}
+  catch(error){if(!(error instanceof NoaaRunUnavailable))throw error;}
  }
  throw Error('NOAA is not returning a complete GFS run. Please try again shortly.');
 }

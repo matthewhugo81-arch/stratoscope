@@ -8,10 +8,10 @@ import {isEnsemble,memberCount,supports,type ModelId} from '@/lib/models';
 import {loadForecast,peekForecast,peekForecastZonal} from '@/lib/forecast-client';
 import {frameZonalWind,matchesZonalFrame,windDisplay} from '@/lib/zonal-wind';
 
-type Props={model:ModelId;run:string;hour:number;member:number;mapLevel:number;mapFrame:Frame|null;mapBusy:boolean;mapError:string;mapProgress:number;refresh:number;onReady?:(key:string)=>void};
-export function ZonalWindCard({model,run,hour,member,mapLevel,mapFrame,mapBusy,mapError,mapProgress,refresh,onReady}:Props){
+type Props={model:ModelId;run:string;hour:number;member:number;mapLevel:number;mapFrame:Frame|null;mapBusy:boolean;mapError:string;mapProgress:number;refresh:number;revision?:string;onReady?:(key:string)=>void};
+export function ZonalWindCard({model,run,hour,member,mapLevel,mapFrame,mapBusy,mapError,mapProgress,refresh,revision,onReady}:Props){
  const [loaded,setLoaded]=useState<{key:string;frame:Frame}|null>(null),[failure,setFailure]=useState<{key:string;message:string}|null>(null),[progress,setProgress]=useState(0),[attempt,setAttempt]=useState(0);
- const available=supports(model,10),ensemble=isEnsemble(model),key=`${model}/${run}/${hour}/${member}/${refresh}`;
+ const available=supports(model,10),ensemble=isEnsemble(model),key=`${model}/${run}/${hour}/${member}/${refresh}/${revision??''}`;
  const direct=matchesZonalFrame(mapFrame,model,run,hour,member)?mapFrame:null;
  const candidate=direct??(loaded?.key===key&&matchesZonalFrame(loaded.frame,model,run,hour,member)?loaded.frame:null);
  useEffect(()=>{

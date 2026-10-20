@@ -5,6 +5,20 @@ import ts from 'typescript';
 const source=await readFile(new URL('../lib/forecast-preload.ts',import.meta.url),'utf8');
 const {preloadTimeline}=await import('data:text/javascript;base64,'+Buffer.from(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText).toString('base64'));
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
+test('a moving preload window stops after nearby frames and follows later navigation',async()=>{
+ let selected={hour:0,direction:1,paused:false};
+ const s=setup({windowFrames:8,selection:()=>selected});
+ try{
+  await tick();while(s.ready.size<8){for(const finish of [...s.jobs.values()])finish();await tick();}
+  await tick();assert.deepEqual(s.calls,[0,6,12,18,24,30,36,42]);assert.equal(s.busy.at(-1),false);
+  selected={hour:120,direction:-1,paused:false};await new Promise(resolve=>setTimeout(resolve,300));
+  assert.deepEqual(s.calls.slice(8),[120,114,108,102]);
+  while(s.jobs.size){for(const finish of [...s.jobs.values()])finish();await tick();}
+  assert.deepEqual(s.calls.slice(8),[120,114,108,102,96,90,84,78]);
+  s.ready.delete(0);await new Promise(resolve=>setTimeout(resolve,300));
+  assert.equal(s.calls.length,16,'evicted distant times must not be downloaded again by an idle window');
+ }finally{s.stop();s.c.abort();}
+});
 function setup(overrides={}){
  const c=new AbortController(),ready=new Set(),jobs=new Map(),calls=[],busy=[];
  const options={maxHour:360,concurrency:4,signal:c.signal,selection:()=>({hour:204,direction:1,paused:false}),hasFrame:h=>ready.has(h),

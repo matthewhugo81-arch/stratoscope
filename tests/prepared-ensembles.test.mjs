@@ -6,7 +6,7 @@ import ts from 'typescript';
 import {preparedFixture,run} from './prepared-fixture.mjs';
 async function moduleUrl(name){
  let source=await readFile(new URL(`../lib/${name}.ts`,import.meta.url),'utf8');
- if(name!=='models')source=source.replace("from './models'",`from '${await moduleUrl('models')}'`);
+ for(const dependency of ['models','forecast-revision'])if(source.includes(`from './${dependency}'`))source=source.replace(`from './${dependency}'`,`from '${await moduleUrl(dependency)}'`);
  return 'data:text/javascript;base64,'+Buffer.from(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText).toString('base64');
 }
 const {decodePrepared,preparedMeta,preparedPair,clearPreparedManifest}=await import(await moduleUrl('prepared-ensembles'));
