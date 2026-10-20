@@ -22,6 +22,7 @@ function correction(){
  const f=preparedFixture('ifs_ens',0,10,{preparedAt:'2026-10-07T11:00:00Z',zonalWind60N:{value:-8,samples:1440,longitudeStep:.25,basis:'native'}});
  f.bytes.writeInt32LE(-5000,12+f.bytes.readUInt32LE(8));return gzipSync(f.bytes);
 }
+function iconFixture(){return {model:'icon',run,hour:0,level:30,valid:run,grid:{nx:360,ny:91,lat0:90,lon0:0,dx:1,dy:-1},source:'https://opendata.dwd.de/weather/nwp/icon/grib',runKind:'cycle',preparedAt:run,temperature:Array(32760).fill(-55),height:Array(32760).fill(23000),u:Array(32760).fill(-8),v:Array(32760).fill(3)};}
 afterEach(async()=>{globalThis.fetch=original;for(const model of ['ifs_ens','icon']){client.clearForecastCache(model);clearPreparedManifest(model);await storage.clearStoredForecast(model);}});
 test('same-cycle corrected content replaces memory, wind and IndexedDB results after a catalogue refresh',async()=>{
  const first=preparedFixture().packed,corrected=correction(),blobs=new Map([[sha(first),first],[sha(corrected),corrected]]);let current=catalogue(first),downloads=0;
@@ -67,10 +68,22 @@ test('a late old-revision download cannot overwrite or satisfy the corrected pub
  const fresh=await import(await moduleUrl('forecast-client','after late write'));assert.equal((await load(fresh)).frame.temperature[0],-50);
 });
 test('same-cycle ICON content corrections also invalidate the decoded and persisted identity',async()=>{
- const frame={model:'icon',run,hour:0,level:30,valid:run,grid:{nx:360,ny:91,lat0:90,lon0:0,dx:1,dy:-1},source:'https://opendata.dwd.de/weather/nwp/icon/grib',runKind:'cycle',preparedAt:run,temperature:Array(32760).fill(-55),height:Array(32760).fill(23000),u:Array(32760).fill(-8),v:Array(32760).fill(3)};
+ const frame=iconFixture();
  const old=gzipSync(JSON.stringify(frame)),corrected=gzipSync(JSON.stringify({...frame,temperature:Array(32760).fill(-50)}));let current=catalogue(old,{model:'icon'}),downloads=0;
  globalThis.fetch=async url=>{const u=new URL(url);if(u.pathname.endsWith('latest.json'))return Response.json(current);downloads++;return new Response(u.searchParams.get('sha')===sha(old)?old:corrected)};
  const before=await iconMeta(signal());assert.equal((await load(client,'icon',30)).frame.temperature[0],-55);
  current=catalogue(corrected,{model:'icon'});assert.notEqual((await iconMeta(signal())).revision,before.revision);assert.equal(client.peekForecast('icon',run,0,30,-1),undefined);
  const fresh=await import(await moduleUrl('forecast-client','icon reload'));assert.equal((await load(fresh,'icon',30)).frame.temperature[0],-50);assert.equal(downloads,2);
+});
+for(const model of ['ifs_ens','icon'])test(`${model} keeps the displayed verified frame when a stale catalogue arrives`,async()=>{
+ const packed=model==='icon'?gzipSync(JSON.stringify(iconFixture())):preparedFixture().packed,level=model==='icon'?30:10;
+ const latest=catalogue(packed,{model,preparedAt:'2026-10-07T11:00:00Z'});let current=latest;
+ globalThis.fetch=async url=>new URL(url).pathname.endsWith('latest.json')?Response.json(current):new Response(packed);
+ const meta=()=>model==='icon'?iconMeta(signal()):preparedMeta(model,signal());
+ await meta();const displayed=await load(client,model,level);
+ const olderRun=model==='icon'?'2026-10-06T12:00:00.000Z':'2026-10-06T18:00:00.000Z',runKey=olderRun.slice(0,10).replaceAll('-','')+olderRun.slice(11,13);
+ current={...latest,run:olderRun,files:Object.fromEntries(Object.entries(latest.files).map(([key,file])=>[key,{...file,path:file.path.replace('2026100700',runKey)}]))};
+ await assert.rejects(meta(),/older forecast catalogue/);assert.equal(client.peekForecast(model,run,0,level,-1),displayed);
+ current={...latest,preparedAt:'2026-10-07T10:00:00Z'};
+ await assert.rejects(meta(),/older forecast catalogue/);assert.equal(await load(client,model,level),displayed);
 });

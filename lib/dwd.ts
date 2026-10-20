@@ -1,6 +1,6 @@
 import type {Frame} from './grib';
 import type {ForecastMeta} from './models';
-import {publicationRevision} from './forecast-revision';
+import {publicationRevision,assertPublicationProgress} from './forecast-revision';
 const ROOT='https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/forecast-data-icon/';
 const SOURCE='https://opendata.dwd.de/weather/nwp/icon/grib';
 const LEVELS=[30,50,70,100];
@@ -17,7 +17,7 @@ export function validateIconManifest(m:Manifest){
 export async function iconMeta(signal:AbortSignal):Promise<ForecastMeta>{
  const response=await fetch(ROOT+'latest.json?check='+Date.now(),{signal,cache:'no-cache'});
  if(!response.ok)throw Error('Prepared DWD ICON maps are unavailable. Please retry shortly.');
- const next=validateIconManifest(await response.json()),revision=await publicationRevision(next.files);signal.throwIfAborted();manifest=next;
+ const next=validateIconManifest(await response.json()),revision=await publicationRevision(next.files);signal.throwIfAborted();assertPublicationProgress(manifest,next);manifest=next;
  return {model:'icon',run:next.run,maxHour:180,levels:LEVELS,step:6,runKind:'cycle',fetchedAt:next.preparedAt,revision};
 }
 export function validateIconFrame(f:Frame,run:string,hour:number,level:number){

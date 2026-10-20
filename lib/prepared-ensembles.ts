@@ -1,6 +1,6 @@
 import type {Frame} from './grib';
 import {MODELS,memberCount,type EnsembleModel,type ForecastMeta} from './models';
-import {publicationRevision} from './forecast-revision';
+import {publicationRevision,assertPublicationProgress} from './forecast-revision';
 
 const root=(model:EnsembleModel)=>`https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/forecast-data-${model.replaceAll('_','-')}/`;
 type Manifest={version:number;model:EnsembleModel;run:string;maxHour:number;levels:number[];step:number;count:number;complete:boolean;preparedAt:string;files:Record<string,{path:string;bytes:number;sha256:string}>};
@@ -14,7 +14,7 @@ export async function preparedMeta(model:EnsembleModel,signal:AbortSignal):Promi
  if(m.version!==1||m.model!==model||!m.complete||m.count!==memberCount(model)||m.maxHour!==MODELS[model].maxHour||m.step!==6||!/^\d{4}-\d{2}-\d{2}T(00|06|12|18):00:00\.000Z$/.test(m.run)||!Number.isFinite(Date.parse(m.run))||!Number.isFinite(Date.parse(m.preparedAt))||JSON.stringify(m.levels)!==JSON.stringify(MODELS[model].levels))throw Error('The prepared ensemble catalogue is incomplete. Please retry later.');
  const runKey=m.run.slice(0,10).replaceAll('-','')+m.run.slice(11,13);
  for(const level of m.levels)for(let hour=0;hour<=m.maxHour;hour+=6){const file=m.files?.[`${level}/${hour}`];if(!file||file.path!==`${runKey}/${level}/${hour}.bin.gz`||!Number.isInteger(file.bytes)||file.bytes<=0||file.bytes>2000000||!/^[a-f0-9]{64}$/.test(file.sha256))throw Error('The prepared ensemble catalogue has missing frames.');}
- const revision=await publicationRevision(m.files);signal.throwIfAborted();manifests.set(model,m);
+ const revision=await publicationRevision(m.files);signal.throwIfAborted();assertPublicationProgress(manifests.get(model),m);manifests.set(model,m);
  return {model,run:m.run,maxHour:m.maxHour,levels:m.levels,step:6,runKind:'cycle',fetchedAt:m.preparedAt,revision};
 }
 
