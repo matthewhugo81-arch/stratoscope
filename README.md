@@ -213,7 +213,7 @@ The wind-outlook selector includes ECMWF EC46, loaded directly from the official
 
 ### Northern forecast diagnostics
 
-The expandable northern diagnostics compare complete GEFS, IFS ENS and AIFS ENS 10 hPa forecasts in two native charts: signed zonal-mean u wind at 60°N and area-weighted temperature over 60–90°N. Wind retains the native longitude-circle diagnostic; temperature uses spherical latitude-band weights on the stored 2° member overview grid (including clipped boundary cells). It is explicitly a forecast-only view with labelled initialization times, not a historical analysis. Individual member curves and a zero-wind reference are available.
+The expandable northern diagnostics compare complete GEFS, IFS ENS and AIFS ENS 10 hPa forecasts in two native charts: signed zonal-mean u wind at 60°N and area-weighted temperature over 60–90°N. Wind retains the native longitude-circle diagnostic; temperature uses spherical latitude-band weights on the stored 2° member overview grid (including clipped boundary cells). Forecast initialization times are labelled. Both charts include a dashed white calendar-day long-term mean from NASA Ozone Watch’s published 1978/79–2025/26 MERRA2 climatology, with normal values and forecast departures at the selected time. Individual member curves and a zero-wind reference are available.
 
 `scripts/prepare-diagnostics.py` verifies and reuses already published member panels; it submits no model-member or CDS requests. Complete compact series are saved on `forecast-data-diagnostics`, one small JSON per model. The public standard-runner workflow checks hourly and after ensemble preparation, skips unchanged inputs and refuses partial ensembles/timelines. It uses no paid API or Actions artifact storage.
 
@@ -298,3 +298,23 @@ an open desktop session. GitHub scheduling, raw-file cache propagation and
 upstream availability can still delay publication; this is automatic recovery,
 not a guaranteed delivery deadline. The native GitHub failure status remains
 the alert path for unresolved outages.
+
+### Northern diagnostic climatology
+
+Both 10 hPa comparison charts bundle the published NASA Ozone Watch **Mean**
+column for 60°N zonal wind and 60–90°N polar-cap temperature. The source labels
+the period **1978/1979 to 2025/2026**. It is independent of the seasonal ERA5
+reference and is not a 1991–2020 normal. Temperature is converted from K to °C.
+No current-year Data or Fcst column is used. Historical reanalysis and forecast
+grids differ; displayed departures are not model-bias corrected.
+
+Source snapshots are archived in `scripts/data/northern-climate/`; source URLs
+and SHA-256 hashes are in `lib/diagnostic-climate.json`. Regenerate offline with
+`python scripts/prepare-diagnostic-climate.py`. The extractor checks variable,
+pressure, units, period, column identity, finite bounds and all 365 calendar days.
+The chart interpolates daily normals between UTC midnights, handles December–
+January wraparound and uses the adjacent-day mean on 29 February. Its axes
+include the reference even when model curves are hidden. Saved images include
+the line and its attribution. No recurring downloads or new services are needed.
+
+Credit: [NASA Ozone Watch](https://ozonewatch.gsfc.nasa.gov/meteorology/).
