@@ -1,0 +1,2 @@
+# Preserve archived source bytes for reproducible SHA-256 verification on Windows.
+scripts/data/northern-climate/*.txt -text
