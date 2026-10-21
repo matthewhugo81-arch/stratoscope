@@ -135,3 +135,11 @@ test('retained sequences obey expiry and cannot be filled by an abandoned select
   assert.equal(peekForecast('ecmwf_direct',run,6,50,-1),undefined);
  }finally{Date.now=now;}
 });
+test('a long ensemble timeline does not pin more than the decoded sequence budget',async()=>{
+ let calls=0;globalThis.fetch=async url=>{calls++;return preparedResponse(url);};
+ activateForecastSequence('ifs_ens',run,10,-1);
+ for(let hour=0;hour<=138;hour+=6)await request(hour,controller().signal,'ifs_ens');
+ const retained=Array.from({length:24},(_,i)=>i*6).filter(hour=>peekForecast('ifs_ens',run,hour,10,-1));
+ assert.ok(retained.length<=18,`${retained.length} decoded ensemble pairs retained`);
+ assert.ok(retained.includes(138));assert.equal(calls,24);
+});

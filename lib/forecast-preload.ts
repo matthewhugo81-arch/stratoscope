@@ -1,4 +1,4 @@
-type Selection={hour:number;direction:number;paused:boolean};
+type Selection={hour:number;direction:number;paused:boolean;windowFrames?:number};
 type Options={
  maxHour:number;concurrency:number;signal:AbortSignal;
  selection:()=>Selection;hasFrame:(hour:number)=>boolean;load:(hour:number)=>Promise<unknown>;
@@ -18,7 +18,8 @@ export function preloadTimeline(options:Options){
   if(stopped||signal.aborted)return;
   const current=selection();
   if(current.paused){onBusy(active.size>0);schedule(100);return;}
-  const hours=Array.from({length:maxHour/6+1},(_,i)=>i*6).filter(h=>!hasFrame(h)&&!active.has(h));
+  const nearby=(h:number)=>current.windowFrames===undefined||Math.abs(h-current.hour)<=12||(current.direction*(h-current.hour)+maxHour+6)%(maxHour+6)<=current.windowFrames*6;
+  const hours=Array.from({length:maxHour/6+1},(_,i)=>i*6).filter(h=>nearby(h)&&!hasFrame(h)&&!active.has(h));
   const distance=(h:number)=>(current.direction*(h-current.hour)+maxHour+6)%(maxHour+6);
   hours.sort((a,b)=>distance(a)-distance(b));
   let retryAt=Infinity;
@@ -37,6 +38,7 @@ export function preloadTimeline(options:Options){
   }
   onBusy(active.size>0);
   if(active.size===0&&Number.isFinite(retryAt))schedule(Math.max(0,retryAt-Date.now()));
+  else if(active.size===0&&current.windowFrames!==undefined)schedule(250);
  }
  signal.addEventListener('abort',stop,{once:true});
  pump();

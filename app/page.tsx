@@ -66,21 +66,21 @@ export default function Home(){
   const cached=peekForecast(model,run,hour,level,selectionMember);
   if(cached)apply(cached);else void loadForecast(model,run,hour,level,selectionMember,c.signal,n=>{if(!c.signal.aborted)setProgress(n)}).then(apply).catch(e=>{if(!c.signal.aborted){if(e.retryAfter)setRetryAt(Date.now()+e.retryAfter*1000);setError(e.name==='TimeoutError'?'The model download took too long. Please retry.':e.message);setLoading(false)}});
   return()=>c.abort();
- },[run,model,hour,level,selectionMember,refresh,attempt]);
+ },[run,meta?.revision,model,hour,level,selectionMember,refresh,attempt]);
  useEffect(()=>{
   if(!run||!cyclic||!supports(model,level))return;
   const c=new AbortController();
   const stop=preloadTimeline({maxHour,signal:c.signal,concurrency:prepared||model==='icon'?4:1,
    selection:()=>{
     const connection=(navigator as Navigator & {connection?:{saveData?:boolean;effectiveType?:string}}).connection;
-    return {hour:preloadSelection.current.hour,direction:direction.current,paused:document.visibilityState!=='visible'||!!connection?.saveData||!!connection?.effectiveType?.includes('2g')||preloadSelection.current.loading};
+    return {hour:preloadSelection.current.hour,direction:direction.current,windowFrames:6,paused:document.visibilityState!=='visible'||!!connection?.saveData||!!connection?.effectiveType?.includes('2g')||preloadSelection.current.loading};
    },
    hasFrame:h=>!!peekForecast(model,run,h,level,selectionMember),
    load:h=>loadForecast(model,run,h,level,selectionMember,c.signal,()=>{}),
    onProgress:()=>setCacheVersion(v=>v+1),onBusy:setBackgroundLoading,
   });
   return()=>{stop();c.abort()};
- },[run,model,level,selectionMember,refresh,attempt,cyclic,maxHour,prepared]);
+ },[run,meta?.revision,model,level,selectionMember,refresh,attempt,cyclic,maxHour,prepared]);
  useEffect(()=>{
   const step=(e:KeyboardEvent)=>{
    if(e.defaultPrevented||e.altKey||e.ctrlKey||e.metaKey||e.shiftKey||!['ArrowLeft','ArrowRight'].includes(e.key))return;

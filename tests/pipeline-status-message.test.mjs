@@ -7,6 +7,11 @@ const {pipelineNotice}=await import('data:text/javascript;base64,'+Buffer.from(t
 const checkedAt='2026-10-10T21:38:00Z',run='2026-10-10T00:00:00Z',now=Date.parse(checkedAt);
 const report={version:1,checkedAt,models:[],scheduledIntervalHours:3};
 const current={model:'ifs_ens',publishedRun:run,availableRun:run,status:'current'};
+test('an older audit cannot certify a newly displayed run or missing cycle evidence',()=>{
+ const notice=pipelineNotice(report,current,'2026-10-10T12:00:00Z',now);
+ assert.equal(notice.kind,'warning');assert.match(notice.text,/awaiting an independent/);
+ assert.equal(pipelineNotice(report,{...current,publishedRun:undefined},run,now).kind,'warning');
+});
 test('three-hour checks are not falsely overdue after ninety minutes',()=>{
  for(const minutes of [0,91,179,180,210])assert.equal(pipelineNotice(report,current,run,now+minutes*60000).kind,'current');
 });

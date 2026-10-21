@@ -17,18 +17,18 @@ function database(){
 }
 export const hasForecastStorage=()=>!!globalThis.indexedDB;
 const key=(model:string,run:string,hour:number,level:number,member:number)=>`${model}/${run}/${level}/${hour}/${member}`;
-export async function readStoredForecast(model:string,run:string,hour:number,level:number,member:number):Promise<ForecastResult|undefined>{
+export async function readStoredForecast(model:string,run:string,hour:number,level:number,member:number,revision=''):Promise<ForecastResult|undefined>{
  try{const db=await database();if(!db)return;
   return await new Promise<ForecastResult|undefined>(resolve=>{
    const tx=db.transaction('frames','readonly'),r=tx.objectStore('frames').get(key(model,run,hour,level,member));
    r.onsuccess=()=>{const value=r.result?.value as ForecastResult|undefined;
     const f=value?.frame;
-    resolve(f?.model===model&&f.run===run&&f.hour===hour&&f.level===level?value:undefined)};
+    resolve(f?.model===model&&f.run===run&&f.hour===hour&&f.level===level&&(r.result?.revision??'')===revision?value:undefined)};
    r.onerror=()=>resolve(undefined);tx.onabort=()=>resolve(undefined);
   });
  }catch{return undefined}
 }
-export async function writeStoredForecast(model:string,run:string,hour:number,level:number,member:number,value:ForecastResult){
+export async function writeStoredForecast(model:string,run:string,hour:number,level:number,member:number,value:ForecastResult,revision=''){
  try{const db=await database();if(!db)return;
   await new Promise<void>(resolve=>{
    const tx=db.transaction(['runs','frames'],'readwrite'),runs=tx.objectStore('runs'),frames=tx.objectStore('frames'),r=runs.get(model);
@@ -42,7 +42,7 @@ export async function writeStoredForecast(model:string,run:string,hour:number,le
      cursor.onsuccess=()=>{const c=cursor.result;if(c){if(c.value.run!==run)c.delete();c.continue()}};
      runs.put(run,model);
     }
-    frames.put({key:key(model,run,hour,level,member),model,run,value});
+    frames.put({key:key(model,run,hour,level,member),model,run,value,revision});
    };
   });
  }catch{/* Denied storage or quota exhaustion never discards a usable download. */}

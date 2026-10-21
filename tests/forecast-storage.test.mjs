@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {indexedDB,IDBKeyRange} from 'fake-indexeddb';
 import ts from 'typescript';
-import {preparedResponse} from './prepared-fixture.mjs';
+import {preparedResponse,preparedFixture} from './prepared-fixture.mjs';
+import {createHash} from 'node:crypto';
+import {gzipSync} from 'node:zlib';
 globalThis.indexedDB=indexedDB;globalThis.IDBKeyRange=IDBKeyRange;
 async function moduleUrl(name,suffix=''){
  let source=await readFile(new URL(`../lib/${name}.ts`,import.meta.url),'utf8');
@@ -13,6 +15,7 @@ async function moduleUrl(name,suffix=''){
  return 'data:text/javascript;base64,'+Buffer.from(outputText+'\n// '+suffix).toString('base64');
 }
 const storage=await import(await moduleUrl('forecast-storage'));
+const {preparedMeta}=await import(await moduleUrl('prepared-ensembles'));
 const run='2026-10-07T00:00:00.000Z';
 const make=(model,run,hour)=>({model,run,hour,level:10,valid:new Date(Date.parse(run)+hour*3600000).toISOString(),grid:{nx:1,ny:1,lat0:60,lon0:0,dx:1,dy:-1},temperature:[-60],height:[31000],u:[12],v:[3]});
 test('a whole downloaded loop survives model switching and a fresh client instance',async()=>{
@@ -55,4 +58,26 @@ test('prepared ensemble mean and spread survive reload as a pair',async()=>{
   const restored=await fresh.loadForecast('ifs_ens',run,24,10,-1,new AbortController().signal,()=>{});
   assert.equal(calls,1);assert.deepEqual(restored.pair,first.pair);
  }finally{globalThis.fetch=original;await storage.clearStoredForecast('ifs_ens')}
+});
+test('same-cycle corrections replace only changed hashes in memory and after reload',async()=>{
+ const original=globalThis.fetch,fixtures=new Map([0,6].map(h=>[h,preparedFixture('ifs_ens',h)]));
+ const files={},levels=[10,50,100];
+ for(const level of levels)for(let h=0;h<=360;h+=6){const f=fixtures.get(h)??fixtures.get(0);files[`${level}/${h}`]={path:`2026100700/${level}/${h}.bin.gz`,bytes:f.packed.length,sha256:createHash('sha256').update(f.packed).digest('hex')};}
+ const manifest={version:1,model:'ifs_ens',run,maxHour:360,step:6,count:51,levels,complete:true,preparedAt:'2026-10-07T10:00:00Z',files};let downloads=0;
+ globalThis.fetch=async url=>{if(String(url).includes('latest.json'))return Response.json(manifest);downloads++;return new Response(fixtures.get(Number(new URL(url).pathname.match(/\/(\d+)\.bin\.gz/)[1])).packed)};
+ const load=(client,h)=>client.loadForecast('ifs_ens',run,h,10,-1,new AbortController().signal,()=>{});
+ try{
+  await storage.clearStoredForecast('ifs_ens');await preparedMeta('ifs_ens',new AbortController().signal);
+  const client=await import(await moduleUrl('forecast-client','correction'));
+  client.activateForecastSequence('ifs_ens',run,10,-1);
+  assert.equal((await load(client,0)).frame.temperature[0],-60);await load(client,6);
+  const f=fixtures.get(0);f.bytes.writeInt32LE(-5000,12+f.bytes.readUInt32LE(8));f.packed=gzipSync(f.bytes);
+  files['10/0']={...files['10/0'],bytes:f.packed.length,sha256:createHash('sha256').update(f.packed).digest('hex')};
+  await preparedMeta('ifs_ens',new AbortController().signal);
+  assert.equal(client.peekForecast('ifs_ens',run,0,10,-1),undefined);
+  assert.equal((await load(client,0)).frame.temperature[0],-50);await load(client,6);assert.equal(downloads,3);
+  const fresh=await import(await moduleUrl('forecast-client','correction-reload'));
+  assert.equal((await load(fresh,0)).frame.temperature[0],-50);await load(fresh,6);assert.equal(downloads,3);
+  await preparedMeta('ifs_ens',new AbortController().signal);await load(fresh,0);assert.equal(downloads,3);
+ }finally{globalThis.fetch=original;await storage.clearStoredForecast('ifs_ens');}
 });
