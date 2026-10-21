@@ -28,5 +28,6 @@ export function pipelineNotice(report:PipelineReport,feed:PipelineFeed,run:strin
   return {kind:'warning',text:`Waiting for ${stamp(feed.sourcePendingRun)} UTC at the provider · required source files were not yet available at the last check · showing ${stamp(run)} UTC.`};
  }
  if(feed.status!=='current'&&feed.status!=='direct')return {kind:'warning',text:'Model update not yet verified · showing the last complete run.'};
+ if(!Number.isFinite(displayed)||!published||Date.parse(published)!==displayed||!feed.availableRun||Date.parse(feed.availableRun)!==displayed)return {kind:'warning',text:`New publication awaiting an independent freshness check · last checked ${stamp(report.checkedAt)} UTC`};
  return {kind:'current',text:`Latest complete source run · checked ${stamp(report.checkedAt)} UTC`};
 }

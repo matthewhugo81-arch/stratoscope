@@ -5,6 +5,7 @@ const SOURCE='https://opendata.dwd.de/weather/nwp/icon/grib';
 const LEVELS=[30,50,70,100];
 type Manifest={version:number;model:string;run:string;maxHour:number;levels:number[];step:number;complete:boolean;preparedAt:string;files:Record<string,{path:string;bytes:number;sha256:string}>};
 let manifest:Manifest|undefined;
+export function iconIdentity(run:string,hour:number,level:number){return manifest?.run===run?manifest.files[`${level}/${hour}`]?.sha256??'':'';}
 export function validateIconManifest(m:Manifest){
  if(m.version!==1||m.model!=='icon'||!m.complete||m.maxHour!==180||m.step!==6||JSON.stringify(m.levels)!==JSON.stringify(LEVELS)||!/^\d{4}-\d{2}-\d{2}T(00|12):00:00\.000Z$/.test(m.run)||!Number.isFinite(Date.parse(m.run))||!Number.isFinite(Date.parse(m.preparedAt)))throw Error('The prepared DWD ICON catalogue is incomplete.');
  const key=m.run.slice(0,10).replaceAll('-','')+m.run.slice(11,13);
@@ -15,7 +16,7 @@ export async function iconMeta(signal:AbortSignal):Promise<ForecastMeta>{
  const response=await fetch(ROOT+'latest.json?check='+Date.now(),{signal,cache:'no-cache'});
  if(!response.ok)throw Error('Prepared DWD ICON maps are unavailable. Please retry shortly.');
  manifest=validateIconManifest(await response.json());
- return {model:'icon',run:manifest.run,maxHour:180,levels:LEVELS,step:6,runKind:'cycle',fetchedAt:manifest.preparedAt};
+ return {model:'icon',run:manifest.run,maxHour:180,levels:LEVELS,step:6,runKind:'cycle',fetchedAt:manifest.preparedAt,revision:JSON.stringify(manifest.files)};
 }
 export function validateIconFrame(f:Frame,run:string,hour:number,level:number){
  const g=f.grid;

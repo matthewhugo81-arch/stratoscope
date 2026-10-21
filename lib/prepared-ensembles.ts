@@ -4,6 +4,9 @@ import {MODELS,memberCount,type EnsembleModel,type ForecastMeta} from './models'
 const root=(model:EnsembleModel)=>`https://raw.githubusercontent.com/matthewhugo81-arch/stratoscope/forecast-data-${model.replaceAll('_','-')}/`;
 type Manifest={version:number;model:EnsembleModel;run:string;maxHour:number;levels:number[];step:number;count:number;complete:boolean;preparedAt:string;files:Record<string,{path:string;bytes:number;sha256:string}>};
 const manifests=new Map<EnsembleModel,Manifest>();
+export function preparedIdentity(model:EnsembleModel,run:string,hour:number,level:number){
+ const manifest=manifests.get(model);return manifest?.run===run?manifest.files[`${level}/${hour}`]?.sha256??'':'';
+}
 export function clearPreparedManifest(model:string){manifests.delete(model as EnsembleModel);}
 export async function preparedMeta(model:EnsembleModel,signal:AbortSignal):Promise<ForecastMeta>{
  const response=await fetch(root(model)+'latest.json?check='+Date.now(),{signal,cache:'no-cache'});
@@ -13,7 +16,7 @@ export async function preparedMeta(model:EnsembleModel,signal:AbortSignal):Promi
  const runKey=m.run.slice(0,10).replaceAll('-','')+m.run.slice(11,13);
  for(const level of m.levels)for(let hour=0;hour<=m.maxHour;hour+=6){const file=m.files?.[`${level}/${hour}`];if(!file||file.path!==`${runKey}/${level}/${hour}.bin.gz`||!Number.isInteger(file.bytes)||file.bytes<=0||file.bytes>2000000||!/^[a-f0-9]{64}$/.test(file.sha256))throw Error('The prepared ensemble catalogue has missing frames.');}
  manifests.set(model,m);
- return {model,run:m.run,maxHour:m.maxHour,levels:m.levels,step:6,runKind:'cycle',fetchedAt:m.preparedAt};
+ return {model,run:m.run,maxHour:m.maxHour,levels:m.levels,step:6,runKind:'cycle',fetchedAt:m.preparedAt,revision:JSON.stringify(m.files)};
 }
 
 export function decodePrepared(bytes:Uint8Array,model:EnsembleModel,run:string,hour:number,level:number){

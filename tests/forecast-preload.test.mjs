@@ -51,3 +51,14 @@ test('selection cancellation prevents late progress and any additional downloads
  for(const finish of [...s.jobs.values()])finish();await tick();
  assert.equal(s.calls.length,4);assert.equal(progress,0);assert.equal(s.busy.at(-1),false);
 });
+test('nearby preload window stays bounded and follows a later selection',async()=>{
+ let selected={hour:204,direction:1,paused:false,windowFrames:6};
+ const ready=new Set(),calls=[];
+ const s=setup({selection:()=>selected,hasFrame:h=>ready.has(h),load:async h=>{ready.add(h);calls.push(h);}});
+ try{
+  for(let i=0;i<10;i++)await tick();
+  assert.equal(calls.length,9);assert.ok(calls.every(h=>h>=192&&h<=240));
+  selected={...selected,hour:60};await new Promise(r=>setTimeout(r,280));
+  assert.ok(calls.includes(60));assert.ok(calls.length<=18);
+ }finally{s.stop();s.c.abort();}
+});
